@@ -15,9 +15,10 @@ REPO="${1:-sejaltech994/coaching-centre-fee-app}"
 # approve your own PR); raise it once there is a second reviewer.
 REVIEWS="${REVIEWS:-0}"
 
-# Required status checks: the job names in ci.yml and codeql.yml.
+# Required status checks: the job names in ci.yml and codeql.yml (E2E runs the
+# Playwright suite from the coaching-centre-fee-app-e2e repo).
 # sit, uat and main also need "Promotion source" from promotion-guard.yml.
-CHECKS='"Lint", "Typecheck", "Unit tests", "Build web", "Dependency review", "CodeQL"'
+CHECKS='"Lint", "Typecheck", "Unit tests", "Build web", "E2E", "Dependency review", "CodeQL"'
 
 echo "Repo: $REPO"
 

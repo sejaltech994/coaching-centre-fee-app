@@ -1,5 +1,7 @@
 # Quality gates for every change. Each job is a required status check on
 # develop, sit, uat and main, so a PR cannot merge unless all of them pass.
+# "E2E" runs the Playwright suite from sejaltech994/coaching-centre-fee-app-e2e
+# against this change's own API and web build.
 # deploy.yml calls this same workflow before it deploys anything.
 # See docs/ci-cd.md.
 name: CI
@@ -107,3 +109,84 @@ jobs:
         with:
           fail-on-severity: high
           deny-licenses: AGPL-3.0, GPL-3.0, SSPL-1.0
+
+  e2e:
+    name: E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Playwright's image ships the matching browser, so no slow system-package install.
+    # Keep the tag equal to @playwright/test in the e2e repo.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.0-noble
+      options: --ipc=host
+    env:
+      WEB_URL: http://localhost:3000
+      API_URL: http://localhost:8787/api/v1
+      OTP_LOG_FILE: /tmp/chukta-api.log
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          repository: sejaltech994/coaching-centre-fee-app-e2e
+          ref: main
+          path: e2e
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            e2e/package-lock.json
+
+      - name: Install and build the app
+        env:
+          NEXT_PUBLIC_API_URL: ${{ env.API_URL }}
+        run: |
+          npm ci
+          npm run build -w apps/web
+
+      - name: Start the API (embedded database, console SMS)
+        working-directory: apps/api
+        env:
+          NODE_ENV: development
+          PORT: "8787"
+          DATABASE_URL: pglite:memory
+          JWT_SECRET: e2e-only-secret-not-used-anywhere-else-0123456789
+          SMS_PROVIDER: console
+          WEB_ORIGINS: ${{ env.WEB_URL }}
+        run: nohup npx tsx src/server.ts > "$OTP_LOG_FILE" 2>&1 &
+
+      - name: Serve the web build
+        run: nohup node scripts/serve-static.mjs apps/web/out 3000 > /tmp/chukta-web.log 2>&1 &
+
+      - name: Wait for both
+        run: |
+          node -e '
+            const wait = async (url) => {
+              for (let i = 0; i < 60; i++) {
+                try { if ((await fetch(url)).ok) return; } catch {}
+                await new Promise((r) => setTimeout(r, 1000));
+              }
+              console.error(`Timed out waiting for ${url}`);
+              process.exit(1);
+            };
+            (async () => { for (const url of process.argv.slice(1)) await wait(url); })();
+          ' "$API_URL/health" "$WEB_URL/"
+
+      - name: Run the end-to-end suite
+        working-directory: e2e
+        run: |
+          npm ci
+          npm test
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: e2e-report
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+            /tmp/chukta-api.log
+            /tmp/chukta-web.log
+          retention-days: 14
+          if-no-files-found: ignore
