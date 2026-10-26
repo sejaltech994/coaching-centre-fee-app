@@ -19,7 +19,7 @@
     "build": "npm run build --workspaces --if-present"
   },
   "devDependencies": {
-    "eslint": "10.12.0",
-    "typescript-eslint": "8.71.1"
+    "eslint": "10.13.0",
+    "typescript-eslint": "8.72.0"
   }
 }
