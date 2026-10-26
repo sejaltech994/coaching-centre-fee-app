@@ -15,6 +15,10 @@ REPO="${1:-sejaltech994/coaching-centre-fee-app}"
 # approve your own PR); raise it once there is a second reviewer.
 REVIEWS="${REVIEWS:-0}"
 
+# Required status checks: the job names in ci.yml and codeql.yml.
+# sit, uat and main also need "Promotion source" from promotion-guard.yml.
+CHECKS='"Lint", "Typecheck", "Unit tests", "Build web", "Dependency review", "CodeQL"'
+
 echo "Repo: $REPO"
 
 # 1. Environment branches, all starting from main.
@@ -42,7 +46,7 @@ done
 #    guard here: feature/fix/chore branches are its normal source.
 gh api -X PUT "repos/$REPO/branches/develop/protection" --input - >/dev/null <<JSON
 {
-  "required_status_checks": { "strict": true, "contexts": ["Build web"] },
+  "required_status_checks": { "strict": true, "contexts": [$CHECKS] },
   "enforce_admins": true,
   "required_pull_request_reviews": { "required_approving_review_count": $REVIEWS, "dismiss_stale_reviews": true },
   "restrictions": null,
@@ -58,7 +62,7 @@ echo "Protected develop (PR + CI only)"
 for branch in sit uat main; do
   gh api -X PUT "repos/$REPO/branches/$branch/protection" --input - >/dev/null <<JSON
 {
-  "required_status_checks": { "strict": true, "contexts": ["Build web", "Promotion source"] },
+  "required_status_checks": { "strict": true, "contexts": [$CHECKS, "Promotion source"] },
   "enforce_admins": true,
   "required_pull_request_reviews": { "required_approving_review_count": $REVIEWS, "dismiss_stale_reviews": true },
   "restrictions": null,

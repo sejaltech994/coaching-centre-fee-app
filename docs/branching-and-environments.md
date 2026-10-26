@@ -32,7 +32,7 @@ flowchart LR
 | Direct push | Blocked | Blocked | Blocked | Blocked |
 | Pull request required | Yes | Yes | Yes | Yes |
 | PR must come from | Any work branch | `develop` or `hotfix/*` | `sit` or `hotfix/*` | `uat` or `hotfix/*` |
-| Required checks | `Build web` | `Build web`, `Promotion source` | `Build web`, `Promotion source` | `Build web`, `Promotion source` |
+| Required checks | CI suite | CI suite + `Promotion source` | CI suite + `Promotion source` | CI suite + `Promotion source` |
 | Branch up to date before merge | Yes | Yes | Yes | Yes |
 | Force-push or delete | Blocked | Blocked | Blocked | Blocked |
 | Applies to admins | Yes | Yes | Yes | Yes |
@@ -40,17 +40,7 @@ flowchart LR
 
 ## Pipelines
 
-All three live in `.github/workflows/`.
-
-| Workflow | Runs on | What it does |
-| --- | --- | --- |
-| `ci.yml` (**CI** › `Build web`) | Every PR into any environment branch, and pushes to `develop` | Installs, type-checks and builds `apps/web` |
-| `promotion-guard.yml` (**Promotion guard** › `Promotion source`) | PRs into `sit`, `uat`, `main` | Fails the PR unless it comes from the previous environment or a `hotfix/*` branch |
-| `deploy.yml` (**Deploy**) | Pushes to `develop`, `sit`, `uat`, `main` (that is, merges) | Builds and deploys to the matching GitHub Environment: `dev`, `sit`, `uat` or `prod` |
-
-The web app deploys to Cloudflare Workers, one Worker per environment. Setup, URLs and rollback are in [deployment.md](deployment.md).
-
-As the API and worker gain code, add their build and test steps to `ci.yml` as more jobs, and add those job names to the required checks.
+Every PR must pass **Lint**, **Typecheck**, **Unit tests** (minimum 80% coverage), **Build web**, **Dependency review** and **CodeQL**. PRs into `sit`, `uat` and `main` must also pass **Promotion source**. Deploys rerun the same suite first and smoke-test the live site afterwards. Details: [ci-cd.md](ci-cd.md). Hosting and URLs: [deployment.md](deployment.md).
 
 ## Day-to-day work
 
@@ -65,9 +55,9 @@ git push -u origin feature/batch-filter
 gh pr create --base develop --fill       # CI runs on the PR
 ```
 
-Merge once `Build web` is green; the merge deploys dev. Delete the branch after merging.
+Merge once every check is green; the merge deploys dev. Delete the branch after merging.
 
-**Promote dev → sit:** on GitHub, open a PR with base `sit` and compare `develop`. Title it like `Promote to SIT: <date or version>`. Merge once `Build web` and `Promotion source` are green. Use a **merge commit**, not squash, so the branches keep a shared history and later promotions show only new commits.
+**Promote dev → sit:** on GitHub, open a PR with base `sit` and compare `develop`. Title it like `Promote to SIT: <date or version>`. Merge once every check, including `Promotion source`, is green. Use a **merge commit**, not squash, so the branches keep a shared history and later promotions show only new commits.
 
 **Promote sit → uat**, then **uat → main**, the same way. The merge to `main` waits for a reviewer to approve the `prod` deployment.
 

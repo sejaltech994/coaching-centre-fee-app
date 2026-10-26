@@ -1,0 +1,23 @@
+# Weekly dependency updates, raised as PRs into develop so they pass the same
+# checks as any other change before they reach sit, uat or prod.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /apps/web
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+    labels: [dependencies, ci]
