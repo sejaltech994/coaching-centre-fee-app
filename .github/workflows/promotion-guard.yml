@@ -1,0 +1,33 @@
+# Code moves one environment at a time: develop -> sit -> uat -> main.
+# Only hotfix/* branches may skip the line. "Promotion source" is a required
+# status check on sit, uat and main, so a PR from any other branch cannot merge.
+name: Promotion guard
+
+on:
+  pull_request:
+    branches: [sit, uat, main]
+    types: [opened, reopened, synchronize, edited]
+
+jobs:
+  check-source:
+    name: Promotion source
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the PR comes from the previous environment
+        env:
+          BASE: ${{ github.base_ref }}
+          HEAD: ${{ github.head_ref }}
+        run: |
+          case "$BASE" in
+            sit)  allowed="develop" ;;
+            uat)  allowed="sit" ;;
+            main) allowed="uat" ;;
+          esac
+
+          if [ "$HEAD" = "$allowed" ] || [[ "$HEAD" == hotfix/* ]]; then
+            echo "OK: $HEAD -> $BASE"
+            exit 0
+          fi
+
+          echo "::error::PRs into '$BASE' must come from '$allowed' (or a hotfix/* branch), not '$HEAD'. See docs/branching-and-environments.md."
+          exit 1
