@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createTestApp } from "../../test/harness";
 
 describe("GET /centre", () => {
@@ -77,6 +77,26 @@ describe("the API", () => {
 
     const other = await preflight("https://evil.example");
     expect(other.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
+  it("reports readiness, including the database, without authentication", async () => {
+    const { call } = await createTestApp();
+    const res = await call("GET", "/health/ready");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ status: "ok", database: "ok" });
+  });
+
+  it("reports not ready when the database can't be reached, without details", async () => {
+    const { app, db } = await createTestApp();
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(db, "execute").mockRejectedValueOnce(new Error("connection refused to 10.0.0.5"));
+
+    const res = await app.request("/api/v1/health/ready");
+
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ status: "unavailable", database: "unreachable" });
+    expect(String(error.mock.calls[0])).toContain("connection refused");
+    error.mockRestore();
   });
 
   it("reports health without authentication", async () => {

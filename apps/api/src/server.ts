@@ -1,11 +1,11 @@
-import { createDb, runMigrations } from "@chukta/db";
+import { createLocalDb, runMigrations } from "@chukta/db/local";
 import { createConsoleSmsProvider } from "@chukta/integrations";
 import { serve } from "@hono/node-server";
 import { createApp } from "./app";
 import { loadConfig } from "./config";
 
 const config = loadConfig();
-const handle = createDb(config.databaseUrl);
+const handle = createLocalDb(config.databaseUrl);
 // The embedded database (local development) migrates itself; real servers are
 // migrated by `npm run db:migrate` before a deploy.
 if (handle.kind === "pglite") await runMigrations(handle);

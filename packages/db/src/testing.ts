@@ -1,7 +1,7 @@
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
-import { migrationsFolder } from "./client";
+import { migrationsFolder } from "./local";
 import * as schema from "./schema";
 
 /**

@@ -55,6 +55,11 @@ describe("loadConfig", () => {
     );
   });
 
+  it("runs hosted dev, sit and uat as staging: secure cookies, console SMS still allowed", () => {
+    const config = loadConfig({ ...valid, NODE_ENV: "staging", TRUST_PROXY_HEADERS: "true" });
+    expect(config).toMatchObject({ env: "staging", cookieSecure: true, smsProvider: "console", trustProxyHeaders: true });
+  });
+
   it("keeps the TSD's OTP limits by default", () => {
     expect(loadConfig(valid).otpLimits).toEqual({ perPhonePerHour: 5, perIpPerHour: 20 });
   });
