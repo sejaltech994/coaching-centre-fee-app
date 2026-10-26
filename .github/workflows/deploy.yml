@@ -42,7 +42,8 @@ jobs:
       # Keep dev, sit and uat out of search engines.
       - name: Mark non-prod as noindex
         if: env.DEPLOY_ENV != 'prod'
-        run: printf '\n/*\n  X-Robots-Tag: noindex\n' >> out/_headers
+        run: |
+          printf '\n/*\n  X-Robots-Tag: noindex\n' >> out/_headers
 
       - name: Deploy web to Cloudflare
         id: deploy
