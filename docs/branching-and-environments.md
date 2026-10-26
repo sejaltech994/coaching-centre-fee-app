@@ -48,7 +48,7 @@ All three live in `.github/workflows/`.
 | `promotion-guard.yml` (**Promotion guard** › `Promotion source`) | PRs into `sit`, `uat`, `main` | Fails the PR unless it comes from the previous environment or a `hotfix/*` branch |
 | `deploy.yml` (**Deploy**) | Pushes to `develop`, `sit`, `uat`, `main` (that is, merges) | Builds and deploys to the matching GitHub Environment: `dev`, `sit`, `uat` or `prod` |
 
-The deploy step is a placeholder until hosting is chosen. Put each environment's deploy target and keys in **Settings › Environments › \<env\> › Secrets**, so the same workflow publishes to different places per branch.
+The web app deploys to Cloudflare Workers, one Worker per environment. Setup, URLs and rollback are in [deployment.md](deployment.md).
 
 As the API and worker gain code, add their build and test steps to `ci.yml` as more jobs, and add those job names to the required checks.
 
