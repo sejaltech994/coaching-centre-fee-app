@@ -15,17 +15,17 @@
     "@chukta/db": "*",
     "@chukta/integrations": "*",
     "@chukta/shared": "*",
-    "@hono/node-server": "2.1.4",
+    "@hono/node-server": "2.1.5",
     "drizzle-orm": "0.45.4",
     "hono": "4.13.13",
-    "jose": "6.2.12",
-    "zod": "4.6.6"
+    "jose": "6.2.13",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/node": "^22",
-    "@vitest/coverage-v8": "5.0.3",
+    "@vitest/coverage-v8": "5.0.5",
     "tsx": "4.23.15",
     "typescript": "5.9.3",
-    "vitest": "5.0.3"
+    "vitest": "5.0.5"
   }
 }
