@@ -1,0 +1,24 @@
+// Cloudflare Workers config for the web app: static assets only, no Worker script.
+// One Worker per environment, deployed by .github/workflows/deploy.yml:
+//   wrangler deploy --env dev   -> chukta-web-dev
+//   wrangler deploy --env sit   -> chukta-web-sit
+//   wrangler deploy --env uat   -> chukta-web-uat
+//   wrangler deploy --env prod  -> chukta-web-prod
+// See docs/deployment.md.
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "chukta-web",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./out",
+    "not_found_handling": "404-page"
+  },
+  "workers_dev": true,
+  "preview_urls": false,
+  "env": {
+    "dev": {},
+    "sit": {},
+    "uat": {},
+    "prod": {}
+  }
+}

@@ -1,5 +1,7 @@
 # Publishes each environment branch to its environment after code lands on it.
-# Deploy targets and secrets live in GitHub Environments (dev, sit, uat, prod).
+# The web app goes to Cloudflare Workers (static assets), one Worker per env.
+# Needs repository secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID;
+# see docs/deployment.md.
 name: Deploy
 
 on:
@@ -11,11 +13,23 @@ concurrency:
   group: deploy-${{ github.ref_name }}
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     name: Deploy to ${{ github.ref_name == 'develop' && 'dev' || github.ref_name == 'main' && 'prod' || github.ref_name }}
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name == 'develop' && 'dev' || github.ref_name == 'main' && 'prod' || github.ref_name }}
+    environment:
+      name: ${{ github.ref_name == 'develop' && 'dev' || github.ref_name == 'main' && 'prod' || github.ref_name }}
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      DEPLOY_ENV: ${{ github.ref_name == 'develop' && 'dev' || github.ref_name == 'main' && 'prod' || github.ref_name }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    defaults:
+      run:
+        working-directory: apps/web
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -23,13 +37,22 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
-      - name: Build web
-        working-directory: apps/web
+      - run: npm ci
+      - run: npm run build
+
+      # Keep dev, sit and uat out of search engines.
+      - name: Mark non-prod as noindex
+        if: env.DEPLOY_ENV != 'prod'
+        run: printf '\n/*\n  X-Robots-Tag: noindex\n' >> out/_headers
+
+      - name: Deploy web to Cloudflare
+        id: deploy
         run: |
-          npm ci
-          npm run build
-      # TODO: replace with the real deploy once hosting is chosen (for example
-      # Vercel, or a Docker image pushed to a registry). Read targets and keys
-      # from this environment's secrets, e.g. ${{ secrets.DEPLOY_TOKEN }}.
-      - name: Deploy
-        run: echo "::notice::No hosting target configured yet; built ${{ github.sha }} for $GITHUB_REF_NAME."
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::warning::Cloudflare secrets are not set, so nothing was deployed. See docs/deployment.md."
+            exit 0
+          fi
+          npx wrangler deploy --env "$DEPLOY_ENV" 2>&1 | tee deploy.log
+          url=$(grep -oE 'https://[a-z0-9.-]+\.workers\.dev' deploy.log | head -1)
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "::notice::Deployed $DEPLOY_ENV to $url"
