@@ -1,0 +1,191 @@
+/* Login and signed-in screens: a paper card on the night ledger, matching the landing page. */
+
+.shell {
+  min-height: 100vh;
+  padding: 32px 16px 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+  color: var(--ink);
+  background-color: var(--night);
+  background-image:
+    radial-gradient(520px 420px at 50% 30%, var(--marigold-glow), transparent 70%),
+    repeating-linear-gradient(180deg, transparent 0 47px, var(--night-rule) 47px 48px);
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  color: var(--on-night);
+  text-decoration: none;
+  font-family: var(--font-display);
+  font-size: 30px;
+  line-height: 32px;
+}
+
+.brand:hover {
+  color: var(--on-night);
+}
+
+.coin {
+  width: 18px;
+  height: 18px;
+  align-self: center;
+  border-radius: var(--radius-pill);
+  background: var(--marigold);
+  box-shadow: 0 0 18px rgba(255, 178, 56, 0.7);
+}
+
+.brandHindi {
+  font-size: 18px;
+  color: var(--marigold);
+}
+
+.card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--paper-raised);
+  border-radius: var(--radius-lg);
+  padding: 32px 28px;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.35);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 34px;
+  line-height: 38px;
+}
+
+.lead {
+  margin: 0 0 6px;
+  color: var(--ink-muted);
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.input {
+  height: 52px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 0 16px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 17px;
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--night);
+  outline-offset: 2px;
+  border-color: var(--night);
+}
+
+.input[aria-invalid="true"] {
+  border-color: var(--overdue);
+}
+
+.code {
+  font-size: 26px;
+  letter-spacing: 0.4em;
+  text-align: center;
+}
+
+.error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--overdue-soft);
+  color: var(--overdue);
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 600;
+}
+
+.primary {
+  min-height: 52px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--marigold);
+  color: var(--night);
+  font-family: var(--font-sans);
+  font-size: 17px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--marigold-hover);
+}
+
+.primary:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.primary:focus-visible {
+  outline: 2px solid var(--night);
+  outline-offset: 2px;
+}
+
+.secondaryRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.link {
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--night);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.link:disabled {
+  color: var(--ink-muted);
+  text-decoration: none;
+  cursor: default;
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--night);
+  outline-offset: 2px;
+}
+
+.meta {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--paid);
+}
