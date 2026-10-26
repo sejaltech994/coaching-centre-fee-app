@@ -100,6 +100,8 @@ REVIEWS=1 scripts/setup-github-branches.sh      # once there is a second reviewe
 
 Then, under **Settings › Environments › prod**, add yourself as a **Required reviewer**.
 
-> **Plan requirement.** This repository is private. GitHub only enforces branch protection on private repositories on the **Pro**, **Team** or **Enterprise** plans. On GitHub Free, the protection step of the script fails with a 403. The workflows still run and still show red on a bad PR, but nothing stops a direct push to `sit`, `uat` or `main`. Until the plan is upgraded, treat the rules as a team agreement.
+This setup has been applied to `sejaltech994/coaching-centre-fee-app`. The repository is **public**, so GitHub enforces branch protection on the Free plan.
+
+> **If the repository is made private again**, GitHub enforces branch protection there only on the **Pro**, **Team** or **Enterprise** plans. On Free, the rules stop being enforced and the script's protection step fails with a 403. Because the repo is public, never commit secrets: keep them in `.env` (git-ignored) and in GitHub Environment secrets.
 
 With one reviewer required, you can't approve your own PR. That's why `REVIEWS` defaults to 0: a PR and a green pipeline are still required.
