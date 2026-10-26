@@ -1,5 +1,6 @@
 export type Config = {
-  env: "development" | "test" | "production";
+  /** development = local; staging = hosted dev, sit and uat; production = prod. */
+  env: "development" | "test" | "staging" | "production";
   port: number;
   databaseUrl: string;
   jwtSecret: string;
@@ -15,6 +16,7 @@ export type Config = {
 };
 
 const SMS_PROVIDERS = ["console"] as const;
+const ENVS = ["development", "test", "staging", "production"] as const;
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
   const required = (name: string) => {
@@ -23,7 +25,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     return value;
   };
 
-  const nodeEnv = env.NODE_ENV === "production" || env.NODE_ENV === "test" ? env.NODE_ENV : "development";
+  const nodeEnv = ENVS.find((name) => name === env.NODE_ENV) ?? "development";
   const jwtSecret = required("JWT_SECRET");
   if (jwtSecret.length < 32) throw new Error("JWT_SECRET must be at least 32 characters");
 
