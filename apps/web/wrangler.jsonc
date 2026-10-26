@@ -6,7 +6,7 @@
 //   wrangler deploy --env prod  -> chukta-web-prod
 // See docs/deployment.md.
 {
-  "$schema": "./node_modules/wrangler/config-schema.json",
+  "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "chukta-web",
   // Not a secret (it appears in every dashboard URL); the API token is.
   "account_id": "331f26e5ac81748f2fa5699192fabc53",
