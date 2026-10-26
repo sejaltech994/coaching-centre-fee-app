@@ -21,13 +21,12 @@ The web app is a static Next.js export served by **Cloudflare Workers** (static 
 
 1. **Create a free Cloudflare account** at [dash.cloudflare.com/sign-up](https://dash.cloudflare.com/sign-up).
 2. **Pick the workers.dev subdomain.** Open **Workers & Pages** in the dashboard once and choose a subdomain, for example `chukta`. Deploys from CI fail until this is set.
-3. **Copy the Account ID.** It's under **Account home**: open the account's menu (⋯) and choose **Copy account ID**.
+3. **Account ID** (`331f26e5ac81748f2fa5699192fabc53`) is already set as `account_id` in `apps/web/wrangler.jsonc`. It isn't a secret.
 4. **Create an API token.** Go to **My Profile › API Tokens › Create Token**, use the **Edit Cloudflare Workers** template, and set **Account Resources** to this account only. Leave the expiry date empty, or set one and calendar a rotation.
-5. **Store both as GitHub secrets.** Run this from the repo root. Each command prompts for the value, so it never lands in your shell history:
+5. **Store the token as a GitHub secret.** Run this from the repo root. It prompts for the value, so it never lands in your shell history:
 
    ```sh
    gh secret set CLOUDFLARE_API_TOKEN
-   gh secret set CLOUDFLARE_ACCOUNT_ID
    ```
 
 6. **Deploy dev.** Push to `develop`, or run it by hand:
@@ -37,7 +36,7 @@ The web app is a static Next.js export served by **Cloudflare Workers** (static 
    gh run watch
    ```
 
-Until the secrets exist, the Deploy workflow builds the site, skips the upload and shows a warning, so CI does not go red.
+Until the secret exists, the Deploy workflow builds the site, skips the upload and shows a warning, so CI does not go red.
 
 ## Day to day
 
