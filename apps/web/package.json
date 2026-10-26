@@ -1,5 +1,5 @@
 {
-  "name": "@coaching-centre-fee-app/web",
+  "name": "@chukta/web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -14,6 +14,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@chukta/shared": "*",
     "next": "16.4.3",
     "react": "19.3.1",
     "react-dom": "19.3.1"
@@ -32,7 +33,6 @@
     "eslint-config-next": "16.4.0",
     "jsdom": "30.1.2",
     "typescript": "^5",
-    "vite-tsconfig-paths": "6.1.1",
     "vitest": "5.0.3",
     "wrangler": "4.149.0"
   },
