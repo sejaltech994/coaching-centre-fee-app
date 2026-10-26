@@ -1,7 +1,7 @@
 // Serves a static build (e.g. apps/web/out) for end-to-end tests in CI.
 // No dependencies, so it runs in any image with Node:
 //   node scripts/serve-static.mjs apps/web/out 3000
-import { readFile, stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, join, resolve, sep } from "node:path";
 
@@ -27,8 +27,13 @@ createServer(async (req, res) => {
     return;
   }
   try {
-    if ((await stat(file)).isDirectory()) file = join(file, "index.html");
-    const body = await readFile(file);
+    // Read first and fall back to index.html on EISDIR, rather than stat-then-read,
+    // so nothing can change between a check and the read.
+    const body = await readFile(file).catch((err) => {
+      if (err.code !== "EISDIR") throw err;
+      file = join(file, "index.html");
+      return readFile(file);
+    });
     res.writeHead(200, { "content-type": types[extname(file)] ?? "application/octet-stream" }).end(body);
   } catch {
     const page = await readFile(join(root, "404.html")).catch(() => Buffer.from("Not found"));
