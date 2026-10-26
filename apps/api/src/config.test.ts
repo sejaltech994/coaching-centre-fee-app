@@ -17,6 +17,7 @@ describe("loadConfig", () => {
       webOrigins: ["http://localhost:3000"],
       cookieSecure: false,
       trustProxyHeaders: false,
+      otpLimits: { perPhonePerHour: 5, perIpPerHour: 20 },
     });
   });
 
@@ -52,6 +53,25 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ ...valid, NODE_ENV: "production", WEB_ORIGINS: "https://app.example" })).toThrow(
       "SMS_PROVIDER",
     );
+  });
+
+  it("keeps the TSD's OTP limits by default", () => {
+    expect(loadConfig(valid).otpLimits).toEqual({ perPhonePerHour: 5, perIpPerHour: 20 });
+  });
+
+  it("lets development and test raise the OTP limits, for automated test runs", () => {
+    const config = loadConfig({ ...valid, NODE_ENV: "test", OTP_PER_IP_PER_HOUR: "1000", OTP_PER_PHONE_PER_HOUR: "50" });
+    expect(config.otpLimits).toEqual({ perPhonePerHour: 50, perIpPerHour: 1000 });
+  });
+
+  it("never lets production change the OTP limits", () => {
+    expect(() =>
+      loadConfig({ ...valid, NODE_ENV: "production", SMS_PROVIDER: "console", OTP_PER_IP_PER_HOUR: "1000" }),
+    ).toThrow("OTP_PER_IP_PER_HOUR");
+  });
+
+  it("refuses a limit that isn't a positive whole number", () => {
+    expect(() => loadConfig({ ...valid, OTP_PER_IP_PER_HOUR: "lots" })).toThrow("OTP_PER_IP_PER_HOUR");
   });
 
   it("refuses an unknown SMS provider", () => {

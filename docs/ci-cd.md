@@ -21,7 +21,7 @@ All of these are **required status checks**: GitHub blocks the merge until each 
 | **Typecheck** | `ci.yml` | Any TypeScript error (`tsc --noEmit`) |
 | **Unit tests** | `ci.yml` | A failing test, or coverage below the minimum (below) |
 | **Build web** | `ci.yml` | `next build` fails to produce the static site |
-| **E2E** | `ci.yml` | Any scenario in the [Playwright BDD suite](https://github.com/sejaltech994/coaching-centre-fee-app-e2e) fails against this change's own API and web build (landing page, login, dashboard, auth API) |
+| **E2E** | `ci.yml` | Any scenario in the [Playwright BDD suite](https://github.com/sejaltech994/coaching-centre-fee-app-e2e) fails against this change's own API and web build. Uses the e2e repo's same-named branch when there is one (so `feature/x` here runs `feature/x` there), otherwise `main` |
 | **Dependency review** | `ci.yml` | The PR adds a dependency with a known **high or critical** vulnerability, or under AGPL-3.0, GPL-3.0 or SSPL-1.0 |
 | **CodeQL** | `codeql.yml` | Code scanning (`security-extended` queries) finds a new security issue |
 | **Promotion source** | `promotion-guard.yml` | Into `sit`/`uat`/`main` only: the PR doesn't come from the previous environment or a `hotfix/*` branch |

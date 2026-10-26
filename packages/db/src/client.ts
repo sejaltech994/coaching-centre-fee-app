@@ -1,6 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
+import { sql } from "drizzle-orm";
 import { drizzle as drizzleNodePg } from "drizzle-orm/node-postgres";
 import { migrate as migrateNodePg } from "drizzle-orm/node-postgres/migrator";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
@@ -34,6 +35,23 @@ export function createDb(url: string): DbHandle {
   }
   const pool = new pg.Pool({ connectionString: url, max: 10 });
   return { db: drizzleNodePg(pool, { schema }), close: () => pool.end(), kind: "postgres" };
+}
+
+/** A transaction handle, as passed to withCentre's callback. */
+export type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
+
+/**
+ * Runs `fn` in a transaction scoped to one centre: as the restricted chukta_app
+ * role, with app.centre_id set, so row-level security hides and protects every
+ * other centre's rows even if a query forgets its WHERE. Both settings are
+ * transaction-local and end with it.
+ */
+export async function withCentre<T>(db: Database, centreId: string, fn: (tx: Tx) => Promise<T>): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select set_config('app.centre_id', ${centreId}, true)`);
+    await tx.execute(sql`set local role chukta_app`);
+    return fn(tx);
+  });
 }
 
 /** Applies any migrations not yet applied. Safe to run repeatedly. */

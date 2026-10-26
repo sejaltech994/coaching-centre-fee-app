@@ -105,6 +105,14 @@ describe("POST /auth/otp/request", () => {
     expect(otherIp.status).toBe(202);
   });
 
+  it("uses the configured hourly limits", async () => {
+    const { call } = await createTestApp({ otpLimits: { perPhonePerHour: 5, perIpPerHour: 2 } });
+    for (const phone of ["9876543210", "9876543211"]) {
+      expect((await call("POST", "/auth/otp/request", { body: { phone } })).status).toBe(202);
+    }
+    expect((await call("POST", "/auth/otp/request", { body: { phone: "9876543212" } })).status).toBe(429);
+  });
+
   it("reports when the SMS could not be sent, and lets the user retry at once", async () => {
     const { call, sms } = await createTestApp();
     sms.sendOtp.mockRejectedValueOnce(new Error("provider down"));
