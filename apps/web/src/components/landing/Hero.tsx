@@ -13,7 +13,7 @@ export function Hero() {
         <h1 className={styles.h1}>
           <span className={styles.h1Line} style={delay(200)}>
             Stop chasing fees.
-          </span>
+          </span>{" "}
           <span className={styles.h1Line} style={delay(340)}>
             Get them <span className={styles.settled}>settled.</span>
           </span>

@@ -6,18 +6,18 @@ One repository, one long-lived branch per environment. Code is written on `devel
 
 | Environment | Branch | Purpose | How code gets in | Deploys |
 | --- | --- | --- | --- | --- |
-| **dev** | `develop` | Day-to-day integration; always the newest code | Direct commits allowed, or PRs from `feature/*` | On every push |
+| **dev** | `develop` | Day-to-day integration; always the newest code | PR from a `feature/*`, `fix/*` or `chore/*` branch | On merge |
 | **sit** | `sit` | System integration testing: the full system (web, API, worker) against real Razorpay, WhatsApp and SMS sandboxes | PR from `develop` only | On merge |
 | **uat** | `uat` | User acceptance testing: the centre owner or client signs off a release on production-like data | PR from `sit` only | On merge |
 | **prod** | `main` | What real centres and parents use | PR from `uat` only | On merge, after approval |
 
-`develop` is the only branch you can commit to directly. `sit`, `uat` and `main` accept changes only through a pull request that passes the pipeline.
+No branch accepts direct commits. `develop`, `sit`, `uat` and `main` change only through a pull request that passes the pipeline, and that applies to admins too.
 
 ## Flow
 
 ```mermaid
 flowchart LR
-    F["feature/*<br/>(optional)"] -->|PR or merge| D["develop<br/>dev"]
+    F["feature/* · fix/* · chore/*"] -->|PR + pipeline| D["develop<br/>dev"]
     D -->|PR + pipeline| S["sit<br/>sit"]
     S -->|PR + pipeline| U["uat<br/>uat"]
     U -->|PR + pipeline<br/>+ approval| M["main<br/>prod"]
@@ -29,44 +29,35 @@ flowchart LR
 
 | Rule | `develop` | `sit` | `uat` | `main` |
 | --- | --- | --- | --- | --- |
-| Direct push | Allowed | Blocked | Blocked | Blocked |
-| Pull request required | No | Yes | Yes | Yes |
-| PR must come from | Anything | `develop` or `hotfix/*` | `sit` or `hotfix/*` | `uat` or `hotfix/*` |
-| Required checks | None | `Build web`, `Promotion source` | `Build web`, `Promotion source` | `Build web`, `Promotion source` |
-| Branch up to date before merge | No | Yes | Yes | Yes |
+| Direct push | Blocked | Blocked | Blocked | Blocked |
+| Pull request required | Yes | Yes | Yes | Yes |
+| PR must come from | Any work branch | `develop` or `hotfix/*` | `sit` or `hotfix/*` | `uat` or `hotfix/*` |
+| Required checks | CI suite | CI suite + `Promotion source` | CI suite + `Promotion source` | CI suite + `Promotion source` |
+| Branch up to date before merge | Yes | Yes | Yes | Yes |
 | Force-push or delete | Blocked | Blocked | Blocked | Blocked |
-| Applies to admins | No | Yes | Yes | Yes |
+| Applies to admins | Yes | Yes | Yes | Yes |
 | Deploy needs approval | No | No | No | Yes (`prod` environment reviewers) |
 
 ## Pipelines
 
-All three live in `.github/workflows/`.
-
-| Workflow | Runs on | What it does |
-| --- | --- | --- |
-| `ci.yml` (**CI** › `Build web`) | Every PR into any environment branch, and pushes to `develop` | Installs, type-checks and builds `apps/web` |
-| `promotion-guard.yml` (**Promotion guard** › `Promotion source`) | PRs into `sit`, `uat`, `main` | Fails the PR unless it comes from the previous environment or a `hotfix/*` branch |
-| `deploy.yml` (**Deploy**) | Pushes to `develop`, `sit`, `uat`, `main` (that is, merges) | Builds and deploys to the matching GitHub Environment: `dev`, `sit`, `uat` or `prod` |
-
-The web app deploys to Cloudflare Workers, one Worker per environment. Setup, URLs and rollback are in [deployment.md](deployment.md).
-
-As the API and worker gain code, add their build and test steps to `ci.yml` as more jobs, and add those job names to the required checks.
+Every PR must pass **Lint**, **Typecheck**, **Unit tests** (minimum 80% coverage), **Build web**, **Dependency review** and **CodeQL**. PRs into `sit`, `uat` and `main` must also pass **Promotion source**. Deploys rerun the same suite first and smoke-test the live site afterwards. Details: [ci-cd.md](ci-cd.md). Hosting and URLs: [deployment.md](deployment.md).
 
 ## Day-to-day work
 
-**Small change straight to dev:**
+Every change, however small, goes through a pull request into `develop`:
 
 ```sh
-git switch develop
-git pull
+git switch develop && git pull
+git switch -c feature/batch-filter       # or fix/…, chore/…
 # edit, then
 git commit -am "Add batch filter to students list"
-git push                         # deploys to dev
+git push -u origin feature/batch-filter
+gh pr create --base develop --fill       # CI runs on the PR
 ```
 
-**Larger change (recommended):** branch off `develop` as `feature/<short-name>`, push it, and open a PR into `develop`. CI runs on the PR.
+Merge once every check is green; the merge deploys dev. Delete the branch after merging.
 
-**Promote dev → sit:** on GitHub, open a PR with base `sit` and compare `develop`. Title it like `Promote to SIT: <date or version>`. Merge once `Build web` and `Promotion source` are green. Use a **merge commit**, not squash, so the branches keep a shared history and later promotions show only new commits.
+**Promote dev → sit:** on GitHub, open a PR with base `sit` and compare `develop`. Title it like `Promote to SIT: <date or version>`. Merge once every check, including `Promotion source`, is green. Use a **merge commit**, not squash, so the branches keep a shared history and later promotions show only new commits.
 
 **Promote sit → uat**, then **uat → main**, the same way. The merge to `main` waits for a reviewer to approve the `prod` deployment.
 
@@ -76,7 +67,7 @@ For a production bug that can't wait for the normal flow:
 
 1. Branch from `main`: `git switch -c hotfix/<short-name> origin/main`.
 2. Fix it, push, and open a PR into `main`. The pipeline runs, and the guard allows `hotfix/*`.
-3. After it merges, bring the fix back down so it isn't lost on the next promotion: open PRs from `main` (or the same `hotfix/*` branch) into `uat`, `sit` and `develop`, or merge `main` into `develop` directly.
+3. After it merges, bring the fix back down so it isn't lost on the next promotion: open PRs from `main` (or the same `hotfix/*` branch) into `uat`, `sit` and `develop`, rather than pushing to them directly.
 
 ## Naming
 
@@ -84,6 +75,7 @@ For a production bug that can't wait for the normal flow:
 | --- | --- | --- |
 | Feature | `feature/<short-name>` | `feature/whatsapp-reminders` |
 | Bug fix (normal flow) | `fix/<short-name>` | `fix/overdue-late-fee` |
+| Tooling, docs, config | `chore/<short-name>` | `chore/protect-develop` |
 | Hotfix to prod | `hotfix/<short-name>` | `hotfix/receipt-pdf-crash` |
 | Promotion PR title | `Promote to <ENV>: <date or version>` | `Promote to UAT: 2026-11-02` |
 

@@ -1,7 +1,8 @@
-# Publishes each environment branch to its environment after code lands on it.
+# Publishes each environment branch to its environment after code lands on it:
+# run the full CI suite, deploy only if it passes, then smoke-test the live URL.
 # The web app goes to Cloudflare Workers (static assets), one Worker per env.
 # Needs the repository secret CLOUDFLARE_API_TOKEN; the account ID is in
-# apps/web/wrangler.jsonc. See docs/deployment.md.
+# apps/web/wrangler.jsonc. See docs/deployment.md and docs/ci-cd.md.
 name: Deploy
 
 on:
@@ -17,8 +18,13 @@ permissions:
   contents: read
 
 jobs:
+  checks:
+    name: Checks
+    uses: ./.github/workflows/ci.yml
+
   deploy:
     name: Deploy to ${{ github.ref_name == 'develop' && 'dev' || github.ref_name == 'main' && 'prod' || github.ref_name }}
+    needs: checks
     runs-on: ubuntu-latest
     environment:
       name: ${{ github.ref_name == 'develop' && 'dev' || github.ref_name == 'main' && 'prod' || github.ref_name }}
@@ -30,10 +36,10 @@ jobs:
       run:
         working-directory: apps/web
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
       - run: npm ci
@@ -58,3 +64,23 @@ jobs:
           url=$(grep -oE 'https://[a-z0-9.-]+\.workers\.dev' deploy.log | head -1)
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "::notice::Deployed $DEPLOY_ENV to $url"
+
+      # Fails the run if the live site is down, serves the wrong page or lost its
+      # security headers, so a bad deploy is visible straight away (and rolled back
+      # from Cloudflare's Deployments tab; see docs/deployment.md).
+      - name: Smoke test
+        if: steps.deploy.outputs.url != ''
+        shell: bash
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          for attempt in 1 2 3 4 5; do
+            code=$(curl -s -o page.html -D headers.txt -w '%{http_code}' "$URL/") && [ "$code" = 200 ] && break
+            echo "Attempt $attempt: HTTP $code, retrying in 5s"; sleep 5
+          done
+          [ "$code" = 200 ] || { echo "::error::$URL returned HTTP $code"; exit 1; }
+          grep -q 'Stop chasing fees' page.html || { echo "::error::$URL is not serving the landing page"; exit 1; }
+          grep -qi '^x-content-type-options: nosniff' headers.txt || { echo "::error::Security headers missing on $URL"; exit 1; }
+          code404=$(curl -s -o /dev/null -w '%{http_code}' "$URL/__smoke-test-missing__/")
+          [ "$code404" = 404 ] || { echo "::error::Unknown paths return HTTP $code404 instead of 404"; exit 1; }
+          echo "::notice::Smoke test passed for $URL"

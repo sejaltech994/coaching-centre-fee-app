@@ -15,6 +15,10 @@ REPO="${1:-sejaltech994/coaching-centre-fee-app}"
 # approve your own PR); raise it once there is a second reviewer.
 REVIEWS="${REVIEWS:-0}"
 
+# Required status checks: the job names in ci.yml and codeql.yml.
+# sit, uat and main also need "Promotion source" from promotion-guard.yml.
+CHECKS='"Lint", "Typecheck", "Unit tests", "Build web", "Dependency review", "CodeQL"'
+
 echo "Repo: $REPO"
 
 # 1. Environment branches, all starting from main.
@@ -38,25 +42,27 @@ for env in dev sit uat prod; do
   echo "Environment $env ready"
 done
 
-# 4. develop: direct pushes allowed, but no force-push or deletion.
-gh api -X PUT "repos/$REPO/branches/develop/protection" --input - >/dev/null <<'JSON'
+# 4. develop: changes only through a PR that passes CI. No promotion
+#    guard here: feature/fix/chore branches are its normal source.
+gh api -X PUT "repos/$REPO/branches/develop/protection" --input - >/dev/null <<JSON
 {
-  "required_status_checks": null,
-  "enforce_admins": false,
-  "required_pull_request_reviews": null,
+  "required_status_checks": { "strict": true, "contexts": [$CHECKS] },
+  "enforce_admins": true,
+  "required_pull_request_reviews": { "required_approving_review_count": $REVIEWS, "dismiss_stale_reviews": true },
   "restrictions": null,
   "allow_force_pushes": false,
-  "allow_deletions": false
+  "allow_deletions": false,
+  "required_conversation_resolution": true
 }
 JSON
-echo "Protected develop (direct push allowed)"
+echo "Protected develop (PR + CI only)"
 
 # 5. sit, uat, main: changes only through a PR that passes CI and the
 #    promotion guard. enforce_admins stops the owner bypassing it too.
 for branch in sit uat main; do
   gh api -X PUT "repos/$REPO/branches/$branch/protection" --input - >/dev/null <<JSON
 {
-  "required_status_checks": { "strict": true, "contexts": ["Build web", "Promotion source"] },
+  "required_status_checks": { "strict": true, "contexts": [$CHECKS, "Promotion source"] },
   "enforce_admins": true,
   "required_pull_request_reviews": { "required_approving_review_count": $REVIEWS, "dismiss_stale_reviews": true },
   "restrictions": null,
