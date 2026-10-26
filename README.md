@@ -22,7 +22,7 @@ Design: [Technical Design Specification](https://claude.ai/artifact/JVdM6Ebn8UtW
 
 | Env | Branch | Gets code by |
 | --- | --- | --- |
-| dev | `develop` | Direct commit |
+| dev | `develop` | PR from a work branch + pipeline |
 | sit | `sit` | PR from `develop` + pipeline |
 | uat | `uat` | PR from `sit` + pipeline |
 | prod | `main` | PR from `uat` + pipeline + approval |
