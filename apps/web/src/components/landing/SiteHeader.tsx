@@ -16,7 +16,7 @@ export function SiteHeader() {
   const closeMenu = () => setMenuOpen(false);
 
   return (
-    <header className={styles.header}>
+    <header className={`${styles.header} ${styles.nightBand}`}>
       <div className={styles.headerInner}>
         <Logo />
         <button

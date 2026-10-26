@@ -5,8 +5,10 @@ export function SiteFooter() {
     <footer className={styles.footer}>
       <div className={styles.footerInner}>
         <div className={styles.footerBrand}>
-          <span className={styles.coin} style={{ width: 16, height: 16 }} aria-hidden="true" />
           <span className={styles.footerWord}>Chukta</span>
+          <span className={styles.footerHindi} lang="hi">
+            चुकता
+          </span>
           <span>· Fees, settled.</span>
         </div>
         <nav aria-label="Footer" className={styles.footerNav}>

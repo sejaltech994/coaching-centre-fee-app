@@ -7,13 +7,16 @@ import { Problem } from "@/components/landing/Problem";
 import { SiteFooter } from "@/components/landing/SiteFooter";
 import { SiteHeader } from "@/components/landing/SiteHeader";
 import { StartCta } from "@/components/landing/StartCta";
+import styles from "@/components/landing/landing.module.css";
 
 export default function LandingPage() {
   return (
     <>
       <SiteHeader />
       <main>
-        <Hero />
+        <div className={styles.heroBand}>
+          <Hero />
+        </div>
         <AudienceStrip />
         <Problem />
         <HowItWorks />

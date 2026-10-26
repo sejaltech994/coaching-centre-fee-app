@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { Fraunces, JetBrains_Mono, Manrope } from "next/font/google";
+import { Martian_Mono, Mukta, Rozha_One } from "next/font/google";
 import "./globals.css";
 
-const fraunces = Fraunces({ subsets: ["latin"], axes: ["opsz"], variable: "--font-fraunces" });
-const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope" });
-const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains-mono" });
+const rozhaOne = Rozha_One({ weight: "400", subsets: ["latin", "devanagari"], variable: "--font-rozha" });
+const mukta = Mukta({ weight: ["400", "500", "600", "700", "800"], subsets: ["latin", "devanagari"], variable: "--font-mukta" });
+const martianMono = Martian_Mono({ subsets: ["latin"], variable: "--font-martian-mono" });
 
 export const metadata: Metadata = {
   title: "Chukta — fees, settled",
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${fraunces.variable} ${manrope.variable} ${jetbrainsMono.variable}`}>
+    <html lang="en" className={`${rozhaOne.variable} ${mukta.variable} ${martianMono.variable}`}>
       <body>{children}</body>
     </html>
   );

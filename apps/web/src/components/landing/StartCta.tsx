@@ -3,12 +3,15 @@ import styles from "./landing.module.css";
 /** Sign-up band. Submits the number to the login page, which sends the OTP. */
 export function StartCta() {
   return (
-    <section id="start" className={styles.ctaWrap}>
-      <div className={styles.cta}>
-        <div className={styles.ctaCopy}>
-          <h2 className={styles.h2}>This month, let every fee get settled.</h2>
-          <p className={styles.ctaLead}>Log in with your phone number and send your first reminder today.</p>
-        </div>
+    <section id="start" className={styles.cta}>
+      <span className={styles.watermark} lang="hi" aria-hidden="true">
+        चुकता
+      </span>
+      <div className={styles.ctaInner}>
+        <h2 className={styles.ctaTitle}>
+          This month, let every fee get <span className={styles.accent}>settled.</span>
+        </h2>
+        <p className={styles.ctaLead}>Log in with your phone number and send your first reminder today.</p>
         <form className={styles.ctaForm} action="/login" method="get">
           <label htmlFor="phone" className={styles.visuallyHidden}>
             Mobile number

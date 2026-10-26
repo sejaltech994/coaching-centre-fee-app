@@ -1,37 +1,43 @@
-/* Chukta design tokens (light theme), from the landing page design's tokens.json. */
+/* Chukta "ledger" direction: night indigo dominant, marigold accent, ledger paper for reading.
+   Mirrors the Tokens board of the landing page design. */
 :root {
-  --paper: #fbf6ec;
+  --night: #101236;
+  --night-raised: #1a1d4e;
+  --night-deep: #0a0b26;
+  --night-rule: rgba(255, 255, 255, 0.05);
+  --on-night: #f3f0ff;
+  --on-night-soft: #c4c5ea;
+  --on-night-muted: #a9abd6;
+
+  --marigold: #ffb238;
+  --marigold-hover: #ffc866;
+  --marigold-soft: #fff0d4;
+  --marigold-glow: rgba(255, 178, 56, 0.22);
+
+  --paper: #f8f6ef;
   --paper-raised: #ffffff;
-  --paper-sunk: #f3ecdd;
-  --line: #e6dcc8;
-  --ink: #16182b;
-  --ink-muted: #5c586c;
-  --indigo: #2b2f77;
-  --indigo-deep: #1b1e52;
-  --indigo-soft: #e7e8f8;
-  --on-indigo: #ffffff;
-  --on-deep: #f4efe4;
-  --on-deep-muted: #c9c6e0;
-  --marigold: #f2a33a;
-  --marigold-soft: #fdefd6;
+  --paper-sunk: #efebe0;
+  --ledger-rule: #dce1ef;
+  --margin-red: rgba(208, 81, 59, 0.5);
+  --line: #e3ded0;
+  --ink: #15162e;
+  --ink-muted: #55536a;
+
   --paid: #1e7a50;
   --paid-soft: #dff2e7;
   --pending: #8a5a00;
   --overdue: #b4233c;
   --overdue-soft: #fbe3e6;
 
-  --font-display: var(--font-fraunces), Georgia, "Times New Roman", serif;
-  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: var(--font-jetbrains-mono), ui-monospace, Menlo, monospace;
+  --font-display: var(--font-rozha), Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-mukta), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-martian-mono), ui-monospace, Menlo, monospace;
 
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 28px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
   --radius-pill: 999px;
 
-  --shadow-card: 0 1px 2px rgba(22, 24, 43, 0.06), 0 8px 24px rgba(22, 24, 43, 0.08);
-  --shadow-float: 0 24px 60px rgba(27, 30, 82, 0.22);
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 *,
@@ -46,29 +52,37 @@ html {
 
 body {
   margin: 0;
-  background: var(--paper);
+  background: var(--night);
   color: var(--ink);
   font-family: var(--font-sans);
-  font-size: 16px;
-  line-height: 24px;
+  font-size: 17px;
+  line-height: 27px;
   -webkit-font-smoothing: antialiased;
 }
 
 a {
-  color: var(--indigo);
+  color: var(--marigold);
 }
 
 a:hover {
-  color: var(--indigo-deep);
+  color: var(--marigold-hover);
 }
 
 :focus-visible {
-  outline: 2px solid var(--indigo);
-  outline-offset: 2px;
+  outline: 2px solid var(--marigold);
+  outline-offset: 3px;
 }
 
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
+  }
+
+  /* Elements rest in their final state, so nothing depends on an animation finishing. */
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
   }
 }
