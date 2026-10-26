@@ -36,21 +36,20 @@ The unit-test job writes a coverage table to the run's summary page and uploads 
 | Functions | 80% |
 | Branches | 80% |
 
-- **Where it's set:** `thresholds` in `apps/web/vitest.config.mts`. Vitest exits with an error when any metric is below its minimum, so **Unit tests** fails.
-- **What counts:** everything under `apps/web/src`, except test files and `src/app/layout.tsx`, which only wires up `next/font` and runs only inside the Next.js compiler.
+- **Where it's set:** `thresholds` in each workspace's `vitest.config.mts` (`apps/web`, `apps/api`, `packages/shared`, `packages/db`, `packages/integrations`). Every workspace must meet the minimum on its own; one well-tested package can't carry another. Vitest exits with an error when any metric is below its minimum, so **Unit tests** fails.
+- **What counts:** all source under each workspace's `src`, except tests and three entry points that only wire real infrastructure together: `apps/web/src/app/layout.tsx` (`next/font`), `apps/api/src/server.ts` (HTTP server) and `packages/db/src/migrate.ts` (migration CLI).
 - **Raising the bar:** raise a threshold once coverage sits comfortably above it. Never lower one to get a PR through. Add tests instead.
-- **New code** should come with tests for its behaviour (what the user sees and does), not its markup. See `src/components/landing/SiteHeader.test.tsx` for interaction tests and `src/app/page.test.tsx` for page content.
-- **As `apps/api` and `apps/worker` gain code,** give each its own Vitest config with the same 80% thresholds, add a job per app to `ci.yml`, and add the job names to the required checks.
+- **Test-first:** features are built test-first (red → green → refactor). Tests describe behaviour (what the user sees and does, what the API returns), not markup or internals.
+- **Database tests** run real SQL migrations against an in-memory Postgres (PGlite, `@chukta/db/testing`), so constraints and queries are tested for real, with no Docker.
 
 ## Run the checks locally
 
-Needs Node 22.13 or newer (`.nvmrc` says 22; `nvm use` or `fnm use` picks it up).
+Needs Node 22.13 or newer (`.nvmrc` says 22). From the repo root, each command runs across every workspace:
 
 ```sh
-cd apps/web
 npm run lint
 npm run typecheck
-npm run test:coverage     # or: npm run test:watch while you work
+npm run test:coverage     # or, inside one workspace: npm run test -- --watch
 npm run build
 ```
 

@@ -8,12 +8,12 @@ Design: [Technical Design Specification](https://claude.ai/artifact/JVdM6Ebn8UtW
 
 | Path | What it is |
 | --- | --- |
-| `apps/web` | Next.js frontend for centre owners |
-| `apps/api` | JSON REST API under `/api/v1`, one folder per module in `src/modules` |
+| `apps/web` | Next.js frontend for centre owners: landing page, `/login`, `/dashboard` |
+| `apps/api` | JSON REST API under `/api/v1` (Hono), one folder per module in `src/modules` |
 | `apps/worker` | BullMQ worker; one file per scheduled or queued job in `src/jobs` |
-| `packages/db` | PostgreSQL migrations and seed data |
+| `packages/db` | PostgreSQL schema (Drizzle), SQL migrations, test database helper |
 | `packages/integrations` | Adapters: `PaymentGateway` (Razorpay), `MessagingProvider` (WhatsApp), `SmsProvider`, file storage |
-| `packages/shared` | Types and validation shared by web, api and worker |
+| `packages/shared` | Code shared by web, api and worker (phone number rules, …) |
 | `docs` | Design notes and decisions |
 | `.github/workflows` | CI, promotion guard and deploy pipelines |
 | `scripts` | One-off repo and tooling scripts |
@@ -31,15 +31,17 @@ Details, hotfixes and setup: [docs/branching-and-environments.md](docs/branching
 
 ## Local development
 
-```sh
-cp .env.example .env
-docker compose up -d   # Postgres and Redis
-```
-
-Run the web app:
+Needs Node 22.13+. No Docker or Postgres install: the API uses an embedded Postgres saved in `.data/`.
 
 ```sh
-cd apps/web
-npm install
-npm run dev            # http://localhost:3000
+npm install                       # once, from the repo root (npm workspaces)
+cp .env.example .env              # then set JWT_SECRET: openssl rand -base64 48
+npm run dev -w apps/api           # API on http://localhost:8787/api/v1
+npm run dev -w apps/web           # web on http://localhost:3000 (second terminal)
 ```
+
+Open http://localhost:3000/login, enter any Indian mobile number, and copy the 6-digit code from the **API terminal** (`[sms:console] Chukta login code …`). Codes are printed only in development; production refuses to start with the console SMS provider.
+
+Browse the database: stop the API (only one process can open the embedded database), then run `npm run db:studio -w packages/db` and open https://local.drizzle.studio. Set `DATABASE_URL` to a `postgres://` URL to browse a real server instead.
+
+Checks (same as CI): `npm run lint`, `npm run typecheck`, `npm run test:coverage`, `npm run build`.
