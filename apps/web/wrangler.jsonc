@@ -1,26 +1,63 @@
-// Cloudflare Workers config for the web app: static assets only, no Worker script.
-// One Worker per environment, deployed by .github/workflows/deploy.yml:
-//   wrangler deploy --env dev   -> chukta-web-dev
-//   wrangler deploy --env sit   -> chukta-web-sit
-//   wrangler deploy --env uat   -> chukta-web-uat
-//   wrangler deploy --env prod  -> chukta-web-prod
-// See docs/deployment.md.
+// Cloudflare Workers config: one Worker per environment serves the static web
+// app AND the API (apps/api/src/worker.ts answers /api/*; everything else is
+// a static file). Same origin, so the refresh cookie stays first-party.
+// Deployed by .github/workflows/deploy.yml:
+//   wrangler deploy --env dev   -> chukta-web-dev   (develop)
+//   wrangler deploy --env sit   -> chukta-web-sit   (sit)
+//   wrangler deploy --env uat   -> chukta-web-uat   (uat)
+//   wrangler deploy --env prod  -> chukta-web-prod  (main)
+// Secrets (never here): DATABASE_URL and JWT_SECRET, pushed by the deploy
+// workflow from the GitHub environment's secrets. See docs/deployment.md.
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "chukta-web",
   // Not a secret (it appears in every dashboard URL); the API token is.
   "account_id": "331f26e5ac81748f2fa5699192fabc53",
+  "main": "../api/src/worker.ts",
   "compatibility_date": "2026-10-01",
+  // node:crypto for OTP and token hashing; pg's TCP sockets to Neon.
+  "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": "./out",
-    "not_found_handling": "404-page"
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    // Only API requests run the Worker script; static files are served directly.
+    "run_worker_first": ["/api/*"]
   },
   "workers_dev": true,
   "preview_urls": false,
+  "observability": { "enabled": true },
+  // vars are not inherited by environments, so each lists its own.
   "env": {
-    "dev": {},
-    "sit": {},
-    "uat": {},
-    "prod": {}
+    "dev": {
+      "vars": {
+        "NODE_ENV": "staging",
+        "TRUST_PROXY_HEADERS": "true",
+        "WEB_ORIGINS": "https://chukta-web-dev.chukta.workers.dev"
+      }
+    },
+    "sit": {
+      "vars": {
+        "NODE_ENV": "staging",
+        "TRUST_PROXY_HEADERS": "true",
+        "WEB_ORIGINS": "https://chukta-web-sit.chukta.workers.dev"
+      }
+    },
+    "uat": {
+      "vars": {
+        "NODE_ENV": "staging",
+        "TRUST_PROXY_HEADERS": "true",
+        "WEB_ORIGINS": "https://chukta-web-uat.chukta.workers.dev"
+      }
+    },
+    // Production refuses the console SMS provider, so its API stays off (503)
+    // until a real SMS provider (MSG91, DLT-registered) is configured.
+    "prod": {
+      "vars": {
+        "NODE_ENV": "production",
+        "TRUST_PROXY_HEADERS": "true",
+        "WEB_ORIGINS": "https://chukta-web-prod.chukta.workers.dev"
+      }
+    }
   }
 }
