@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Logo } from "./Logo";
 import styles from "./landing.module.css";
 
@@ -13,10 +13,28 @@ const navLinks = [
 
 export function SiteHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const headerRef = useRef<HTMLElement>(null);
   const closeMenu = () => setMenuOpen(false);
 
+  // While the mobile menu is open, Escape or a tap outside the header closes it.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      if (!headerRef.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [menuOpen]);
+
   return (
-    <header className={`${styles.header} ${styles.nightBand}`}>
+    <header ref={headerRef} className={`${styles.header} ${styles.nightBand}`}>
       <div className={styles.headerInner}>
         <Logo />
         <button

@@ -298,6 +298,9 @@
 
 .header {
   position: relative;
+  /* Above the hero: its animated, transformed elements form their own stacking
+     contexts and would otherwise paint over the open mobile menu. */
+  z-index: 20;
   animation: rise 600ms var(--ease-out) both;
 }
 
