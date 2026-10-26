@@ -1,75 +1,44 @@
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getCentre, logout } from "@/lib/api";
-import { ensureAccessToken, getAccessToken, setAccessToken } from "@/lib/session";
+import { useSession } from "@/lib/useSession";
 import DashboardPage from "./page";
 
-const replace = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn() }) }));
+vi.mock("@/lib/useSession", () => ({ useSession: vi.fn() }));
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ replace }) }));
-
-vi.mock("@/lib/api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/api")>()),
-  getCentre: vi.fn(),
-  logout: vi.fn(),
-}));
-
-vi.mock("@/lib/session", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/session")>()),
-  ensureAccessToken: vi.fn(),
-}));
-
-const centre = (name: string | null) => ({ centre: { id: "c1", name, plan: "free" as const, timezone: "Asia/Kolkata" } });
+const centre = (name: string | null) => ({ id: "c1", name, plan: "free" as const, timezone: "Asia/Kolkata" });
 
 beforeEach(() => {
-  replace.mockReset();
-  vi.mocked(ensureAccessToken).mockReset().mockResolvedValue("token");
-  vi.mocked(getCentre).mockReset().mockResolvedValue(centre("Sunrise Classes"));
-  vi.mocked(logout).mockReset().mockResolvedValue(undefined);
+  vi.mocked(useSession).mockReturnValue({ token: "token", centre: centre("Sunrise Classes") });
 });
 
 describe("/dashboard", () => {
-  it("sends visitors without a session to the login page", async () => {
-    vi.mocked(ensureAccessToken).mockResolvedValueOnce(null);
+  it("shows nothing but a loading note until the session is ready", () => {
+    vi.mocked(useSession).mockReturnValue({ token: null, centre: null });
     render(<DashboardPage />);
-
-    await vi.waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
-    expect(getCentre).not.toHaveBeenCalled();
+    expect(screen.getByText("Loading…")).toBeVisible();
   });
 
-  it("welcomes the owner to their centre", async () => {
+  it("welcomes the owner to their centre", () => {
     render(<DashboardPage />);
-
-    expect(await screen.findByRole("heading", { name: "Sunrise Classes" })).toBeInTheDocument();
-    expect(screen.getByText("Free plan")).toBeInTheDocument();
-    expect(getCentre).toHaveBeenCalledWith("token");
+    expect(screen.getByRole("heading", { name: "Sunrise Classes", level: 1 })).toBeVisible();
   });
 
-  it("asks a new owner to name their centre", async () => {
-    vi.mocked(getCentre).mockResolvedValueOnce(centre(null));
+  it("asks a new owner to name their centre", () => {
+    vi.mocked(useSession).mockReturnValue({ token: "token", centre: centre(null) });
     render(<DashboardPage />);
 
-    expect(await screen.findByRole("heading", { name: "Welcome to Chukta" })).toBeInTheDocument();
-    expect(screen.getByText(/name your centre/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Welcome to Chukta", level: 1 })).toBeVisible();
+    expect(screen.getByText(/name your centre/i)).toBeVisible();
   });
 
-  it("logs out and returns to the login page", async () => {
-    setAccessToken("token");
-    const user = userEvent.setup();
+  it("points to setting up batches first", () => {
     render(<DashboardPage />);
-
-    await user.click(await screen.findByRole("button", { name: "Log out" }));
-
-    expect(logout).toHaveBeenCalled();
-    expect(getAccessToken()).toBeNull();
-    expect(replace).toHaveBeenCalledWith("/login");
+    expect(screen.getByRole("link", { name: "Set up batches" })).toHaveAttribute("href", "/batches");
   });
 
-  it("returns to login if the centre can't be loaded", async () => {
-    vi.mocked(getCentre).mockRejectedValueOnce(new Error("401"));
+  it("sits in the app shell with Dashboard marked as the current page", () => {
     render(<DashboardPage />);
-
-    await vi.waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
+    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute("aria-current", "page");
   });
 });

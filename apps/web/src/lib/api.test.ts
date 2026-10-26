@@ -1,5 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiRequestError, apiBaseUrl, getCentre, logout, refreshSession, requestOtp, verifyOtp } from "./api";
+import {
+  ApiRequestError,
+  apiBaseUrl,
+  archiveBatch,
+  createBatch,
+  getCentre,
+  listBatches,
+  logout,
+  refreshSession,
+  requestOtp,
+  updateBatch,
+  verifyOtp,
+} from "./api";
 
 const fetchMock = vi.fn<typeof fetch>();
 
@@ -101,6 +113,43 @@ describe("API client", () => {
   it("logs out, accepting an empty 204 reply", async () => {
     reply(204);
     await expect(logout()).resolves.toBeUndefined();
+  });
+
+  it("lists batches with the chosen status", async () => {
+    reply(200, { batches: [], nextCursor: null });
+
+    await listBatches("token-123", { status: "all" });
+
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe("http://localhost:8787/api/v1/batches?status=all&limit=100");
+    expect(new Headers(init!.headers).get("authorization")).toBe("Bearer token-123");
+  });
+
+  it("creates, updates and archives batches", async () => {
+    const batch = { id: "b1", name: "Yoga", subject: null, days: ["mon"], startTime: "07:00", endTime: "08:00", isActive: true, createdAt: "x" };
+    reply(201, { batch });
+    reply(200, { batch: { ...batch, name: "Morning yoga" } });
+    reply(200, { batch: { ...batch, isActive: false } });
+    const input = { name: "Yoga", subject: null, days: ["mon" as const], startTime: "07:00", endTime: "08:00" };
+
+    await expect(createBatch("t", input)).resolves.toEqual(batch);
+    await expect(updateBatch("t", "b1", { name: "Morning yoga" })).resolves.toMatchObject({ name: "Morning yoga" });
+    await expect(archiveBatch("t", "b1")).resolves.toMatchObject({ isActive: false });
+
+    expect(fetchMock.mock.calls.map(([url, init]) => `${init!.method} ${url}`)).toEqual([
+      "POST http://localhost:8787/api/v1/batches",
+      "PATCH http://localhost:8787/api/v1/batches/b1",
+      "DELETE http://localhost:8787/api/v1/batches/b1",
+    ]);
+    expect(JSON.parse(fetchMock.mock.calls[0]![1]!.body as string)).toEqual(input);
+  });
+
+  it("passes on the fields at fault", async () => {
+    reply(409, { error: { code: "batch_name_taken", message: "Taken.", fields: { name: "Taken." } } });
+
+    await expect(
+      createBatch("t", { name: "Yoga", subject: null, days: ["mon"], startTime: "07:00", endTime: "08:00" }),
+    ).rejects.toMatchObject({ status: 409, fields: { name: "Taken." } });
   });
 
   it("reads the centre with the access token", async () => {

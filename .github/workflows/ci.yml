@@ -125,10 +125,22 @@ jobs:
       OTP_LOG_FILE: /tmp/chukta-api.log
     steps:
       - uses: actions/checkout@v7
+      # A same-named branch in the e2e repo (e.g. feature/batches) carries this
+      # change's new scenarios; otherwise the suite on main is used.
+      - name: Pick the e2e branch
+        id: e2e-ref
+        env:
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          if git ls-remote --exit-code --heads https://github.com/sejaltech994/coaching-centre-fee-app-e2e "$BRANCH" >/dev/null; then
+            echo "ref=$BRANCH" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v7
         with:
           repository: sejaltech994/coaching-centre-fee-app-e2e
-          ref: main
+          ref: ${{ steps.e2e-ref.outputs.ref }}
           path: e2e
       - uses: actions/setup-node@v7
         with:
@@ -154,6 +166,8 @@ jobs:
           JWT_SECRET: e2e-only-secret-not-used-anywhere-else-0123456789
           SMS_PROVIDER: console
           WEB_ORIGINS: ${{ env.WEB_URL }}
+          # Every scenario logs in from the same IP; the TSD's 20/hour would cap the suite.
+          OTP_PER_IP_PER_HOUR: "1000"
         run: nohup npx tsx src/server.ts > "$OTP_LOG_FILE" 2>&1 &
 
       - name: Serve the web build

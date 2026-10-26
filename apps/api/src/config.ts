@@ -10,6 +10,8 @@ export type Config = {
   cookieSecure: boolean;
   /** Read the client IP from cf-connecting-ip / x-forwarded-for. Only behind a trusted proxy. */
   trustProxyHeaders: boolean;
+  /** Hourly OTP limits. The TSD's values; only non-production may raise them (automated test runs). */
+  otpLimits: { perPhonePerHour: number; perIpPerHour: number };
 };
 
 const SMS_PROVIDERS = ["console"] as const;
@@ -24,6 +26,21 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   const nodeEnv = env.NODE_ENV === "production" || env.NODE_ENV === "test" ? env.NODE_ENV : "development";
   const jwtSecret = required("JWT_SECRET");
   if (jwtSecret.length < 32) throw new Error("JWT_SECRET must be at least 32 characters");
+
+  const limit = (name: string, fallback: number) => {
+    const raw = env[name];
+    if (raw === undefined) return fallback;
+    if (nodeEnv === "production") throw new Error(`${name} can't be changed in production`);
+    const value = Number(raw);
+    if (!Number.isInteger(value) || value < 1) throw new Error(`${name} must be a positive whole number`);
+    return value;
+  };
+
+  // Checked first, so changing a limit in production always fails loudly.
+  const otpLimits = {
+    perPhonePerHour: limit("OTP_PER_PHONE_PER_HOUR", 5),
+    perIpPerHour: limit("OTP_PER_IP_PER_HOUR", 20),
+  };
 
   const smsProvider = env.SMS_PROVIDER ?? "console";
   if (!SMS_PROVIDERS.includes(smsProvider as (typeof SMS_PROVIDERS)[number])) {
@@ -45,5 +62,6 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       .filter(Boolean),
     cookieSecure: nodeEnv !== "development",
     trustProxyHeaders: env.TRUST_PROXY_HEADERS === "true",
+    otpLimits,
   };
 }

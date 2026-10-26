@@ -5,13 +5,11 @@ import type { Deps } from "../../deps";
 import { keyedHash, randomOtp, sameHash } from "../../lib/crypto";
 import { ApiError } from "../../lib/errors";
 
-/** Login code rules from the TSD (Security, compliance and privacy). */
+/** Login code rules from the TSD (Security, compliance and privacy). Hourly limits come from config. */
 export const OTP_RULES = {
   ttlMs: 5 * 60_000,
   resendAfterMs: 30_000,
   maxAttempts: 5,
-  perPhonePerHour: 5,
-  perIpPerHour: 20,
 } as const;
 
 const HOUR = 60 * 60_000;
@@ -41,8 +39,9 @@ export async function requestOtp(deps: Deps, input: { phone: IndianMobile; ip: s
     });
   }
 
-  await enforceHourlyLimit(deps, eq(otpChallenges.phone, input.phone), OTP_RULES.perPhonePerHour, windowStart, now);
-  await enforceHourlyLimit(deps, eq(otpChallenges.requestedIp, input.ip), OTP_RULES.perIpPerHour, windowStart, now);
+  const { perPhonePerHour, perIpPerHour } = config.otpLimits;
+  await enforceHourlyLimit(deps, eq(otpChallenges.phone, input.phone), perPhonePerHour, windowStart, now);
+  await enforceHourlyLimit(deps, eq(otpChallenges.requestedIp, input.ip), perIpPerHour, windowStart, now);
 
   const code = randomOtp();
   const challenge = await db.transaction(async (tx) => {

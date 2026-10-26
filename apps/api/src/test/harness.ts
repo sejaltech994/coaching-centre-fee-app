@@ -13,6 +13,7 @@ export const testConfig: Config = {
   webOrigins: ["http://localhost:3000"],
   cookieSecure: true,
   trustProxyHeaders: true,
+  otpLimits: { perPhonePerHour: 5, perIpPerHour: 20 },
 };
 
 /** The API wired to an in-memory Postgres, a recording SMS fake and a clock the test controls. */

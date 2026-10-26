@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import type { AppEnv, Deps } from "./deps";
 import { handleError, notFound } from "./lib/errors";
 import { authRoutes } from "./modules/auth/routes";
+import { batchRoutes } from "./modules/batches/routes";
 import { centreRoutes } from "./modules/centre/routes";
 
 /** The JSON API under /api/v1. See the TSD's API section. */
@@ -23,6 +24,7 @@ export function createApp(deps: Deps) {
   app.get("/health", (c) => c.json({ status: "ok" }));
   app.route("/auth", authRoutes(deps));
   app.route("/centre", centreRoutes(deps));
+  app.route("/batches", batchRoutes(deps));
 
   app.notFound(notFound);
   app.onError(handleError);

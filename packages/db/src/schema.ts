@@ -1,5 +1,24 @@
 import { sql } from "drizzle-orm";
-import { check, index, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  check,
+  index,
+  integer,
+  pgPolicy,
+  pgRole,
+  pgTable,
+  text,
+  time,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
+
+/** Created in migration 0001; centre-scoped transactions run as this role (see withCentre). */
+export const appRole = pgRole("chukta_app").existing();
+
+/** RLS predicate: the row belongs to the centre set for this transaction. */
+const currentCentre = sql`nullif(current_setting('app.centre_id', true), '')::uuid`;
 
 const id = () => uuid("id").primaryKey().defaultRandom();
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
@@ -90,7 +109,48 @@ export const refreshTokens = pgTable(
   (t) => [index("refresh_tokens_family_id_idx").on(t.familyId), index("refresh_tokens_user_id_idx").on(t.userId)],
 );
 
+/** A class group with a weekly schedule. Archived (is_active = false) rather than deleted. */
+export const batches = pgTable(
+  "batches",
+  {
+    id: id(),
+    centreId: uuid("centre_id")
+      .notNull()
+      .references(() => centres.id),
+    name: text("name").notNull(),
+    subject: text("subject"),
+    // Lower-case weekday codes, Monday first: {mon,wed,fri}.
+    days: text("days").array().notNull(),
+    startTime: time("start_time").notNull(),
+    endTime: time("end_time").notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("batches_centre_id_idx").on(t.centreId),
+    // Archived batches free their name for reuse.
+    uniqueIndex("batches_centre_active_name_unique")
+      .on(t.centreId, sql`lower(${t.name})`)
+      .where(sql`${t.isActive}`),
+    check("batches_name_check", sql`length(trim(${t.name})) > 0`),
+    check(
+      "batches_days_check",
+      sql`cardinality(${t.days}) > 0 and ${t.days} <@ array['mon','tue','wed','thu','fri','sat','sun']`,
+    ),
+    check("batches_time_check", sql`${t.endTime} > ${t.startTime}`),
+    pgPolicy("batches_centre_isolation", {
+      as: "permissive",
+      for: "all",
+      to: appRole,
+      using: sql`${t.centreId} = ${currentCentre}`,
+      withCheck: sql`${t.centreId} = ${currentCentre}`,
+    }),
+  ],
+).enableRLS();
+
 export type Centre = typeof centres.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type OtpChallenge = typeof otpChallenges.$inferSelect;
 export type RefreshToken = typeof refreshTokens.$inferSelect;
+export type Batch = typeof batches.$inferSelect;

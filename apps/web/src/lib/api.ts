@@ -1,4 +1,5 @@
 /** Typed client for the Chukta API (apps/api). See the TSD's API section. */
+import type { BatchInput, Weekday } from "@chukta/shared";
 
 export type LoginSession = {
   accessToken: string;
@@ -12,20 +13,34 @@ export type CentreResponse = {
   centre: { id: string; name: string | null; plan: "free" | "pro"; timezone: string };
 };
 
+export type Batch = {
+  id: string;
+  name: string;
+  subject: string | null;
+  days: Weekday[];
+  startTime: string;
+  endTime: string;
+  isActive: boolean;
+  createdAt: string;
+};
+
 export class ApiRequestError extends Error {
   readonly attemptsLeft?: number;
   readonly retryAfterSeconds?: number;
+  /** Message per field at fault, for forms. */
+  readonly fields?: Record<string, string>;
 
   constructor(
     readonly status: number,
     readonly code: string,
     message: string,
-    options: { attemptsLeft?: number; retryAfterSeconds?: number } = {},
+    options: { attemptsLeft?: number; retryAfterSeconds?: number; fields?: Record<string, string> } = {},
   ) {
     super(message);
     this.name = "ApiRequestError";
     this.attemptsLeft = options.attemptsLeft;
     this.retryAfterSeconds = options.retryAfterSeconds;
+    this.fields = options.fields;
   }
 }
 
@@ -53,7 +68,7 @@ async function call<T>(path: string, init: { method?: string; body?: unknown; to
 
   if (res.status === 204) return undefined as T;
   const payload = (await res.json().catch(() => null)) as
-    | (T & { error?: { code: string; message: string; attemptsLeft?: number } })
+    | (T & { error?: { code: string; message: string; attemptsLeft?: number; fields?: Record<string, string> } })
     | null;
 
   if (!res.ok) {
@@ -65,6 +80,7 @@ async function call<T>(path: string, init: { method?: string; body?: unknown; to
       {
         attemptsLeft: payload?.error?.attemptsLeft,
         retryAfterSeconds: Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined,
+        fields: payload?.error?.fields,
       },
     );
   }
@@ -86,3 +102,22 @@ export const refreshSession = () =>
 export const logout = () => call<void>("/auth/logout", { method: "POST" });
 
 export const getCentre = (token: string) => call<CentreResponse>("/centre", { token });
+
+// --- Batches ---
+
+export const listBatches = (token: string, { status }: { status: "active" | "archived" | "all" }) =>
+  // A centre has tens of batches at most; one page of 100 covers it.
+  call<{ batches: Batch[]; nextCursor: string | null }>(`/batches?status=${status}&limit=100`, { token });
+
+export const getBatch = async (token: string, id: string) =>
+  (await call<{ batch: Batch }>(`/batches/${encodeURIComponent(id)}`, { token })).batch;
+
+export const createBatch = async (token: string, input: BatchInput) =>
+  (await call<{ batch: Batch }>("/batches", { method: "POST", body: input, token })).batch;
+
+export const updateBatch = async (token: string, id: string, changes: Partial<BatchInput> & { isActive?: boolean }) =>
+  (await call<{ batch: Batch }>(`/batches/${id}`, { method: "PATCH", body: changes, token })).batch;
+
+/** The API archives rather than deletes. */
+export const archiveBatch = async (token: string, id: string) =>
+  (await call<{ batch: Batch }>(`/batches/${id}`, { method: "DELETE", token })).batch;
