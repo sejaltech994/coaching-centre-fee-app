@@ -47,6 +47,8 @@ jobs:
 
       - name: Deploy web to Cloudflare
         id: deploy
+        # bash -eo pipefail, so a failed deploy is not hidden by the pipe into tee.
+        shell: bash
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
             echo "::warning::CLOUDFLARE_API_TOKEN is not set, so nothing was deployed. See docs/deployment.md."
