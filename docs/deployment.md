@@ -4,12 +4,12 @@ The web app is a static Next.js export served by **Cloudflare Workers** (static 
 
 | Environment | Branch | Worker | URL |
 | --- | --- | --- | --- |
-| dev | `develop` | `chukta-web-dev` | `https://chukta-web-dev.<subdomain>.workers.dev` |
-| sit | `sit` | `chukta-web-sit` | `https://chukta-web-sit.<subdomain>.workers.dev` |
-| uat | `uat` | `chukta-web-uat` | `https://chukta-web-uat.<subdomain>.workers.dev` |
-| prod | `main` | `chukta-web-prod` | `https://chukta-web-prod.<subdomain>.workers.dev`, later a custom domain |
+| dev | `develop` | `chukta-web-dev` | `https://chukta-web-dev.chukta.workers.dev` |
+| sit | `sit` | `chukta-web-sit` | `https://chukta-web-sit.chukta.workers.dev` |
+| uat | `uat` | `chukta-web-uat` | `https://chukta-web-uat.chukta.workers.dev` |
+| prod | `main` | `chukta-web-prod` | `https://chukta-web-prod.chukta.workers.dev`, later a custom domain |
 
-`<subdomain>` is the account's workers.dev subdomain, chosen once in step 2 below. Each run of the **Deploy** workflow prints its URL, and it also appears on the environment in the repo's **Environments** page.
+The account's workers.dev subdomain is `chukta`. Each run of the **Deploy** workflow prints its URL, and it also appears on the environment in the repo's **Environments** page.
 
 ## Why Cloudflare
 
