@@ -55,7 +55,8 @@ describe("SiteHeader", () => {
     const { menuButton } = renderHeader();
 
     await user.click(menuButton());
-    await user.keyboard("{Enter}");
+    // A key that does nothing on the focused menu button (Enter or Space would toggle it).
+    await user.keyboard("{Shift}");
     expect(menuButton()).toHaveAttribute("aria-expanded", "true");
 
     await user.keyboard("{Escape}");
