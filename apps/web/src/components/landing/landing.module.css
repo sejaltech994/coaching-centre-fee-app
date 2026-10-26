@@ -1,0 +1,1007 @@
+/* ---------- Layout ---------- */
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-inline: 24px;
+}
+
+.section {
+  padding-block: 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+}
+
+.band {
+  background: var(--paper-raised);
+  border-block: 1px solid var(--line);
+}
+
+.bandSunk {
+  background: var(--paper-sunk);
+  border-block: 1px solid var(--line);
+}
+
+/* ---------- Type ---------- */
+
+.eyebrow {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--indigo);
+}
+
+.heading {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 720px;
+}
+
+.headingCentered {
+  composes: heading;
+  text-align: center;
+  align-self: center;
+}
+
+.h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 44px;
+  line-height: 50px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.h3 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 700;
+}
+
+.muted {
+  margin: 0;
+  color: var(--ink-muted);
+}
+
+.caption {
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.amount {
+  font-size: 28px;
+  line-height: 32px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.highlight {
+  box-shadow: inset 0 -0.24em 0 var(--marigold);
+}
+
+/* ---------- Buttons ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 12px 20px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.btnLarge {
+  padding: 15px 27px;
+}
+
+.btnPrimary {
+  composes: btn;
+  background: var(--indigo);
+  color: var(--on-indigo);
+}
+
+.btnPrimary:hover {
+  background: var(--indigo-deep);
+  color: var(--on-indigo);
+}
+
+.btnSecondary {
+  composes: btn;
+  background: var(--paper-raised);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+.btnSecondary:hover {
+  background: var(--paper-sunk);
+  color: var(--ink);
+}
+
+.btnAccent {
+  composes: btn;
+  background: var(--marigold);
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.btnAccent:hover {
+  background: #e8952a;
+  color: var(--ink);
+}
+
+/* ---------- Cards and pills ---------- */
+
+.card {
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cardDeep {
+  composes: card;
+  background: var(--indigo-deep);
+  border-color: var(--indigo-deep);
+  color: var(--on-deep);
+}
+
+.cardDeep .muted {
+  color: var(--on-deep-muted);
+}
+
+.list {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pill {
+  display: inline-block;
+  border-radius: var(--radius-pill);
+  padding: 4px 12px;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.pillPaid {
+  composes: pill;
+  background: var(--paid-soft);
+  color: var(--paid);
+}
+
+.pillPending {
+  composes: pill;
+  background: var(--marigold-soft);
+  color: var(--pending);
+}
+
+.pillOverdue {
+  composes: pill;
+  background: var(--overdue-soft);
+  color: var(--overdue);
+}
+
+.badge {
+  align-self: flex-start;
+  background: var(--marigold);
+  color: var(--ink);
+  border-radius: var(--radius-pill);
+  padding: 4px 12px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.coin {
+  flex: none;
+  border-radius: var(--radius-pill);
+  background: var(--marigold);
+  display: block;
+}
+
+/* ---------- Header ---------- */
+
+.header {
+  border-bottom: 1px solid var(--line);
+  position: relative;
+}
+
+.headerInner {
+  composes: container;
+  padding-block: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--indigo);
+}
+
+.logoWord {
+  font-family: var(--font-display);
+  font-size: 26px;
+  line-height: 32px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+}
+
+.navLink {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.navLink:hover {
+  color: var(--indigo);
+}
+
+.navCta {
+  composes: btnPrimary;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.menuButton {
+  display: none;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper-raised);
+  color: var(--ink);
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* ---------- Hero ---------- */
+
+.hero {
+  composes: container;
+  padding-block: 88px 96px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 64px;
+}
+
+.heroCopy {
+  flex: 1 1 480px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 64px;
+  line-height: 68px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.lead {
+  margin: 0;
+  max-width: 520px;
+  font-size: 18px;
+  line-height: 28px;
+  color: var(--ink-muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.heroVisual {
+  flex: 1 1 420px;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding-block: 24px;
+}
+
+.phone {
+  width: 300px;
+  background: var(--ink);
+  border-radius: 40px;
+  padding: 12px;
+  box-shadow: var(--shadow-float);
+}
+
+.phoneScreen {
+  background: var(--paper-sunk);
+  border-radius: 30px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.chatHeader {
+  background: var(--indigo-deep);
+  color: var(--on-deep);
+  padding: 20px 16px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-pill);
+  background: var(--marigold);
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.chatTitle {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 700;
+}
+
+.chatSubtitle {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+  color: var(--on-deep-muted);
+}
+
+.chatBody {
+  padding: 16px 12px 20px;
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 13px;
+  line-height: 19px;
+}
+
+.bubbleIn {
+  align-self: flex-start;
+  max-width: 236px;
+  background: var(--paper-raised);
+  border-radius: 16px 16px 16px 6px;
+  padding: 12px 14px;
+  box-shadow: 0 1px 2px rgba(22, 24, 43, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bubbleIn p {
+  margin: 0;
+}
+
+.bubbleOut {
+  align-self: flex-end;
+  max-width: 200px;
+  background: var(--paid-soft);
+  border-radius: 16px 16px 6px 16px;
+  padding: 10px 14px;
+}
+
+.payLink {
+  display: block;
+  background: var(--indigo-soft);
+  color: var(--indigo);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.time {
+  text-align: right;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--ink-muted);
+}
+
+.received {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--paid);
+  font-weight: 700;
+}
+
+.attachment {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--paper-sunk);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+}
+
+.statCard {
+  position: absolute;
+  left: 0;
+  bottom: 56px;
+  width: 230px;
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.statLabel {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ink-muted);
+}
+
+.progress {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--paper-sunk);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--paid);
+}
+
+.statusStack {
+  position: absolute;
+  right: 0;
+  top: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.statusStack .pill {
+  padding: 6px 12px;
+}
+
+/* ---------- Audience strip ---------- */
+
+.audience {
+  composes: container;
+  padding-block: 28px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 32px;
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.audience strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* ---------- Grids ---------- */
+
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+.steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.stepNumber {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-pill);
+  background: var(--marigold);
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.label {
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.labelOverdue {
+  composes: label;
+  color: var(--overdue);
+}
+
+.labelAccent {
+  composes: label;
+  color: var(--marigold);
+}
+
+/* ---------- Features ---------- */
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 24px;
+}
+
+.featureHero {
+  composes: cardDeep;
+  grid-row: span 2;
+  gap: 20px;
+}
+
+.featureCard {
+  composes: card;
+  gap: 12px;
+}
+
+.featureIcon {
+  color: var(--indigo);
+}
+
+.miniDashboard {
+  margin-top: auto;
+  background: var(--paper-raised);
+  color: var(--ink);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.miniRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.miniRowDivided {
+  composes: miniRow;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.miniTitle {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 700;
+}
+
+.miniAction {
+  background: var(--indigo);
+  color: var(--on-indigo);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 700;
+}
+
+.miniStudent {
+  display: flex;
+  flex-direction: column;
+  font-weight: 700;
+}
+
+/* ---------- Pricing ---------- */
+
+.plans {
+  composes: grid2;
+  width: 100%;
+  max-width: 840px;
+  align-self: center;
+}
+
+.plan {
+  composes: card;
+  gap: 20px;
+  position: relative;
+}
+
+.planPro {
+  composes: plan;
+  background: var(--indigo-deep);
+  border-color: var(--indigo-deep);
+  color: var(--on-deep);
+}
+
+.planBadge {
+  composes: badge;
+  position: absolute;
+  top: 24px;
+  right: 24px;
+}
+
+.price {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.priceValue {
+  font-family: var(--font-display);
+  font-size: 44px;
+  line-height: 50px;
+  font-weight: 600;
+}
+
+.priceUnit {
+  color: var(--ink-muted);
+}
+
+.planPro .priceUnit {
+  color: var(--on-deep-muted);
+}
+
+.planList {
+  composes: list;
+  gap: 8px;
+}
+
+.plan .planList {
+  color: var(--ink-muted);
+}
+
+.planPro .planList {
+  color: var(--on-deep);
+}
+
+.planCta {
+  margin-top: auto;
+}
+
+/* ---------- Start CTA ---------- */
+
+.ctaWrap {
+  composes: container;
+  padding-block: 96px;
+}
+
+.cta {
+  background: var(--indigo);
+  color: var(--on-indigo);
+  border-radius: var(--radius-xl);
+  padding: 64px 48px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+}
+
+.ctaCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 620px;
+}
+
+.ctaLead {
+  margin: 0;
+  font-size: 18px;
+  line-height: 28px;
+  color: #d9daf2;
+}
+
+.ctaForm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.ctaForm :focus-visible {
+  outline-color: var(--marigold);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.phoneInput {
+  width: 240px;
+  height: 52px;
+  border: 0;
+  border-radius: var(--radius-md);
+  padding: 0 16px;
+  background: var(--paper-raised);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+}
+
+.ctaSubmit {
+  composes: btnAccent;
+  height: 52px;
+  border: 0;
+  padding: 0 24px;
+}
+
+/* ---------- Footer ---------- */
+
+.footer {
+  border-top: 1px solid var(--line);
+}
+
+.footerInner {
+  composes: container;
+  padding-block: 40px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 24px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-muted);
+}
+
+.footerBrand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.footerWord {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--indigo);
+}
+
+.footerNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+
+.footerNav a {
+  color: var(--ink-muted);
+}
+
+/* ---------- Tablet ---------- */
+
+@media (max-width: 900px) {
+  .menuButton {
+    display: inline-flex;
+  }
+
+  .nav {
+    display: none;
+  }
+
+  .navOpen {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    padding: 12px 16px 16px;
+    background: var(--paper-raised);
+    border-bottom: 1px solid var(--line);
+    box-shadow: var(--shadow-card);
+  }
+
+  .navOpen .navLink {
+    padding: 12px 8px;
+  }
+
+  .navOpen .navCta {
+    margin-top: 8px;
+  }
+}
+
+/* ---------- Phone (design's mobile board, 390px) ---------- */
+
+@media (max-width: 640px) {
+  .container,
+  .headerInner,
+  .hero,
+  .audience,
+  .ctaWrap,
+  .footerInner {
+    padding-inline: 16px;
+  }
+
+  .headerInner {
+    padding-block: 16px;
+  }
+
+  .logoWord {
+    font-size: 22px;
+    line-height: 28px;
+  }
+
+  .section,
+  .ctaWrap {
+    padding-block: 64px;
+    gap: 32px;
+  }
+
+  .hero {
+    padding-block: 40px 48px;
+    gap: 40px;
+  }
+
+  .heroCopy {
+    gap: 20px;
+  }
+
+  .h1 {
+    font-size: 40px;
+    line-height: 44px;
+  }
+
+  .h2 {
+    font-size: 30px;
+    line-height: 36px;
+    letter-spacing: -0.01em;
+  }
+
+  .lead {
+    font-size: 17px;
+    line-height: 26px;
+  }
+
+  .actions > a {
+    flex: 1 1 100%;
+  }
+
+  /* Floating cards sit in the flow under the phone instead of over it. */
+  .heroVisual {
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding-block: 0;
+  }
+
+  .phone {
+    width: 100%;
+    max-width: 300px;
+  }
+
+  .chatBody {
+    min-height: 0;
+  }
+
+  .statCard,
+  .statusStack {
+    position: static;
+  }
+
+  .statCard {
+    width: 100%;
+    max-width: 300px;
+  }
+
+  .statusStack {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .audience {
+    justify-content: flex-start;
+  }
+
+  .audience strong {
+    flex: 1 1 100%;
+  }
+
+  .card {
+    padding: 24px;
+  }
+
+  .grid2,
+  .features,
+  .steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .featureHero {
+    grid-row: auto;
+  }
+
+  .cta {
+    padding: 40px 24px;
+  }
+
+  .ctaForm,
+  .phoneInput,
+  .ctaSubmit {
+    width: 100%;
+  }
+}

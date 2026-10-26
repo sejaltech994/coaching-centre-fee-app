@@ -1,0 +1,74 @@
+/* Chukta design tokens (light theme), from the landing page design's tokens.json. */
+:root {
+  --paper: #fbf6ec;
+  --paper-raised: #ffffff;
+  --paper-sunk: #f3ecdd;
+  --line: #e6dcc8;
+  --ink: #16182b;
+  --ink-muted: #5c586c;
+  --indigo: #2b2f77;
+  --indigo-deep: #1b1e52;
+  --indigo-soft: #e7e8f8;
+  --on-indigo: #ffffff;
+  --on-deep: #f4efe4;
+  --on-deep-muted: #c9c6e0;
+  --marigold: #f2a33a;
+  --marigold-soft: #fdefd6;
+  --paid: #1e7a50;
+  --paid-soft: #dff2e7;
+  --pending: #8a5a00;
+  --overdue: #b4233c;
+  --overdue-soft: #fbe3e6;
+
+  --font-display: var(--font-fraunces), Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, Menlo, monospace;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 28px;
+  --radius-pill: 999px;
+
+  --shadow-card: 0 1px 2px rgba(22, 24, 43, 0.06), 0 8px 24px rgba(22, 24, 43, 0.08);
+  --shadow-float: 0 24px 60px rgba(27, 30, 82, 0.22);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 24px;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--indigo);
+}
+
+a:hover {
+  color: var(--indigo-deep);
+}
+
+:focus-visible {
+  outline: 2px solid var(--indigo);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}

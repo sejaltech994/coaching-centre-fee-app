@@ -15,10 +15,31 @@ Design: [Technical Design Specification](https://claude.ai/artifact/JVdM6Ebn8UtW
 | `packages/integrations` | Adapters: `PaymentGateway` (Razorpay), `MessagingProvider` (WhatsApp), `SmsProvider`, file storage |
 | `packages/shared` | Types and validation shared by web, api and worker |
 | `docs` | Design notes and decisions |
+| `.github/workflows` | CI, promotion guard and deploy pipelines |
+| `scripts` | One-off repo and tooling scripts |
+
+## Branches and environments
+
+| Env | Branch | Gets code by |
+| --- | --- | --- |
+| dev | `develop` | Direct commit |
+| sit | `sit` | PR from `develop` + pipeline |
+| uat | `uat` | PR from `sit` + pipeline |
+| prod | `main` | PR from `uat` + pipeline + approval |
+
+Details, hotfixes and setup: [docs/branching-and-environments.md](docs/branching-and-environments.md).
 
 ## Local development
 
 ```sh
 cp .env.example .env
 docker compose up -d   # Postgres and Redis
+```
+
+Run the web app:
+
+```sh
+cd apps/web
+npm install
+npm run dev            # http://localhost:3000
 ```
