@@ -1,12 +1,36 @@
 /** Typed client for the Chukta API (apps/api). See the TSD's API section. */
-import type { BatchInput, Weekday } from "@chukta/shared";
+import type { BatchInput, CentreType, Weekday } from "@chukta/shared";
 
-export type LoginSession = {
+export type Me = {
+  user: { id: string; phone: string; fullName: string | null; email: string | null; role: "owner" };
+  centre: {
+    id: string;
+    name: string | null;
+    city: string | null;
+    centreType: CentreType | null;
+    plan: "free" | "pro";
+    timezone: string;
+  };
+};
+
+export type LoginSession = Me & {
+  status: "signed_in";
   accessToken: string;
   expiresIn: number;
   isNewAccount: boolean;
-  user: { id: string; phone: string; name: string | null; role: "owner" };
-  centre: { id: string; name: string | null; plan: "free" | "pro" };
+};
+
+/** A verified number with no account yet: the ticket lets it register within `expiresIn` seconds. */
+export type SignupRequired = { status: "signup_required"; signupTicket: string; phone: string; expiresIn: number };
+
+export type RegisterInput = {
+  signupTicket: string;
+  fullName: string;
+  centreName: string;
+  city: string;
+  centreType: string;
+  email?: string;
+  acceptedTerms: boolean;
 };
 
 export type CentreResponse = {
@@ -96,7 +120,12 @@ export const requestOtp = (phone: string) =>
   });
 
 export const verifyOtp = (phone: string, code: string) =>
-  call<LoginSession>("/auth/otp/verify", { method: "POST", body: { phone, code } });
+  call<LoginSession | SignupRequired>("/auth/otp/verify", { method: "POST", body: { phone, code } });
+
+export const registerOwner = (input: RegisterInput) =>
+  call<LoginSession>("/auth/register", { method: "POST", body: input });
+
+export const getMe = (token: string) => call<Me>("/me", { token });
 
 export const refreshSession = () =>
   call<{ accessToken: string; expiresIn: number }>("/auth/refresh", { method: "POST" });

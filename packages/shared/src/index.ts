@@ -10,3 +10,11 @@ export {
   type Weekday,
 } from "./batch";
 export { formatIndianMobile, maskPhone, normalizeIndianMobile, type IndianMobile } from "./phone";
+export {
+  CENTRE_TYPE_LABELS,
+  CENTRE_TYPES,
+  validateProfile,
+  type CentreType,
+  type ProfileInput,
+  type ProfileValidation,
+} from "./profile";
