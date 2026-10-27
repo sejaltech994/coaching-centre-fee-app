@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { AppEnv, Deps } from "./deps";
@@ -22,6 +23,16 @@ export function createApp(deps: Deps) {
   );
 
   app.get("/health", (c) => c.json({ status: "ok" }));
+  // Readiness for deploy smoke tests: the API can reach its database.
+  app.get("/health/ready", async (c) => {
+    try {
+      await deps.db.execute(sql`select 1`);
+      return c.json({ status: "ok", database: "ok" });
+    } catch (err) {
+      console.error("Readiness check failed:", err);
+      return c.json({ status: "unavailable", database: "unreachable" }, 503);
+    }
+  });
   app.route("/auth", authRoutes(deps));
   app.route("/centre", centreRoutes(deps));
   app.route("/batches", batchRoutes(deps));

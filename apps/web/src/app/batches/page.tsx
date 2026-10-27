@@ -15,6 +15,9 @@ export default function BatchesPage() {
   const [batches, setBatches] = useState<Batch[] | null>(null);
   const [view, setView] = useState<"active" | "archived">("active");
   const [query, setQuery] = useState("");
+  const [loadFailed, setLoadFailed] = useState(false);
+  // Bumped by "Try again" to reload.
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!token) return;
@@ -22,11 +25,12 @@ export default function BatchesPage() {
     // One request for both tabs, so both counts are known.
     listBatches(token, { status: "all" })
       .then((result) => !cancelled && setBatches(result.batches))
-      .catch(() => !cancelled && setBatches([]));
+      // Never show a failed load as an empty (or stale) list: say so, and offer a retry.
+      .catch(() => !cancelled && setLoadFailed(true));
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, attempt]);
 
   const active = batches?.filter((b) => b.isActive) ?? [];
   const archived = batches?.filter((b) => !b.isActive) ?? [];
@@ -70,7 +74,23 @@ export default function BatchesPage() {
           </label>
         </div>
 
-        {batches === null ? (
+        {loadFailed ? (
+          <div className={styles.loadError}>
+            <p role="alert" className={styles.empty}>
+              We couldn&apos;t load your batches. Check your connection and try again.
+            </p>
+            <button
+              type="button"
+              className={app.secondaryButton}
+              onClick={() => {
+                setLoadFailed(false);
+                setAttempt((n) => n + 1);
+              }}
+            >
+              Try again
+            </button>
+          </div>
+        ) : batches === null ? (
           <p className={styles.empty} aria-live="polite">
             Loading…
           </p>

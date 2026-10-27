@@ -65,11 +65,18 @@ export function batchRoutes(deps: Deps) {
   routes.use("*", requireAuth(deps));
 
   /** Runs `fn` scoped to the caller's centre (RLS), translating name clashes to 409. */
-  const inCentre = <T>(centreId: string, fn: Parameters<typeof withCentre<T>>[2], name?: string) =>
+  /**
+   * Runs `fn` in one transaction scoped to the caller's centre (RLS). A unique
+   * violation becomes 409 for `name`, which may only be known inside `fn`.
+   */
+  const inCentre = <T>(centreId: string, fn: Parameters<typeof withCentre<T>>[2], name?: string | (() => string | undefined)) =>
     withCentre(deps.db, centreId, fn).catch((err: unknown) => {
-      if (name !== undefined && isUniqueViolation(err)) throw nameTaken(name);
+      const clashing = typeof name === "function" ? name() : name;
+      if (clashing !== undefined && isUniqueViolation(err)) throw nameTaken(clashing);
       throw err;
     });
+
+  const byId = (centreId: string, id: string) => and(eq(batches.id, id), eq(batches.centreId, centreId));
 
   routes.get("/", async (c) => {
     const parsed = listQuery.safeParse(c.req.query());
@@ -120,12 +127,7 @@ export function batchRoutes(deps: Deps) {
   /** Loads one of the caller's batches by id, or 404. */
   const findBatch = async (centreId: string, id: string) => {
     if (!UUID.test(id)) throw notFound();
-    const [row] = await inCentre(centreId, (tx) =>
-      tx
-        .select()
-        .from(batches)
-        .where(and(eq(batches.id, id), eq(batches.centreId, centreId))),
-    );
+    const [row] = await inCentre(centreId, (tx) => tx.select().from(batches).where(byId(centreId, id)));
     if (!row) throw notFound();
     return row;
   };
@@ -134,41 +136,46 @@ export function batchRoutes(deps: Deps) {
     return c.json({ batch: toDto(await findBatch(c.var.auth.centreId, c.req.param("id"))) });
   });
 
+  // Read, check and write in ONE transaction: fewer database round trips, and the
+  // row lock (FOR UPDATE) stops two simultaneous saves from overwriting each other.
   routes.patch("/:id", async (c) => {
     const { centreId } = c.var.auth;
-    const changes = await readJson(c, patchBody);
-    const current = toDto(await findBatch(centreId, c.req.param("id")));
+    const id = c.req.param("id");
+    if (!UUID.test(id)) throw notFound();
+    const { isActive, ...scheduleChanges } = await readJson(c, patchBody);
+    let newName: string | undefined;
 
-    // Validate the batch as it will be after the change, not just the changed fields.
-    const { isActive, ...scheduleChanges } = changes;
-    const checked = validateBatch({ ...current, ...scheduleChanges });
-    if (!checked.ok) throw invalidFields(checked.fields);
-
-    const [row] = await inCentre(
+    const row = await inCentre(
       centreId,
-      (tx) =>
-        tx
+      async (tx) => {
+        const [current] = await tx.select().from(batches).where(byId(centreId, id)).for("update");
+        if (!current) throw notFound();
+        // Validate the batch as it will be after the change, not just the changed fields.
+        const checked = validateBatch({ ...toDto(current), ...scheduleChanges });
+        if (!checked.ok) throw invalidFields(checked.fields);
+        newName = checked.value.name;
+        const [updated] = await tx
           .update(batches)
           .set({ ...checked.value, ...(isActive !== undefined && { isActive }) })
-          .where(and(eq(batches.id, current.id), eq(batches.centreId, centreId)))
-          .returning(),
-      checked.value.name,
+          .where(byId(centreId, id))
+          .returning();
+        return updated!;
+      },
+      () => newName,
     );
-    return c.json({ batch: toDto(row!) });
+    return c.json({ batch: toDto(row) });
   });
 
   // TSD: DELETE archives. History (enrolments, invoices) keeps pointing at the batch.
   routes.delete("/:id", async (c) => {
     const { centreId } = c.var.auth;
-    const current = await findBatch(centreId, c.req.param("id"));
+    const id = c.req.param("id");
+    if (!UUID.test(id)) throw notFound();
     const [row] = await inCentre(centreId, (tx) =>
-      tx
-        .update(batches)
-        .set({ isActive: false })
-        .where(and(eq(batches.id, current.id), eq(batches.centreId, centreId)))
-        .returning(),
+      tx.update(batches).set({ isActive: false }).where(byId(centreId, id)).returning(),
     );
-    return c.json({ batch: toDto(row!) });
+    if (!row) throw notFound();
+    return c.json({ batch: toDto(row) });
   });
 
   return routes;

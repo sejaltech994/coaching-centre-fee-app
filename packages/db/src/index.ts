@@ -1,2 +1,2 @@
 export * from "./schema";
-export { createDb, runMigrations, withCentre, type Database, type DbHandle, type Tx } from "./client";
+export { createDb, withCentre, type Database, type DbHandle, type Tx } from "./client";

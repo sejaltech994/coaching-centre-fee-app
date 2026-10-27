@@ -1,5 +1,5 @@
 // Applies pending migrations: `DATABASE_URL=... npm run db:migrate -w packages/db`.
-import { createDb, runMigrations } from "./client";
+import { createLocalDb, runMigrations } from "./local";
 
 const url = process.env.DATABASE_URL;
 if (!url) {
@@ -7,7 +7,7 @@ if (!url) {
   process.exit(1);
 }
 
-const handle = createDb(url);
+const handle = createLocalDb(url);
 try {
   await runMigrations(handle);
   console.info("Migrations applied");

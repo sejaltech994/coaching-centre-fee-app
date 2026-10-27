@@ -1,8 +1,9 @@
 # Publishes each environment branch to its environment after code lands on it:
-# run the full CI suite, deploy only if it passes, then smoke-test the live URL.
-# The web app goes to Cloudflare Workers (static assets), one Worker per env.
-# Needs the repository secret CLOUDFLARE_API_TOKEN; the account ID is in
-# apps/web/wrangler.jsonc. See docs/deployment.md and docs/ci-cd.md.
+# run the full CI suite, migrate the database, deploy, then smoke-test the site
+# and the API. One Cloudflare Worker per env serves the web app and, at /api/*,
+# the API (apps/api/src/worker.ts), backed by that env's Neon Postgres branch.
+# Secrets: CLOUDFLARE_API_TOKEN (repository); DATABASE_URL and JWT_SECRET
+# (per GitHub environment). See docs/deployment.md and docs/ci-cd.md.
 name: Deploy
 
 on:
@@ -32,6 +33,9 @@ jobs:
     env:
       DEPLOY_ENV: ${{ github.ref_name == 'develop' && 'dev' || github.ref_name == 'main' && 'prod' || github.ref_name }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      # Per-environment secrets (Settings › Environments › <env>).
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
     defaults:
       run:
         working-directory: apps/web
@@ -44,7 +48,21 @@ jobs:
           cache-dependency-path: package-lock.json
       - run: npm ci
         working-directory: .
+      # The web app calls the API on its own origin, served by the same Worker.
       - run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: /api/v1
+
+      # Before the new code goes live, so it never runs against an older schema.
+      # Migrations only add; they are safe for the running version too.
+      - name: Migrate the database
+        working-directory: .
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::warning::DATABASE_URL is not set for $DEPLOY_ENV, so no migrations ran and the API can't start. See docs/deployment.md."
+            exit 0
+          fi
+          npm run db:migrate -w packages/db
 
       # Keep dev, sit and uat out of search engines.
       - name: Mark non-prod as noindex
@@ -66,6 +84,22 @@ jobs:
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "::notice::Deployed $DEPLOY_ENV to $url"
 
+      # The Worker reads DATABASE_URL and JWT_SECRET as encrypted Worker secrets.
+      # Synced from the GitHub environment on every deploy, so rotating a secret
+      # is: update it in GitHub, re-run the deploy.
+      - name: Sync API secrets to the Worker
+        if: steps.deploy.outputs.url != ''
+        shell: bash
+        run: |
+          if [ -z "$DATABASE_URL" ] || [ -z "$JWT_SECRET" ]; then
+            echo "::warning::DATABASE_URL or JWT_SECRET is not set for $DEPLOY_ENV, so the API answers 503. See docs/deployment.md."
+            exit 0
+          fi
+          umask 077
+          node -e 'process.stdout.write(JSON.stringify({ DATABASE_URL: process.env.DATABASE_URL, JWT_SECRET: process.env.JWT_SECRET }))' > "$RUNNER_TEMP/secrets.json"
+          npx wrangler secret bulk "$RUNNER_TEMP/secrets.json" --env "$DEPLOY_ENV"
+          rm -f "$RUNNER_TEMP/secrets.json"
+
       # Fails the run if the live site is down, serves the wrong page or lost its
       # security headers, so a bad deploy is visible straight away (and rolled back
       # from Cloudflare's Deployments tab; see docs/deployment.md).
@@ -84,4 +118,13 @@ jobs:
           grep -qi '^x-content-type-options: nosniff' headers.txt || { echo "::error::Security headers missing on $URL"; exit 1; }
           code404=$(curl -s -o /dev/null -w '%{http_code}' "$URL/__smoke-test-missing__/")
           [ "$code404" = 404 ] || { echo "::error::Unknown paths return HTTP $code404 instead of 404"; exit 1; }
+
+          # The API and its database. Prod's API stays off until real SMS exists.
+          if [ "$DEPLOY_ENV" != prod ] && [ -n "$DATABASE_URL" ] && [ -n "$JWT_SECRET" ]; then
+            for attempt in 1 2 3 4 5; do
+              ready=$(curl -s -o ready.json -w '%{http_code}' "$URL/api/v1/health/ready") && [ "$ready" = 200 ] && break
+              echo "Attempt $attempt: API readiness HTTP $ready, retrying in 5s"; sleep 5
+            done
+            [ "$ready" = 200 ] || { echo "::error::$URL/api/v1/health/ready returned HTTP $ready: $(cat ready.json)"; exit 1; }
+          fi
           echo "::notice::Smoke test passed for $URL"
