@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, type ClipboardEvent, type KeyboardEvent } from "react";
+import { copy, fill as fillIn } from "@/lib/copy";
 import styles from "./auth.module.css";
 
 const LENGTH = 6;
@@ -59,7 +60,7 @@ export function CodeInput({ value, onChange, invalid, disabled, autoFocus }: Pro
 
   return (
     <fieldset className={styles.codeGroup} disabled={disabled}>
-      <legend className={styles.label}>6-digit code</legend>
+      <legend className={styles.label}>{copy.auth.codeLabel}</legend>
       <div className={styles.codeBoxes}>
         {Array.from({ length: LENGTH }, (_, i) => (
           <input
@@ -71,7 +72,7 @@ export function CodeInput({ value, onChange, invalid, disabled, autoFocus }: Pro
             type="text"
             inputMode="numeric"
             autoComplete={i === 0 ? "one-time-code" : "off"}
-            aria-label={`Digit ${i + 1}`}
+            aria-label={fillIn(copy.auth.digitLabel, { n: i + 1 })}
             aria-invalid={invalid ? true : undefined}
             value={value[i] ?? ""}
             // Selecting on focus lets a typed digit replace the one in the box.

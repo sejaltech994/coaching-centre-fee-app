@@ -27,7 +27,7 @@ Design: [Technical Design Specification](https://claude.ai/artifact/JVdM6Ebn8UtW
 | uat | `uat` | PR from `sit` + pipeline |
 | prod | `main` | PR from `uat` + pipeline + approval |
 
-Details, hotfixes and setup: [docs/branching-and-environments.md](docs/branching-and-environments.md). Hosting (Cloudflare Workers, one per env): [docs/deployment.md](docs/deployment.md). PR checks, the 80% coverage minimum and the deploy pipeline: [docs/ci-cd.md](docs/ci-cd.md).
+Details, hotfixes and setup: [docs/branching-and-environments.md](docs/branching-and-environments.md). Hosting (Cloudflare Workers, one per env): [docs/deployment.md](docs/deployment.md). PR checks, the 80% coverage minimum and the deploy pipeline: [docs/ci-cd.md](docs/ci-cd.md). App text, edited in Sanity: [docs/content.md](docs/content.md).
 
 ## Local development
 
