@@ -55,6 +55,12 @@ describe("API client", () => {
     expect(JSON.parse(init!.body as string)).toEqual({ phone: "+919876543210" });
   });
 
+  it("never answers from the browser's cache, so lists are always current", async () => {
+    reply(200, { batches: [], nextCursor: null });
+    await listBatches("t", { status: "all" });
+    expect(fetchMock.mock.calls[0]![1]).toMatchObject({ cache: "no-store" });
+  });
+
   it("verifies an OTP and returns the session", async () => {
     const session = { accessToken: "t", expiresIn: 900, isNewAccount: true, user: {}, centre: {} };
     reply(200, session);
