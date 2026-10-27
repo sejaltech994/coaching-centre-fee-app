@@ -65,6 +65,29 @@ describe("Cloudflare Worker", () => {
     expect(assets).not.toHaveBeenCalled();
   });
 
+  it("connects through Hyperdrive's pooled connections when bound, instead of DATABASE_URL", async () => {
+    const worker = createWorker(makeDb);
+    const hyperdrive = { connectionString: "postgres://user:pass@hyperdrive.local:5432/chukta_dev" };
+
+    const res = await worker.fetch(new Request(`${SITE}/api/v1/health/ready`), env({ HYPERDRIVE: hyperdrive }), ctx());
+
+    expect(res.status).toBe(200);
+    expect(makeDb).toHaveBeenCalledWith("postgres://user:pass@hyperdrive.local:5432/chukta_dev");
+  });
+
+  it("runs on Hyperdrive alone, without a DATABASE_URL secret", async () => {
+    const worker = createWorker(makeDb);
+    const hyperdrive = { connectionString: "postgres://user:pass@hyperdrive.local:5432/chukta_dev" };
+
+    const res = await worker.fetch(
+      new Request(`${SITE}/api/v1/health`),
+      env({ HYPERDRIVE: hyperdrive, DATABASE_URL: undefined }),
+      ctx(),
+    );
+
+    expect(res.status).toBe(200);
+  });
+
   it("logs an owner in end to end, with a Secure cookie", async () => {
     const info = vi.spyOn(console, "info").mockImplementation(() => {});
     const worker = createWorker(makeDb);

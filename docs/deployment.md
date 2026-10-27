@@ -86,3 +86,17 @@ gh run watch
 
 - **Real SMS** (MSG91 or similar) needs DLT registration of the sender ID and template. Production's API turns on once it's configured.
 - **Background jobs** (`apps/worker`, BullMQ): Upstash Redis free gives 1 database and 500K commands/month ([pricing](https://upstash.com/pricing/redis)). BullMQ polls Redis constantly, so budget for pay-as-you-go before prod, or use Cloudflare Queues and Cron Triggers instead.
+
+## Performance
+
+Measured on dev (Worker served from Singapore, database in Ohio, ~220 ms apart) before tuning: **2.3 s** for one query, **3.5 s** to list batches, **4 s** to save one, **5.5 s** to edit one. Almost all of it was database round trips, about 6 to open a fresh connection plus several per transaction. What keeps it fast:
+
+| Setting | Where | Effect |
+| --- | --- | --- |
+| **Targeted placement** next to the database | `placement` per env in `apps/web/wrangler.jsonc` (`aws:us-east-2` for non-prod; prod's will be Mumbai) | Each database round trip is a few ms instead of ~220 ms; only the visitor → Worker hop stays long |
+| **Hyperdrive** connection pooling, **query cache off** | `hyperdrive` binding per env (configs `chukta-dev`, `chukta-sit`, `chukta-uat`) | No TCP + TLS + login per request. The cache stays off because writes don't invalidate it, which would show stale lists |
+| One statement to scope a transaction to a centre | `withCentre` in `packages/db` | One round trip instead of two per transaction |
+| Edit and archive in one transaction | `apps/api/src/modules/batches/routes.ts` | Half the transactions per save |
+| Token first, centre cached between pages | `useSession` in `apps/web` | Pages load their data in parallel and don't refetch the centre on every page |
+
+Hyperdrive holds its own copy of each database's credentials. **After rotating a Neon password, update the Hyperdrive config too** (Cloudflare › Storage & Databases › Hyperdrive › `chukta-<env>` › Edit), as well as the `DATABASE_URL` secret.

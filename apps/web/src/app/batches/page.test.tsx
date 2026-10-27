@@ -103,6 +103,22 @@ describe("/batches", () => {
     expect(screen.getByText("No batches match “zzz”.")).toBeVisible();
   });
 
+  it("says when the batches couldn't be loaded, instead of showing an empty list, and can retry", async () => {
+    vi.mocked(listBatches)
+      .mockRejectedValueOnce(new Error("timeout"))
+      .mockResolvedValueOnce({ batches: [batch()], nextCursor: null });
+    const user = userEvent.setup();
+    render(<BatchesPage />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("We couldn't load your batches.");
+    expect(screen.queryByText(/No batches yet/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(await screen.findByRole("link", { name: "Class 10 Maths" })).toBeVisible();
+    expect(listBatches).toHaveBeenCalledTimes(2);
+  });
+
   it("shows the active count in the heading area", async () => {
     vi.mocked(listBatches).mockResolvedValueOnce({ batches: [batch(), batch({ id: "b2", name: "B" })], nextCursor: null });
     render(<BatchesPage />);
