@@ -12,7 +12,7 @@ export type SanityConfig = {
   dataset: string;
   /** "drafts" shows unpublished edits (dev, sit, uat); "published" is what production shows. */
   perspective: "published" | "drafts";
-  /** A read token; required for drafts. */
+  /** A read (Viewer) token. Chukta's dataset is private, so every read needs one. */
   token?: string;
 };
 
@@ -24,9 +24,9 @@ export function sanityConfigFrom(env: Record<string, string | undefined>): Sanit
   if (!projectId) return null;
   const perspective = env.SANITY_PERSPECTIVE === "drafts" ? "drafts" : "published";
   const token = env.SANITY_READ_TOKEN?.trim() || undefined;
-  if (perspective === "drafts" && !token) {
-    throw new Error("SANITY_PERSPECTIVE=drafts needs SANITY_READ_TOKEN: drafts are private.");
-  }
+  // Without a token a private dataset answers with no documents, which would
+  // quietly ship the built-in text instead of the editors' text.
+  if (!token) throw new Error("SANITY_PROJECT_ID is set but SANITY_READ_TOKEN is not: the dataset is private.");
   return { projectId, dataset: env.SANITY_DATASET?.trim() || "production", perspective, token };
 }
 
@@ -36,8 +36,8 @@ export async function fetchCopyFromSanity(
   catalog: Catalog,
   fetchImpl: typeof fetch = fetch,
 ): Promise<Record<string, Record<string, unknown>>> {
-  // Drafts are private, so they come from the live API; published text from the CDN.
-  const host = config.token ? "api.sanity.io" : "apicdn.sanity.io";
+  // Drafts aren't cached, so they come from the live API; published text from the CDN.
+  const host = config.perspective === "drafts" ? "api.sanity.io" : "apicdn.sanity.io";
   const url = new URL(`https://${config.projectId}.${host}/${API_VERSION}/data/query/${config.dataset}`);
   url.searchParams.set("query", "*[_type in $types]");
   url.searchParams.set("$types", JSON.stringify(Object.keys(catalog).map(documentType)));

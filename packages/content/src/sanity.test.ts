@@ -45,6 +45,16 @@ describe("fetchCopyFromSanity", () => {
     expect(new Headers(init?.headers).get("authorization")).toBe("Bearer sk-read");
   });
 
+  it("sends the token for published text too, since the dataset is private, still via the CDN", async () => {
+    const fetch = respond({ result: [] });
+
+    await fetchCopyFromSanity({ ...config, token: "sk-read" }, catalog, fetch);
+
+    const [url, init] = fetch.mock.calls[0]!;
+    expect(new URL(String(url)).origin).toBe("https://abc123.apicdn.sanity.io");
+    expect(new Headers(init?.headers).get("authorization")).toBe("Bearer sk-read");
+  });
+
   it("fails loudly when Sanity can't be read", async () => {
     await expect(fetchCopyFromSanity(config, catalog, respond({ error: "nope" }, 401))).rejects.toThrow(
       "Sanity answered 401",
@@ -58,18 +68,19 @@ describe("sanityConfigFrom", () => {
   });
 
   it("reads published text unless drafts are asked for", () => {
-    expect(sanityConfigFrom({ SANITY_PROJECT_ID: "abc123" })).toEqual({
+    expect(sanityConfigFrom({ SANITY_PROJECT_ID: "abc123", SANITY_READ_TOKEN: "sk" })).toEqual({
       projectId: "abc123",
       dataset: "production",
       perspective: "published",
-      token: undefined,
+      token: "sk",
     });
     expect(
       sanityConfigFrom({ SANITY_PROJECT_ID: "abc123", SANITY_PERSPECTIVE: "drafts", SANITY_READ_TOKEN: "sk", SANITY_DATASET: "copy" }),
     ).toEqual({ projectId: "abc123", dataset: "copy", perspective: "drafts", token: "sk" });
   });
 
-  it("refuses drafts without a token, since drafts are private", () => {
+  it("refuses to run without a token, since the dataset is private and would read as empty", () => {
+    expect(() => sanityConfigFrom({ SANITY_PROJECT_ID: "abc123" })).toThrow("SANITY_READ_TOKEN");
     expect(() => sanityConfigFrom({ SANITY_PROJECT_ID: "abc123", SANITY_PERSPECTIVE: "drafts" })).toThrow(
       "SANITY_READ_TOKEN",
     );

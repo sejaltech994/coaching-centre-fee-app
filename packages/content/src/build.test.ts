@@ -20,7 +20,7 @@ describe("loadCopyForBuild", () => {
     const log = vi.fn();
     const fetch = respond({ result: [{ _type: "copy_auth", welcomeTitle: "Namaste! Welcome to Chukta" }] });
 
-    const json = await loadCopyForBuild({ SANITY_PROJECT_ID: "abc123" }, { fetch, log });
+    const json = await loadCopyForBuild({ SANITY_PROJECT_ID: "abc123", SANITY_READ_TOKEN: "sk" }, { fetch, log });
 
     expect(JSON.parse(json!)).toEqual({
       ...defaultCopy(CATALOG),
@@ -33,7 +33,7 @@ describe("loadCopyForBuild", () => {
     const log = vi.fn();
     const fetch = respond({ result: [{ _type: "copy_errors", invalidOtp: "Wrong code." }] });
 
-    await loadCopyForBuild({ SANITY_PROJECT_ID: "abc123", GITHUB_ACTIONS: "true" }, { fetch, log });
+    await loadCopyForBuild({ SANITY_PROJECT_ID: "abc123", SANITY_READ_TOKEN: "sk", GITHUB_ACTIONS: "true" }, { fetch, log });
 
     expect(log).toHaveBeenCalledWith(
       "::warning title=CMS copy::errors.invalidOtp: must include {tries} (using the built-in text)",
@@ -42,7 +42,7 @@ describe("loadCopyForBuild", () => {
 
   it("fails the build when the CMS is configured but can't be read, so the live site keeps its last good text", async () => {
     await expect(
-      loadCopyForBuild({ SANITY_PROJECT_ID: "abc123" }, { fetch: respond({}, 503), log: vi.fn() }),
+      loadCopyForBuild({ SANITY_PROJECT_ID: "abc123", SANITY_READ_TOKEN: "sk" }, { fetch: respond({}, 503), log: vi.fn() }),
     ).rejects.toThrow("Couldn't read copy from Sanity: Sanity answered 503");
   });
 });

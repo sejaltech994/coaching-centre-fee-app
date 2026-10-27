@@ -6,7 +6,7 @@ Code decides *which* texts exist; editors decide *what they say*.
 | Piece | Where |
 | --- | --- |
 | The list of texts, their editor labels and built-in wording | `packages/content/src/copy.ts` (`CATALOG`) |
-| The editor (Sanity Studio) | `apps/studio`, hosted free at `https://chukta.sanity.studio` |
+| The editor (Sanity Studio) | `apps/studio`, hosted free at <https://chukta.sanity.studio> |
 | Reading the text at build time | `packages/content/src/build.ts`, called from `apps/web/next.config.ts` |
 | Using it in screens | `copy`, `fill`, `withParts`, `errorMessage` from `apps/web/src/lib/copy.tsx` |
 
@@ -47,19 +47,26 @@ they must match the DLT- or Meta-approved wording exactly (see the TSD).
 Renaming or deleting an entry orphans its text in Sanity. The build lists it as
 "not used by the app" and otherwise ignores it.
 
-## One-time setup
+## Setup
 
-1. Create a free account and project at <https://www.sanity.io/manage>
-   (dataset `production`, the default).
-2. **Studio:** `cd apps/studio && SANITY_STUDIO_PROJECT_ID=<id> npx sanity login && SANITY_STUDIO_PROJECT_ID=<id> npm run deploy`.
-3. **Read token:** in the Sanity project, API › Tokens › add a **Viewer** token.
-4. **GitHub:** under Settings › Secrets and variables › Actions, add:
-   - the repository **variable** `SANITY_PROJECT_ID`: the project ID;
-   - the repository **secret** `SANITY_READ_TOKEN`: the Viewer token.
+Done on 2026-10-27:
 
-   dev, sit and uat need the token to read drafts. Without it their build fails
-   with a message naming `SANITY_READ_TOKEN`.
-5. **CORS:** none needed. Only the build talks to Sanity, never the browser.
+- **Organization** Chukta (`owok9ut92`) and **project** Chukta, ID `hshda1j7`.
+  The dataset `production` is **private**: nothing can be read without a token.
+- **Studio** deployed to <https://chukta.sanity.studio>. Redeploy after catalog
+  changes: `npm run deploy -w apps/studio` (needs `npx sanity login` once).
+
+Still to do, by the project owner:
+
+1. **Read token:** go to <https://www.sanity.io/manage/project/hshda1j7>, then
+   API › Tokens › Add API token. Name it `GitHub Actions builds`, with **Viewer** permissions.
+2. **GitHub:** under Settings › Secrets and variables › Actions, add:
+   - the repository **variable** `SANITY_PROJECT_ID` = `hshda1j7`;
+   - the repository **secret** `SANITY_READ_TOKEN` = the token.
+
+   Every environment needs the token, because the dataset is private. A build with the
+   project ID but no token fails, rather than quietly using the built-in text.
+3. **CORS:** none needed. Only the build talks to Sanity, never the browser.
 
 To preview CMS text locally:
-`SANITY_PROJECT_ID=<id> SANITY_PERSPECTIVE=drafts SANITY_READ_TOKEN=<token> npm run dev -w apps/web`.
+`SANITY_PROJECT_ID=hshda1j7 SANITY_READ_TOKEN=<token> SANITY_PERSPECTIVE=drafts npm run dev -w apps/web`.

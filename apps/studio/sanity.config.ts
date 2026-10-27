@@ -13,7 +13,8 @@ const singletons = new Set(types.map((type) => type.name));
 export default defineConfig({
   name: "chukta",
   title: "Chukta text",
-  projectId: process.env.SANITY_STUDIO_PROJECT_ID ?? "",
+  // The project ID is not a secret: it is in every Studio and API URL.
+  projectId: process.env.SANITY_STUDIO_PROJECT_ID ?? "hshda1j7",
   dataset: process.env.SANITY_STUDIO_DATASET ?? "production",
   plugins: [
     structureTool({
