@@ -60,6 +60,8 @@ async function call<T>(path: string, init: { method?: string; body?: unknown; to
       headers,
       // The refresh token travels in an httpOnly cookie set by the API.
       credentials: "include",
+      // Always the server's current data, never a cached copy.
+      cache: "no-store",
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
     });
   } catch {

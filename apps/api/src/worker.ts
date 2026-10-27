@@ -32,9 +32,15 @@ export function createWorker(makeDb: (url: string) => DbHandle = (url) => create
     async fetch(request: Request, env: WorkerEnv, ctx: ExecutionContext): Promise<Response> {
       if (!new URL(request.url).pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
 
+      // Hyperdrive keeps warm, pooled connections close to the database, saving the
+      // TCP + TLS + login round trips a fresh connection costs on every request.
+      const vars = stringVars(env);
+      const hyperdrive = env.HYPERDRIVE as { connectionString?: string } | undefined;
+      if (hyperdrive?.connectionString) vars.DATABASE_URL = hyperdrive.connectionString;
+
       let config;
       try {
-        config = loadConfig(stringVars(env));
+        config = loadConfig(vars);
       } catch (err) {
         // Names the missing setting for whoever reads the log; the response stays generic.
         console.error("API misconfigured:", (err as Error).message);

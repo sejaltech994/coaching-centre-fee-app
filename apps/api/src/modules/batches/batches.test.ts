@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestApp } from "../../test/harness";
 
 type App = Awaited<ReturnType<typeof createTestApp>>;
@@ -199,6 +199,23 @@ describe("DELETE /batches/:id", () => {
 
   it("answers 404 for an unknown id", async () => {
     expect((await app.call("DELETE", "/batches/00000000-0000-4000-8000-000000000000", { token })).status).toBe(404);
+  });
+});
+
+// Each transaction costs several database round trips; on a distant database
+// that is the difference between a fast and a slow save.
+describe("database round trips", () => {
+  it.each([
+    ["PATCH", { name: "Renamed" }],
+    ["DELETE", undefined],
+  ])("%s /batches/:id reads and writes in one transaction", async (method, body) => {
+    const { batch } = await (await create(maths)).json();
+    const transaction = vi.spyOn(app.db, "transaction");
+
+    const res = await app.call(method, `/batches/${batch.id}`, { token, body });
+
+    expect(res.status).toBe(200);
+    expect(transaction).toHaveBeenCalledTimes(1);
   });
 });
 
