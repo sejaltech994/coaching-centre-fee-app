@@ -26,10 +26,11 @@
   },
   "workers_dev": true,
   "preview_urls": false,
-  "observability": { "enabled": true },
-  // vars are not inherited by environments, so each lists its own.
+  // vars and observability are not inherited by environments, so each lists its own.
   "env": {
     "dev": {
+      // Workers Logs: console output (e.g. dev login codes) kept in the dashboard.
+      "observability": { "enabled": true, "logs": { "enabled": true, "invocation_logs": true } },
       "vars": {
         "NODE_ENV": "staging",
         "TRUST_PROXY_HEADERS": "true",
@@ -37,6 +38,8 @@
       }
     },
     "sit": {
+      // Workers Logs: console output (e.g. dev login codes) kept in the dashboard.
+      "observability": { "enabled": true, "logs": { "enabled": true, "invocation_logs": true } },
       "vars": {
         "NODE_ENV": "staging",
         "TRUST_PROXY_HEADERS": "true",
@@ -44,6 +47,8 @@
       }
     },
     "uat": {
+      // Workers Logs: console output (e.g. dev login codes) kept in the dashboard.
+      "observability": { "enabled": true, "logs": { "enabled": true, "invocation_logs": true } },
       "vars": {
         "NODE_ENV": "staging",
         "TRUST_PROXY_HEADERS": "true",
@@ -53,6 +58,8 @@
     // Production refuses the console SMS provider, so its API stays off (503)
     // until a real SMS provider (MSG91, DLT-registered) is configured.
     "prod": {
+      // Workers Logs: console output (e.g. dev login codes) kept in the dashboard.
+      "observability": { "enabled": true, "logs": { "enabled": true, "invocation_logs": true } },
       "vars": {
         "NODE_ENV": "production",
         "TRUST_PROXY_HEADERS": "true",
