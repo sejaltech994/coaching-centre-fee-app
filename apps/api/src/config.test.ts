@@ -17,7 +17,7 @@ describe("loadConfig", () => {
       webOrigins: ["http://localhost:3000"],
       cookieSecure: false,
       trustProxyHeaders: false,
-      otpLimits: { perPhonePerHour: 5, perIpPerHour: 20 },
+      otpLimits: { perPhonePerHour: 5, perIpPerHour: 10 },
     });
   });
 
@@ -61,7 +61,7 @@ describe("loadConfig", () => {
   });
 
   it("keeps the TSD's OTP limits by default", () => {
-    expect(loadConfig(valid).otpLimits).toEqual({ perPhonePerHour: 5, perIpPerHour: 20 });
+    expect(loadConfig(valid).otpLimits).toEqual({ perPhonePerHour: 5, perIpPerHour: 10 });
   });
 
   it("lets development and test raise the OTP limits, for automated test runs", () => {

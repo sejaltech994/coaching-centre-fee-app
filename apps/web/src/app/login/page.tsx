@@ -9,7 +9,13 @@ function LoginScreen() {
   const router = useRouter();
   // The landing page's "Get OTP" form sends ?phone=…
   const phone = useSearchParams().get("phone") ?? "";
-  return <LoginFlow initialPhone={phone} onLoggedIn={() => router.replace("/dashboard")} />;
+  return (
+    <LoginFlow
+      initialPhone={phone}
+      // A new centre has nothing to show yet: its first job is adding batches.
+      onSignedIn={(session) => router.replace(session.isNewAccount ? "/batches" : "/dashboard")}
+    />
+  );
 }
 
 export default function LoginPage() {
