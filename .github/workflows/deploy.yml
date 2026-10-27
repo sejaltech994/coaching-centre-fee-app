@@ -2,8 +2,9 @@
 # run the full CI suite, migrate the database, deploy, then smoke-test the site
 # and the API. One Cloudflare Worker per env serves the web app and, at /api/*,
 # the API (apps/api/src/worker.ts), backed by that env's Neon Postgres branch.
-# Secrets: CLOUDFLARE_API_TOKEN (repository); DATABASE_URL and JWT_SECRET
-# (per GitHub environment). See docs/deployment.md and docs/ci-cd.md.
+# Secrets: CLOUDFLARE_API_TOKEN and SANITY_READ_TOKEN (repository); DATABASE_URL
+# and JWT_SECRET (per GitHub environment). Variable: SANITY_PROJECT_ID.
+# See docs/deployment.md, docs/ci-cd.md and docs/content.md.
 name: Deploy
 
 on:
@@ -52,6 +53,13 @@ jobs:
       - run: npm run build
         env:
           NEXT_PUBLIC_API_URL: /api/v1
+          # App text from Sanity, baked into the build (packages/content). With no
+          # SANITY_PROJECT_ID the built-in text is used. dev, sit and uat show
+          # unpublished drafts so copy can be reviewed; prod shows published text.
+          SANITY_PROJECT_ID: ${{ vars.SANITY_PROJECT_ID }}
+          SANITY_DATASET: ${{ vars.SANITY_DATASET }}
+          SANITY_PERSPECTIVE: ${{ env.DEPLOY_ENV == 'prod' && 'published' || 'drafts' }}
+          SANITY_READ_TOKEN: ${{ secrets.SANITY_READ_TOKEN }}
 
       # Before the new code goes live, so it never runs against an older schema.
       # Migrations only add; they are safe for the running version too.

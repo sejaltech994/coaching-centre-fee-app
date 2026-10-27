@@ -4,6 +4,7 @@ import { formatIndianMobile, normalizeIndianMobile } from "@chukta/shared";
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { ApiRequestError, requestOtp, verifyOtp, type LoginSession } from "@/lib/api";
+import { copy, errorMessage, fill, withParts } from "@/lib/copy";
 import { setAccessToken } from "@/lib/session";
 import styles from "./auth.module.css";
 import { CodeInput } from "./CodeInput";
@@ -21,12 +22,14 @@ type Step =
   | { name: "code"; phone: string }
   | { name: "profile"; phone: string; signupTicket: string };
 
-const messageFor = (err: unknown) =>
-  err instanceof ApiRequestError ? err.message : "Something went wrong. Try again.";
+const t = copy.auth;
 
 const Legal = () => (
   <p className={styles.fineprint}>
-    By continuing you agree to Chukta’s <Link href="/terms">Terms</Link> and <Link href="/privacy">Privacy notice</Link>.
+    {withParts(t.legalNotice, {
+      terms: <Link href="/terms">{t.termsLink}</Link>,
+      privacy: <Link href="/privacy">{t.privacyLink}</Link>,
+    })}
   </p>
 );
 
@@ -79,7 +82,7 @@ export function LoginFlow({ initialPhone = "", onSignedIn }: Props) {
       setNow(sentAt);
       setResendAt(sentAt + resendAfterSeconds * 1000);
     } catch (err) {
-      setError(messageFor(err));
+      setError(errorMessage(err));
     } finally {
       setBusy(false);
     }
@@ -89,7 +92,7 @@ export function LoginFlow({ initialPhone = "", onSignedIn }: Props) {
     event.preventDefault();
     const normalized = normalizeIndianMobile(phoneInput);
     if (!normalized) {
-      setError("Enter a 10-digit Indian mobile number.");
+      setError(t.phoneInvalid);
       return;
     }
     void send(normalized);
@@ -98,7 +101,7 @@ export function LoginFlow({ initialPhone = "", onSignedIn }: Props) {
   async function submitCode(event: FormEvent, phone: string) {
     event.preventDefault();
     if (code.length !== 6) {
-      setError("Enter the 6-digit code.");
+      setError(t.codeIncomplete);
       return;
     }
     setBusy(true);
@@ -111,7 +114,7 @@ export function LoginFlow({ initialPhone = "", onSignedIn }: Props) {
         signedIn(result);
       }
     } catch (err) {
-      setError(messageFor(err));
+      setError(errorMessage(err));
       setWrongCode(err instanceof ApiRequestError && err.code === "invalid_otp");
       setCode("");
     } finally {
@@ -130,7 +133,7 @@ export function LoginFlow({ initialPhone = "", onSignedIn }: Props) {
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
         <path d="M15 5l-7 7 7 7" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      Back
+      {t.back}
     </button>
   );
 
@@ -138,10 +141,10 @@ export function LoginFlow({ initialPhone = "", onSignedIn }: Props) {
     case "welcome":
       return (
         <div className={styles.form}>
-          <h1 className={styles.title}>Welcome to Chukta</h1>
-          <p className={styles.lead}>Sign up or log in with the same steps. New here? We’ll set up your centre next.</p>
+          <h1 className={styles.title}>{t.welcomeTitle}</h1>
+          <p className={styles.lead}>{t.welcomeLead}</p>
           <button className={styles.primary} type="button" onClick={() => goTo({ name: "phone" })}>
-            Continue with mobile number
+            {t.continueWithMobile}
           </button>
           <Legal />
         </div>
@@ -151,11 +154,11 @@ export function LoginFlow({ initialPhone = "", onSignedIn }: Props) {
       return (
         <form className={styles.form} onSubmit={submitPhone} noValidate>
           {back({ name: "welcome" })}
-          <h1 className={styles.title}>Your mobile number</h1>
-          <p className={styles.lead}>We’ll send a 6-digit code by SMS.</p>
+          <h1 className={styles.title}>{t.phoneTitle}</h1>
+          <p className={styles.lead}>{t.phoneLead}</p>
           <div className={styles.field}>
             <label className={styles.label} htmlFor="login-phone">
-              Mobile number
+              {t.phoneLabel}
             </label>
             <div className={styles.prefixed}>
               <span className={styles.prefix} aria-hidden="true">
@@ -176,12 +179,12 @@ export function LoginFlow({ initialPhone = "", onSignedIn }: Props) {
               />
             </div>
             <p id="login-phone-hint" className={styles.hint}>
-              Indian numbers only for now.
+              {t.phoneHint}
             </p>
           </div>
           {errorBox}
           <button className={styles.primary} type="submit" disabled={busy}>
-            Send code
+            {t.sendCode}
           </button>
           <Legal />
         </form>
@@ -191,11 +194,11 @@ export function LoginFlow({ initialPhone = "", onSignedIn }: Props) {
       return (
         <form className={styles.form} onSubmit={(e) => void submitCode(e, step.phone)} noValidate>
           {back({ name: "phone" })}
-          <h1 className={styles.title}>Enter the code</h1>
+          <h1 className={styles.title}>{t.codeTitle}</h1>
           <p className={styles.lead}>
-            Sent by SMS to {formatIndianMobile(step.phone)}.{" "}
+            {fill(t.codeSentTo, { phone: formatIndianMobile(step.phone) })}{" "}
             <button className={styles.inlineLink} type="button" onClick={() => goTo({ name: "phone" })}>
-              Change number
+              {t.changeNumber}
             </button>
           </p>
           <CodeInput
@@ -216,12 +219,12 @@ export function LoginFlow({ initialPhone = "", onSignedIn }: Props) {
               disabled={busy || resendIn > 0}
               onClick={() => void send(step.phone)}
             >
-              {resendIn > 0 ? `Resend code in 0:${String(resendIn).padStart(2, "0")}` : "Resend code"}
+              {resendIn > 0 ? fill(t.resendIn, { time: `0:${String(resendIn).padStart(2, "0")}` }) : t.resend}
             </button>{" "}
-            · Valid for 5 minutes
+            · {t.codeValidity}
           </p>
           <button className={styles.primary} type="submit" disabled={busy}>
-            Verify
+            {t.verify}
           </button>
         </form>
       );

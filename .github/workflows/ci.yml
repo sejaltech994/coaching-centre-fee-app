@@ -64,7 +64,7 @@ jobs:
         run: |
           node -e '
             const fs = require("fs");
-            const rows = ["apps/web", "apps/api", "packages/shared", "packages/db", "packages/integrations"]
+            const rows = ["apps/web", "apps/api", "packages/shared", "packages/content", "packages/db", "packages/integrations"]
               .filter((dir) => fs.existsSync(`${dir}/coverage/coverage-summary.json`))
               .map((dir) => {
                 const t = require(`./${dir}/coverage/coverage-summary.json`).total;

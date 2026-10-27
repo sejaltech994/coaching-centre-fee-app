@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { copy } from "@/lib/copy";
 import styles from "./auth.module.css";
 
 /**
@@ -18,8 +19,8 @@ export function AuthShell({ children }: { children: ReactNode }) {
           </span>
         </Link>
         <div className={styles.pitch}>
-          <p className={styles.promise}>Fees, settled.</p>
-          <p className={styles.pitchLead}>Batches, reminders with UPI links, and receipts for your coaching centre.</p>
+          <p className={styles.promise}>{copy.auth.promise}</p>
+          <p className={styles.pitchLead}>{copy.auth.pitch}</p>
         </div>
         <div className={styles.coins} aria-hidden="true">
           <span />
