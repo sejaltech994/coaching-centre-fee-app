@@ -83,6 +83,34 @@ export const users = pgTable(
   ],
 );
 
+/**
+ * Other ways an owner signs in, besides their phone number (which lives on
+ * users). Google: subject = Google's stable account id ("sub"). Google's own
+ * tokens are never stored.
+ */
+export const authIdentities = pgTable(
+  "auth_identities",
+  {
+    id: id(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    provider: text("provider", { enum: ["google"] }).notNull(),
+    subject: text("subject").notNull(),
+    // As Google reported it when last used; the account's own email is users.email.
+    email: text("email").notNull(),
+    pictureUrl: text("picture_url"),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check("auth_identities_provider_check", sql`${t.provider} in ('google')`),
+    uniqueIndex("auth_identities_provider_subject_unique").on(t.provider, t.subject),
+    // One Google account per owner.
+    uniqueIndex("auth_identities_user_provider_unique").on(t.userId, t.provider),
+  ],
+);
+
 /** Which version of the terms and privacy notice an owner accepted, and when (DPDP evidence). */
 export const consents = pgTable(
   "consents",
@@ -203,6 +231,7 @@ export type Centre = typeof centres.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type OtpChallenge = typeof otpChallenges.$inferSelect;
 export type Consent = typeof consents.$inferSelect;
+export type AuthIdentity = typeof authIdentities.$inferSelect;
 export type SignupTicket = typeof signupTickets.$inferSelect;
 export type RefreshToken = typeof refreshTokens.$inferSelect;
 export type Batch = typeof batches.$inferSelect;

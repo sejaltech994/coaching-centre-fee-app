@@ -4,6 +4,7 @@ import { and, eq, gt, isNull } from "drizzle-orm";
 import type { Deps } from "../../deps";
 import { keyedHash, randomToken } from "../../lib/crypto";
 import { ApiError, isUniqueViolation } from "../../lib/errors";
+import { linkGoogle, type PendingGoogle } from "./google";
 
 /** How long a verified number may take to finish profile setup. */
 export const SIGNUP_TICKET_TTL_SECONDS = 15 * 60;
@@ -33,7 +34,7 @@ export async function issueSignupTicket(deps: Deps, phone: IndianMobile): Promis
  */
 export async function register(
   deps: Deps,
-  input: { ticket: string; profile: ProfileInput; ip: string; userAgent?: string },
+  input: { ticket: string; profile: ProfileInput; ip: string; userAgent?: string; google?: PendingGoogle | null },
 ): Promise<{ user: User; centre: Centre }> {
   const { db, config } = deps;
   const now = deps.now();
@@ -63,7 +64,15 @@ export async function register(
         .returning();
       const [user] = await tx
         .insert(users)
-        .values({ centreId: centre!.id, phone: ticket.phone, name: profile.fullName, email: profile.email, lastLoginAt: now })
+        .values({
+          centreId: centre!.id,
+          phone: ticket.phone,
+          name: profile.fullName,
+          email: profile.email,
+          // Google has verified its own address; any other email waits for its own check.
+          emailVerifiedAt: input.google && profile.email === input.google.email ? now : null,
+          lastLoginAt: now,
+        })
         .returning();
       await tx.insert(consents).values({
         userId: user!.id,
@@ -73,6 +82,7 @@ export async function register(
         userAgent: input.userAgent,
         acceptedAt: now,
       });
+      if (input.google) await linkGoogle(tx, user!.id, input.google, now);
       return { user: user!, centre: centre! };
     });
   } catch (err) {

@@ -33,7 +33,19 @@ export const CATALOG = {
         text: "Sign up or log in with the same steps. New here? We’ll set up your centre next.",
         multiline: true,
       },
+      continueWithGoogle: { label: "Welcome: Google button", text: "Continue with Google" },
       continueWithMobile: { label: "Welcome: mobile button", text: "Continue with mobile number" },
+      googlePhoneTitle: { label: "After Google: heading", text: "Verify your mobile number" },
+      googlePhoneLead: {
+        label: "After Google: text under the heading",
+        text: "Signed in with Google as {email}. Add your mobile number: reminders, receipts and account recovery use it.",
+        multiline: true,
+      },
+      googleEmailInUse: {
+        label: "After Google: the email already has an account",
+        text: "This email already has a Chukta account. Verify its mobile number to connect Google.",
+        multiline: true,
+      },
       legalNotice: {
         label: "Legal line under the buttons ({terms} and {privacy} become links)",
         text: "By continuing you agree to Chukta’s {terms} and {privacy}.",
@@ -102,6 +114,28 @@ export const CATALOG = {
       smsUnavailable: { label: "SMS could not be sent", text: "We couldn't send the SMS. Try again in a moment." },
       signupExpired: { label: "Sign-up took longer than 15 minutes", text: "Your sign-up has expired. Verify your number again." },
       accountExists: { label: "Number already has an account", text: "This number already has an account. Log in instead." },
+      googleCancelled: {
+        label: "Google: cancelled",
+        text: "Google sign-in was cancelled. Try again, or continue with your mobile number.",
+      },
+      googleUnavailable: {
+        label: "Google: not set up",
+        text: "Google sign-in isn’t available right now. Continue with your mobile number.",
+      },
+      googleEmailUnverified: {
+        label: "Google: email not verified by Google",
+        text: "Google hasn’t verified this email. Use another Google account or your mobile number.",
+      },
+      googleFailed: { label: "Google: anything else", text: "Google sign-in didn’t work. Try again, or continue with your mobile number." },
+      googleExpired: { label: "Google: took longer than 15 minutes", text: "Your Google sign-in has expired. Continue with Google again." },
+      googleAlreadyLinked: {
+        label: "Google: account has a different Google account",
+        text: "This account is already connected to a different Google account.",
+      },
+      googleInUse: {
+        label: "Google: Google account belongs to another account",
+        text: "This Google account is connected to another Chukta account.",
+      },
       emailTaken: {
         label: "Email used by another account",
         text: "Another account uses this email. Use a different one or leave it blank.",

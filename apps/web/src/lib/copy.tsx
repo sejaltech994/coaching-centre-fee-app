@@ -42,8 +42,29 @@ export function errorMessage(err: unknown): string {
       return e.signupExpired;
     case "account_exists":
       return e.accountExists;
+    case "google_already_linked":
+      return e.googleAlreadyLinked;
+    case "google_in_use":
+      return e.googleInUse;
+    case "google_pending_missing":
+      return e.googleExpired;
     default:
       return err.message;
+  }
+}
+
+/** Why Google sent the owner back to the login page (?google_error=…). */
+export function googleErrorMessage(reason: string): string {
+  const e = copy.errors;
+  switch (reason) {
+    case "cancelled":
+      return e.googleCancelled;
+    case "email_unverified":
+      return e.googleEmailUnverified;
+    case "unavailable":
+      return e.googleUnavailable;
+    default:
+      return e.googleFailed;
   }
 }
 

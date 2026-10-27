@@ -18,6 +18,7 @@ describe("loadConfig", () => {
       cookieSecure: false,
       trustProxyHeaders: false,
       otpLimits: { perPhonePerHour: 5, perIpPerHour: 10 },
+      google: null,
     });
   });
 
@@ -81,5 +82,39 @@ describe("loadConfig", () => {
 
   it("refuses an unknown SMS provider", () => {
     expect(() => loadConfig({ ...valid, SMS_PROVIDER: "pigeon" })).toThrow("SMS_PROVIDER");
+  });
+
+  describe("Google sign-in", () => {
+    it("is off unless configured", () => {
+      expect(loadConfig(valid).google).toBeNull();
+    });
+
+    it("uses Google with the environment's OAuth client", () => {
+      expect(loadConfig({ ...valid, GOOGLE_CLIENT_ID: "id.apps.googleusercontent.com", GOOGLE_CLIENT_SECRET: "s" }).google).toEqual({
+        provider: "google",
+        clientId: "id.apps.googleusercontent.com",
+        clientSecret: "s",
+      });
+    });
+
+    it("needs both the client ID and the secret", () => {
+      expect(() => loadConfig({ ...valid, GOOGLE_CLIENT_ID: "id" })).toThrow("GOOGLE_CLIENT_SECRET");
+      expect(() => loadConfig({ ...valid, GOOGLE_CLIENT_SECRET: "s" })).toThrow("GOOGLE_CLIENT_ID");
+    });
+
+    it("offers the fake account chooser outside production, for local runs and automated tests", () => {
+      expect(loadConfig({ ...valid, GOOGLE_PROVIDER: "fake" }).google).toEqual({ provider: "fake" });
+      expect(loadConfig({ ...valid, NODE_ENV: "staging", GOOGLE_PROVIDER: "fake" }).google).toEqual({ provider: "fake" });
+    });
+
+    it("never fakes Google in production", () => {
+      expect(() =>
+        loadConfig({ ...valid, NODE_ENV: "production", SMS_PROVIDER: "console", GOOGLE_PROVIDER: "fake" }),
+      ).toThrow("GOOGLE_PROVIDER=fake");
+    });
+
+    it("refuses an unknown provider", () => {
+      expect(() => loadConfig({ ...valid, GOOGLE_PROVIDER: "yahoo" })).toThrow("GOOGLE_PROVIDER");
+    });
   });
 });

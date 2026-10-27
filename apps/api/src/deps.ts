@@ -1,11 +1,13 @@
 import type { Database } from "@chukta/db";
-import type { SmsProvider } from "@chukta/integrations";
+import type { GoogleSignIn, SmsProvider } from "@chukta/integrations";
 import type { Config } from "./config";
 
 /** Everything the API needs from the outside world, injected so tests can control it. */
 export type Deps = {
   db: Database;
   sms: SmsProvider;
+  /** Google sign-in, or null when it isn't configured for this environment. */
+  google: GoogleSignIn | null;
   now: () => Date;
   config: Config;
 };
