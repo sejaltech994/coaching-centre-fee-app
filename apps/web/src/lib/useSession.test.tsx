@@ -1,7 +1,7 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiRequestError, getCentre } from "./api";
-import { ensureAccessToken, getAccessToken, setAccessToken } from "./session";
+import { clearSession, ensureAccessToken, getAccessToken, setAccessToken } from "./session";
 import { useSession } from "./useSession";
 
 const replace = vi.fn();
@@ -15,6 +15,7 @@ vi.mock("./session", async (importOriginal) => ({
 const centre = { id: "c1", name: "Sunrise Classes", plan: "free" as const, timezone: "Asia/Kolkata" };
 
 beforeEach(() => {
+  clearSession();
   replace.mockReset();
   vi.mocked(ensureAccessToken).mockReset().mockResolvedValue("token");
   vi.mocked(getCentre).mockReset().mockResolvedValue({ centre });
@@ -44,6 +45,30 @@ describe("useSession", () => {
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
     expect(getAccessToken()).toBeNull();
+  });
+
+  it("hands over the token before the centre has loaded, so pages can load their data in parallel", async () => {
+    let finishCentre: (value: { centre: typeof centre }) => void = () => {};
+    vi.mocked(getCentre).mockReturnValueOnce(new Promise((resolve) => (finishCentre = resolve)));
+    const { result } = renderHook(() => useSession());
+
+    await waitFor(() => expect(result.current.token).toBe("token"));
+    expect(result.current.centre).toBeNull();
+
+    finishCentre({ centre });
+    await waitFor(() => expect(result.current.centre).toEqual(centre));
+  });
+
+  it("remembers the centre between pages instead of fetching it again", async () => {
+    const first = renderHook(() => useSession());
+    await waitFor(() => expect(first.result.current.centre).toEqual(centre));
+    first.unmount();
+
+    const second = renderHook(() => useSession());
+
+    expect(second.result.current.centre).toEqual(centre);
+    await waitFor(() => expect(second.result.current.token).toBe("token"));
+    expect(getCentre).toHaveBeenCalledTimes(1);
   });
 
   it("loads only once, however often the page re-renders", async () => {

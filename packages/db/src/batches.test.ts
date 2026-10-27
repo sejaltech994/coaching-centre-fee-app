@@ -95,6 +95,18 @@ describe("row-level security", () => {
     expect(rows).toEqual([]);
   });
 
+  it("runs the transaction as the restricted role, scoped to the centre", async () => {
+    const [scope] = await withCentre(
+      db,
+      centreA,
+      async (tx) => {
+        const result = await tx.execute(sql`select current_user as role, current_setting('app.centre_id') as centre`);
+        return (result as unknown as { rows: { role: string; centre: string }[] }).rows;
+      },
+    );
+    expect(scope).toEqual({ role: "chukta_app", centre: centreA });
+  });
+
   it("does not leak the centre setting to the next transaction", async () => {
     await withCentre(db, centreA, (tx) => tx.select().from(batches));
     const setting = await db.execute(sql`select current_setting('app.centre_id', true) as centre`);

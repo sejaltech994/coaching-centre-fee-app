@@ -7,7 +7,8 @@
 //   wrangler deploy --env uat   -> chukta-web-uat   (uat)
 //   wrangler deploy --env prod  -> chukta-web-prod  (main)
 // Secrets (never here): DATABASE_URL and JWT_SECRET, pushed by the deploy
-// workflow from the GitHub environment's secrets. See docs/deployment.md.
+// workflow from the GitHub environment's secrets. The API connects through the
+// env's Hyperdrive binding when it has one (IDs aren't secrets). See docs/deployment.md.
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "chukta-web",
@@ -26,10 +27,17 @@
   },
   "workers_dev": true,
   "preview_urls": false,
-  "observability": { "enabled": true },
-  // vars are not inherited by environments, so each lists its own.
+  // vars and observability are not inherited by environments, so each lists its own.
   "env": {
     "dev": {
+      // Run next to the database (Neon, AWS us-east-2): each query is ~2 ms
+      // instead of ~220 ms from the visitor's nearest edge.
+      "placement": { "mode": "targeted", "region": "aws:us-east-2" },
+      // Pooled, warm connections (no TCP + TLS + login per request). Query cache is
+      // off on the Hyperdrive config: writes don't invalidate it, so lists would go stale.
+      "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "2d1e1b85b776482087adb790ff4a8990" }],
+      // Workers Logs: console output (e.g. dev login codes) kept in the dashboard.
+      "observability": { "enabled": true, "logs": { "enabled": true, "invocation_logs": true } },
       "vars": {
         "NODE_ENV": "staging",
         "TRUST_PROXY_HEADERS": "true",
@@ -37,6 +45,14 @@
       }
     },
     "sit": {
+      // Run next to the database (Neon, AWS us-east-2): each query is ~2 ms
+      // instead of ~220 ms from the visitor's nearest edge.
+      "placement": { "mode": "targeted", "region": "aws:us-east-2" },
+      // Pooled, warm connections (no TCP + TLS + login per request). Query cache is
+      // off on the Hyperdrive config: writes don't invalidate it, so lists would go stale.
+      "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "acfacac4058841f0a8f436ec6db153e7" }],
+      // Workers Logs: console output (e.g. dev login codes) kept in the dashboard.
+      "observability": { "enabled": true, "logs": { "enabled": true, "invocation_logs": true } },
       "vars": {
         "NODE_ENV": "staging",
         "TRUST_PROXY_HEADERS": "true",
@@ -44,6 +60,14 @@
       }
     },
     "uat": {
+      // Run next to the database (Neon, AWS us-east-2): each query is ~2 ms
+      // instead of ~220 ms from the visitor's nearest edge.
+      "placement": { "mode": "targeted", "region": "aws:us-east-2" },
+      // Pooled, warm connections (no TCP + TLS + login per request). Query cache is
+      // off on the Hyperdrive config: writes don't invalidate it, so lists would go stale.
+      "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "c3cb8c0275d74bf0929c2af27b879869" }],
+      // Workers Logs: console output (e.g. dev login codes) kept in the dashboard.
+      "observability": { "enabled": true, "logs": { "enabled": true, "invocation_logs": true } },
       "vars": {
         "NODE_ENV": "staging",
         "TRUST_PROXY_HEADERS": "true",
@@ -53,6 +77,8 @@
     // Production refuses the console SMS provider, so its API stays off (503)
     // until a real SMS provider (MSG91, DLT-registered) is configured.
     "prod": {
+      // Workers Logs: console output (e.g. dev login codes) kept in the dashboard.
+      "observability": { "enabled": true, "logs": { "enabled": true, "invocation_logs": true } },
       "vars": {
         "NODE_ENV": "production",
         "TRUST_PROXY_HEADERS": "true",

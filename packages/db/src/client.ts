@@ -34,8 +34,8 @@ export type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
  */
 export async function withCentre<T>(db: Database, centreId: string, fn: (tx: Tx) => Promise<T>): Promise<T> {
   return db.transaction(async (tx) => {
-    await tx.execute(sql`select set_config('app.centre_id', ${centreId}, true)`);
-    await tx.execute(sql`set local role chukta_app`);
+    // One statement, so one round trip: set_config('role', …, true) is SET LOCAL ROLE.
+    await tx.execute(sql`select set_config('app.centre_id', ${centreId}, true), set_config('role', 'chukta_app', true)`);
     return fn(tx);
   });
 }
