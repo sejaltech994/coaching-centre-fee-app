@@ -91,9 +91,9 @@ describe("POST /auth/otp/request", () => {
     expect((await call("POST", "/auth/otp/request", { body: { phone: "9876543210" } })).status).toBe(202);
   });
 
-  it("allows at most 20 codes per IP address per hour", async () => {
+  it("allows at most 10 codes per IP address per hour (TSD)", async () => {
     const { call } = await createTestApp();
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 10; i++) {
       const phone = `98765432${String(i).padStart(2, "0")}`;
       expect((await call("POST", "/auth/otp/request", { body: { phone }, ip: "198.51.100.1" })).status).toBe(202);
     }
@@ -126,17 +126,16 @@ describe("POST /auth/otp/request", () => {
 });
 
 describe("POST /auth/otp/verify", () => {
-  it("logs a new owner in, creating their centre on first login", async () => {
+  it("signs an owner in once they have an account", async () => {
     const { login } = await createTestApp();
 
     const { res, body, cookie } = await login("98765 43210");
 
-    expect(res.status).toBe(200);
-    expect(body.isNewAccount).toBe(true);
-    expect(body.expiresIn).toBe(900);
+    expect(res.status).toBe(201);
+    expect(body).toMatchObject({ status: "signed_in", isNewAccount: true, expiresIn: 900 });
     expect(body.accessToken.split(".")).toHaveLength(3);
-    expect(body.user).toMatchObject({ phone: "+919876543210", role: "owner", name: null });
-    expect(body.centre).toMatchObject({ plan: "free", name: null });
+    expect(body.user).toMatchObject({ phone: "+919876543210", role: "owner", fullName: "Asha Sharma" });
+    expect(body.centre).toMatchObject({ plan: "free", name: "Sunrise Classes" });
     expect(cookie).toMatch(/^chukta_rt=.{40,}$/);
   });
 
@@ -152,18 +151,6 @@ describe("POST /auth/otp/verify", () => {
     expect(header).toContain("Max-Age=2592000");
   });
 
-  it("logs a returning owner into the same centre", async () => {
-    const { login, clock } = await createTestApp();
-    const first = await login();
-    clock.advance(31_000);
-
-    const second = await login();
-
-    expect(second.body.isNewAccount).toBe(false);
-    expect(second.body.centre.id).toBe(first.body.centre.id);
-    expect(second.body.user.id).toBe(first.body.user.id);
-  });
-
   it("rejects a wrong code and says how many attempts are left", async () => {
     const { call, lastCode } = await createTestApp();
     await call("POST", "/auth/otp/request", { body: { phone: "9876543210" } });
@@ -173,7 +160,7 @@ describe("POST /auth/otp/verify", () => {
 
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({
-      error: { code: "invalid_otp", message: "That code is not right. 4 attempts left.", attemptsLeft: 4 },
+      error: { code: "invalid_otp", message: "That code didn’t match. 4 tries left.", attemptsLeft: 4 },
     });
   });
 

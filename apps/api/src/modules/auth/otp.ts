@@ -25,13 +25,15 @@ export async function requestOtp(deps: Deps, input: { phone: IndianMobile; ip: s
   const now = deps.now();
   const windowStart = new Date(now.getTime() - HOUR);
 
+  // The 30-second wait applies only while the last code is still usable: after
+  // logging out, an owner can log straight back in.
   const [latest] = await db
-    .select({ createdAt: otpChallenges.createdAt })
+    .select({ createdAt: otpChallenges.createdAt, consumedAt: otpChallenges.consumedAt })
     .from(otpChallenges)
     .where(eq(otpChallenges.phone, input.phone))
     .orderBy(desc(otpChallenges.createdAt))
     .limit(1);
-  const resendAt = latest && new Date(latest.createdAt.getTime() + OTP_RULES.resendAfterMs);
+  const resendAt = latest && !latest.consumedAt && new Date(latest.createdAt.getTime() + OTP_RULES.resendAfterMs);
   if (resendAt && resendAt > now) {
     const wait = secondsUntil(now, resendAt);
     throw new ApiError(429, "otp_resend_too_soon", `Wait ${wait} seconds before asking for a new code.`, {
@@ -92,11 +94,15 @@ async function enforceHourlyLimit(
   });
 }
 
-/** Checks a login code. On success returns the owner, creating their centre on first login. */
-export async function verifyOtp(
-  deps: Deps,
-  input: { phone: IndianMobile; code: string },
-): Promise<{ user: User; centre: Centre; isNewAccount: boolean }> {
+export type VerifiedPhone =
+  | { status: "signed_in"; user: User; centre: Centre }
+  | { status: "signup_required"; phone: IndianMobile };
+
+/**
+ * Checks a login code. A number with an account is signed in; an unknown number
+ * is reported as verified but nothing is created until the owner registers.
+ */
+export async function verifyOtp(deps: Deps, input: { phone: IndianMobile; code: string }): Promise<VerifiedPhone> {
   const { db, config } = deps;
   const now = deps.now();
 
@@ -120,7 +126,7 @@ export async function verifyOtp(
     throw new ApiError(
       400,
       "invalid_otp",
-      `That code is not right. ${attemptsLeft} ${attemptsLeft === 1 ? "attempt" : "attempts"} left.`,
+      `That code didn’t match. ${attemptsLeft} ${attemptsLeft === 1 ? "try" : "tries"} left.`,
       { extra: { attemptsLeft } },
     );
   }
@@ -133,15 +139,12 @@ export async function verifyOtp(
     .returning({ id: otpChallenges.id });
   if (consumed.length === 0) throw otpExpired();
 
-  return db.transaction(async (tx) => {
-    let user = await tx.query.users.findFirst({ where: eq(users.phone, input.phone) });
-    const isNewAccount = !user;
-    if (!user) {
-      const [centre] = await tx.insert(centres).values({ ownerPhone: input.phone }).returning();
-      [user] = await tx.insert(users).values({ centreId: centre!.id, phone: input.phone }).returning();
-    }
-    const [loggedIn] = await tx.update(users).set({ lastLoginAt: now }).where(eq(users.id, user!.id)).returning();
-    const centre = await tx.query.centres.findFirst({ where: eq(centres.id, loggedIn!.centreId) });
-    return { user: loggedIn!, centre: centre!, isNewAccount };
-  });
+  const [user] = await db
+    .update(users)
+    .set({ lastLoginAt: now })
+    .where(eq(users.phone, input.phone))
+    .returning();
+  if (!user) return { status: "signup_required", phone: input.phone };
+  const centre = await db.query.centres.findFirst({ where: eq(centres.id, user.centreId) });
+  return { status: "signed_in", user, centre: centre! };
 }

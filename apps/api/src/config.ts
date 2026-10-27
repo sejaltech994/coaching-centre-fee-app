@@ -41,7 +41,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   // Checked first, so changing a limit in production always fails loudly.
   const otpLimits = {
     perPhonePerHour: limit("OTP_PER_PHONE_PER_HOUR", 5),
-    perIpPerHour: limit("OTP_PER_IP_PER_HOUR", 20),
+    perIpPerHour: limit("OTP_PER_IP_PER_HOUR", 10),
   };
 
   const smsProvider = env.SMS_PROVIDER ?? "console";

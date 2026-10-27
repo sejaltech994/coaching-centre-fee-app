@@ -1,6 +1,7 @@
 import type { Database, DbHandle } from "@chukta/db";
 import { createTestDb } from "@chukta/db/testing";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import { PROFILE } from "./test/harness";
 import { createWorker, type WorkerEnv } from "./worker";
 
 const SITE = "https://chukta-web-dev.chukta.workers.dev";
@@ -100,7 +101,11 @@ describe("Cloudflare Worker", () => {
 
     const verified = await worker.fetch(post("/api/v1/auth/otp/verify", { phone: "9876543210", code }), env(), ctx());
     expect(verified.status).toBe(200);
-    expect(verified.headers.get("set-cookie")).toContain("Secure");
+    const { signupTicket } = (await verified.json()) as { signupTicket: string };
+
+    const registered = await worker.fetch(post("/api/v1/auth/register", { signupTicket, ...PROFILE }), env(), ctx());
+    expect(registered.status).toBe(201);
+    expect(registered.headers.get("set-cookie")).toContain("Secure");
   });
 
   it("refuses to serve the API without its secrets, and says so only in the log", async () => {
