@@ -70,3 +70,13 @@ Still to do, by the project owner:
 
 To preview CMS text locally:
 `SANITY_PROJECT_ID=hshda1j7 SANITY_READ_TOKEN=<token> SANITY_PERSPECTIVE=drafts npm run dev -w apps/web`.
+
+## Security overrides
+
+`package.json` `overrides` force patched versions of three packages deep inside
+the Sanity CLI's tooling: js-yaml 3.15.2 and smol-toml 1.9.1 (under
+`@vercel/frameworks`), and undici 7.30.1 (under `@module-federation/dts-plugin`).
+They fix high-severity advisories that failed the Dependency review check.
+Remove each one once Sanity ships a release that depends on a fixed version
+(check with `npm audit`).
+
