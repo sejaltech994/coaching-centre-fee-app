@@ -18,25 +18,25 @@ describe("loadCopyForBuild", () => {
 
   it("returns the CMS text merged over the built-in text, as JSON for the bundle", async () => {
     const log = vi.fn();
-    const fetch = respond({ result: [{ _type: "copy_auth", welcomeTitle: "Namaste! Welcome to Chukta" }] });
+    const fetch = respond({ result: [{ _type: "copy_auth", signInTitle: "Namaste! Sign in" }] });
 
     const json = await loadCopyForBuild({ SANITY_PROJECT_ID: "abc123", SANITY_READ_TOKEN: "sk" }, { fetch, log });
 
     expect(JSON.parse(json!)).toEqual({
       ...defaultCopy(CATALOG),
-      auth: { ...defaultCopy(CATALOG).auth, welcomeTitle: "Namaste! Welcome to Chukta" },
+      auth: { ...defaultCopy(CATALOG).auth, signInTitle: "Namaste! Sign in" },
     });
     expect(log).toHaveBeenCalledWith("Copy: read published text from Sanity project abc123 (production).");
   });
 
   it("reports entries the CMS got wrong, as GitHub warnings on CI", async () => {
     const log = vi.fn();
-    const fetch = respond({ result: [{ _type: "copy_errors", invalidOtp: "Wrong code." }] });
+    const fetch = respond({ result: [{ _type: "copy_profile", lead: "Welcome." }] });
 
     await loadCopyForBuild({ SANITY_PROJECT_ID: "abc123", SANITY_READ_TOKEN: "sk", GITHUB_ACTIONS: "true" }, { fetch, log });
 
     expect(log).toHaveBeenCalledWith(
-      "::warning title=CMS copy::errors.invalidOtp: must include {tries} (using the built-in text)",
+      "::warning title=CMS copy::profile.lead: must include {email} (using the built-in text)",
     );
   });
 

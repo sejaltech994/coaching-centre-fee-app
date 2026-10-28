@@ -64,11 +64,13 @@ export const users = pgTable(
     centreId: uuid("centre_id")
       .notNull()
       .references(() => centres.id),
-    // E.164, e.g. +919876543210. One login per phone number.
-    phone: text("phone").notNull().unique(),
+    // E.164, e.g. +919876543210, for WhatsApp reminders. Typed at sign-up and
+    // confirmed later by a code; only a confirmed number is unique.
+    phone: text("phone").notNull(),
+    phoneVerifiedAt: timestamp("phone_verified_at", { withTimezone: true }),
     // The owner's full name, from profile setup.
     name: text("name"),
-    // Lower-cased. Optional for phone sign-ups; unique when present.
+    // Lower-cased; Google's address. Empty only on accounts from before Google sign-in.
     email: text("email"),
     emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
     role: text("role", { enum: ["owner"] }).notNull().default("owner"),
@@ -80,6 +82,7 @@ export const users = pgTable(
     check("users_role_check", sql`${t.role} in ('owner')`),
     index("users_centre_id_idx").on(t.centreId),
     uniqueIndex("users_email_unique").on(sql`lower(${t.email})`),
+    uniqueIndex("users_verified_phone_unique").on(t.phone).where(sql`${t.phoneVerifiedAt} is not null`),
   ],
 );
 

@@ -26,26 +26,10 @@ export function errorMessage(err: unknown): string {
   switch (err.code) {
     case "network_error":
       return e.network;
-    case "invalid_otp":
-      return err.attemptsLeft === 1 ? e.invalidOtpLastTry : fill(e.invalidOtp, { tries: err.attemptsLeft ?? "" });
-    case "otp_resend_too_soon":
-      return fill(e.resendTooSoon, { seconds: err.retryAfterSeconds ?? 30 });
-    case "rate_limited":
-      return e.rateLimited;
-    case "too_many_attempts":
-      return e.tooManyAttempts;
-    case "otp_expired":
-      return e.otpExpired;
-    case "sms_unavailable":
-      return e.smsUnavailable;
-    case "signup_ticket_invalid":
-      return e.signupExpired;
-    case "account_exists":
-      return e.accountExists;
-    case "google_already_linked":
-      return e.googleAlreadyLinked;
     case "google_in_use":
       return e.googleInUse;
+    case "email_in_use":
+      return e.emailInUse;
     case "google_pending_missing":
       return e.googleExpired;
     default:
@@ -53,7 +37,7 @@ export function errorMessage(err: unknown): string {
   }
 }
 
-/** Why Google sent the owner back to the login page (?google_error=…). */
+/** Why the owner is back on the sign-in page (?google_error=…, from the API's Google callback or sign-up). */
 export function googleErrorMessage(reason: string): string {
   const e = copy.errors;
   switch (reason) {
@@ -63,6 +47,10 @@ export function googleErrorMessage(reason: string): string {
       return e.googleEmailUnverified;
     case "unavailable":
       return e.googleUnavailable;
+    case "expired":
+      return e.googleExpired;
+    case "email_in_use":
+      return e.emailInUse;
     default:
       return e.googleFailed;
   }

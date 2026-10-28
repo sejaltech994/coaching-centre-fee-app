@@ -16,9 +16,9 @@ describe("GET /centre", () => {
 
   it("only ever shows an owner their own centre", async () => {
     const { login, call, clock } = await createTestApp();
-    const asha = await login("9876543210");
+    const asha = await login("asha@example.com");
     clock.advance(31_000);
-    const ravi = await login("9123456789");
+    const ravi = await login("ravi@example.com");
 
     const forAsha = await (await call("GET", "/centre", { token: asha.body.accessToken })).json();
     const forRavi = await (await call("GET", "/centre", { token: ravi.body.accessToken })).json();

@@ -33,13 +33,6 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const post = (path: string, body: unknown) =>
-  new Request(`${SITE}${path}`, {
-    method: "POST",
-    headers: { "content-type": "application/json", "cf-connecting-ip": "203.0.113.5" },
-    body: JSON.stringify(body),
-  });
-
 describe("Cloudflare Worker", () => {
   it("serves the website for everything outside /api, without touching the database", async () => {
     const worker = createWorker(makeDb);
@@ -89,21 +82,33 @@ describe("Cloudflare Worker", () => {
     expect(res.status).toBe(200);
   });
 
-  it("logs an owner in end to end, with a Secure cookie", async () => {
-    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+  it("signs an owner up end to end through Google, with Secure cookies", async () => {
     const worker = createWorker(makeDb);
+    const google = env({ GOOGLE_PROVIDER: "fake" });
+    const get = (url: string, cookie = "") => worker.fetch(new Request(url, { headers: { cookie } }), google, ctx());
+    const cookie = (res: Response, name: string) =>
+      res.headers.getSetCookie().find((c) => c.startsWith(`${name}=`))!.split(";")[0]!;
 
-    const requested = await worker.fetch(post("/api/v1/auth/otp/request", { phone: "9876543210" }), env(), ctx());
-    expect(requested.status).toBe(202);
-    // Hosted dev uses the console SMS provider: the code is in the Worker's log.
-    const code = /: (\d{6}) /.exec(String(info.mock.calls.at(-1)?.[0]))?.[1];
-    expect(code).toMatch(/^\d{6}$/);
+    const started = await get(`${SITE}/api/v1/auth/google/start`);
+    expect(started.headers.get("set-cookie")).toContain("Secure");
+    const chooser = new URL(started.headers.get("location")!);
+    const approve = new URL("/api/v1/auth/google/fake/approve", SITE);
+    for (const key of ["redirect_uri", "state", "nonce"]) approve.searchParams.set(key, chooser.searchParams.get(key)!);
+    approve.searchParams.set("email", "asha@example.com");
+    const callback = (await get(approve.href)).headers.get("location")!;
 
-    const verified = await worker.fetch(post("/api/v1/auth/otp/verify", { phone: "9876543210", code }), env(), ctx());
-    expect(verified.status).toBe(200);
-    const { signupTicket } = (await verified.json()) as { signupTicket: string };
+    const signedIn = await get(callback, cookie(started, "chukta_oauth"));
+    expect(signedIn.headers.get("location")).toBe(`${SITE}/signup/`);
 
-    const registered = await worker.fetch(post("/api/v1/auth/register", { signupTicket, ...PROFILE }), env(), ctx());
+    const registered = await worker.fetch(
+      new Request(`${SITE}/api/v1/auth/register`, {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie: cookie(signedIn, "chukta_google") },
+        body: JSON.stringify(PROFILE),
+      }),
+      google,
+      ctx(),
+    );
     expect(registered.status).toBe(201);
     expect(registered.headers.get("set-cookie")).toContain("Secure");
   });

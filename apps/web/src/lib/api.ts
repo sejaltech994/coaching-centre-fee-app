@@ -2,7 +2,15 @@
 import type { BatchInput, CentreType, Weekday } from "@chukta/shared";
 
 export type Me = {
-  user: { id: string; phone: string; fullName: string | null; email: string | null; role: "owner" };
+  user: {
+    id: string;
+    phone: string;
+    /** False until the owner confirms the number with a code. */
+    phoneVerified: boolean;
+    fullName: string | null;
+    email: string | null;
+    role: "owner";
+  };
   centre: {
     id: string;
     name: string | null;
@@ -18,30 +26,18 @@ export type LoginSession = Me & {
   accessToken: string;
   expiresIn: number;
   isNewAccount: boolean;
-  /** Set when this sign-in also connected a waiting Google account. */
-  linkedGoogle?: boolean;
 };
 
-/** A Google account waiting for its owner to verify a mobile number. */
+/** The Google account that just signed in and has no Chukta account yet. */
 export type GooglePending = { email: string; name: string | null };
 
-/** A verified number with no account yet: the ticket lets it register within `expiresIn` seconds. */
-export type SignupRequired = {
-  status: "signup_required";
-  signupTicket: string;
-  phone: string;
-  expiresIn: number;
-  /** When signing up after Google: its name and email, to pre-fill the profile. */
-  google?: GooglePending;
-};
-
+/** What sign-up sends; the API checks it with the shared validateProfile. */
 export type RegisterInput = {
-  signupTicket: string;
   fullName: string;
+  phone: string;
   centreName: string;
   city: string;
   centreType: string;
-  email?: string;
   acceptedTerms: boolean;
 };
 
@@ -61,7 +57,6 @@ export type Batch = {
 };
 
 export class ApiRequestError extends Error {
-  readonly attemptsLeft?: number;
   readonly retryAfterSeconds?: number;
   /** Message per field at fault, for forms. */
   readonly fields?: Record<string, string>;
@@ -70,11 +65,10 @@ export class ApiRequestError extends Error {
     readonly status: number,
     readonly code: string,
     message: string,
-    options: { attemptsLeft?: number; retryAfterSeconds?: number; fields?: Record<string, string> } = {},
+    options: { retryAfterSeconds?: number; fields?: Record<string, string> } = {},
   ) {
     super(message);
     this.name = "ApiRequestError";
-    this.attemptsLeft = options.attemptsLeft;
     this.retryAfterSeconds = options.retryAfterSeconds;
     this.fields = options.fields;
   }
@@ -106,7 +100,7 @@ async function call<T>(path: string, init: { method?: string; body?: unknown; to
 
   if (res.status === 204) return undefined as T;
   const payload = (await res.json().catch(() => null)) as
-    | (T & { error?: { code: string; message: string; attemptsLeft?: number; fields?: Record<string, string> } })
+    | (T & { error?: { code: string; message: string; fields?: Record<string, string> } })
     | null;
 
   if (!res.ok) {
@@ -116,7 +110,6 @@ async function call<T>(path: string, init: { method?: string; body?: unknown; to
       payload?.error?.code ?? `http_${res.status}`,
       payload?.error?.message ?? "Something went wrong. Try again.",
       {
-        attemptsLeft: payload?.error?.attemptsLeft,
         retryAfterSeconds: Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined,
         fields: payload?.error?.fields,
       },
@@ -125,15 +118,7 @@ async function call<T>(path: string, init: { method?: string; body?: unknown; to
   return payload as T;
 }
 
-export const requestOtp = (phone: string) =>
-  call<{ expiresInSeconds: number; resendAfterSeconds: number }>("/auth/otp/request", {
-    method: "POST",
-    body: { phone },
-  });
-
-export const verifyOtp = (phone: string, code: string) =>
-  call<LoginSession | SignupRequired>("/auth/otp/verify", { method: "POST", body: { phone, code } });
-
+/** Signs up the Google account waiting in the API's cookie. */
 export const registerOwner = (input: RegisterInput) =>
   call<LoginSession>("/auth/register", { method: "POST", body: input });
 
