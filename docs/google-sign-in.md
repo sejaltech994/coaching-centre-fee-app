@@ -1,7 +1,8 @@
 # Google sign-in
 
-Owners can sign up and log in with Google as well as with a mobile number.
-Both lead to the same account, and every account has a verified mobile number.
+Google is the only way to sign up and sign in. There are no passwords and no
+codes; the mobile number an owner gives at sign-up is for WhatsApp reminders and
+is confirmed later.
 
 ## How it works
 
@@ -15,11 +16,13 @@ Both lead to the same account, and every account has a verified mobile number.
    own tokens are dropped.
 3. Then one of three things happens:
    - **The Google account is already connected:** signed in, sent to the dashboard.
-   - **A new Google account:** asked to verify a mobile number. A new number
-     goes on to profile setup, pre-filled with the Google name and email. A
-     number that already has an account gets Google connected to it.
-   - **The Google email matches an existing account:** told so, and asked to
-     verify that account's mobile number. A matching email alone never connects Google.
+   - **A new Google account:** sent to `/signup/`, "Tell us about your centre",
+     with the Google name filled in. `POST /auth/register` then creates the
+     owner (email from Google, already confirmed), the centre, the consent and
+     the Google link together, and signs them in.
+   - **The email belongs to an account from before Google sign-in:** sent back
+     to sign-in with `google_error=email_in_use`. A matching email alone never
+     connects Google to an account.
 
 The pending Google account waits for up to 15 minutes in a signed cookie
 (`chukta_google`). Code: `apps/api/src/modules/auth/google.ts` and

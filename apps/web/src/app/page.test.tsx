@@ -54,15 +54,13 @@ describe("Landing page", () => {
     expect(pricing.getByRole("link", { name: "Go Pro" })).toHaveAttribute("href", "#start");
   });
 
-  it("sends the phone number to the login page", () => {
+  it("sends new owners to sign in with Google", () => {
     render(<LandingPage />);
-    const phone = screen.getByLabelText("Mobile number");
+    const start = within(document.getElementById("start")!);
 
-    expect(phone).toBeRequired();
-    expect(phone).toHaveAttribute("type", "tel");
-    expect(phone).toHaveAttribute("name", "phone");
-    expect(phone.closest("form")).toHaveAttribute("action", "/login");
-    expect(screen.getByRole("button", { name: "Get OTP" })).toHaveAttribute("type", "submit");
+    expect(start.getByRole("link", { name: "Continue with Google" })).toHaveAttribute("href", "/login");
+    expect(start.queryByLabelText("Mobile number")).not.toBeInTheDocument();
+    expect(screen.getByText(/Sign in with Google · no card · live in 15 minutes/)).toBeInTheDocument();
   });
 
   it("links to the legal and contact pages in the footer", () => {

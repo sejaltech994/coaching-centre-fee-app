@@ -10,37 +10,31 @@ afterEach(() => {
 
 describe("copy", () => {
   it("is the built-in text when the build baked in none", () => {
-    expect(copy.auth.welcomeTitle).toBe("Welcome to Chukta");
+    expect(copy.auth.signInTitle).toBe("Sign in");
   });
 
   it("is the CMS text the build baked in", async () => {
-    vi.stubEnv("CHUKTA_COPY", JSON.stringify({ auth: { welcomeTitle: "Namaste!" } }));
+    vi.stubEnv("CHUKTA_COPY", JSON.stringify({ auth: { signInTitle: "Namaste!" } }));
     const fresh = await import("./copy");
-    expect(fresh.copy.auth.welcomeTitle).toBe("Namaste!");
-    expect(fresh.copy.auth.sendCode).toBe("Send code");
+    expect(fresh.copy.auth.signInTitle).toBe("Namaste!");
+    expect(fresh.copy.auth.continueWithGoogle).toBe("Continue with Google");
   });
 
   it("falls back to the built-in text if the baked-in copy is unreadable", async () => {
     vi.stubEnv("CHUKTA_COPY", "{not json");
     const fresh = await import("./copy");
-    expect(fresh.copy.auth.welcomeTitle).toBe("Welcome to Chukta");
+    expect(fresh.copy.auth.signInTitle).toBe("Sign in");
   });
 });
 
 describe("errorMessage", () => {
   it.each([
-    [new ApiRequestError(0, "network_error", "x"), "Can't reach Chukta. Check your connection and try again."],
-    [new ApiRequestError(400, "invalid_otp", "x", { attemptsLeft: 4 }), "That code didn’t match. 4 tries left."],
-    [new ApiRequestError(400, "invalid_otp", "x", { attemptsLeft: 1 }), "That code didn’t match. 1 try left."],
-    [new ApiRequestError(429, "otp_resend_too_soon", "x", { retryAfterSeconds: 12 }), "Wait 12 seconds before asking for a new code."],
-    [new ApiRequestError(429, "rate_limited", "x"), "Too many codes requested. Try again later."],
-    [new ApiRequestError(429, "too_many_attempts", "x"), "Too many wrong codes. Request a new one."],
-    [new ApiRequestError(400, "otp_expired", "x"), "This code has expired. Request a new one."],
-    [new ApiRequestError(503, "sms_unavailable", "x"), "We couldn't send the SMS. Try again in a moment."],
-    [new ApiRequestError(400, "signup_ticket_invalid", "x"), "Your sign-up has expired. Verify your number again."],
-    [new ApiRequestError(409, "account_exists", "x"), "This number already has an account. Log in instead."],
-  ])("uses the editable text for %s", (err, text) => {
-    expect(errorMessage(err)).toBe(text);
+    ["network_error", "Can't reach Chukta. Check your connection and try again."],
+    ["google_in_use", "This Google account already has a Chukta account. Sign in instead."],
+    ["email_in_use", "This email already has a Chukta account that signs in another way. Contact us to move it to Google."],
+    ["google_pending_missing", "Your Google sign-in has expired. Continue with Google again."],
+  ])("uses the editable text for %s", (code, text) => {
+    expect(errorMessage(new ApiRequestError(400, code, "x"))).toBe(text);
   });
 
   it("shows the server's own message for codes the copy doesn't cover", () => {

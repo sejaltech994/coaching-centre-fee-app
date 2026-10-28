@@ -1,4 +1,4 @@
-import { authIdentities, users, type Tx } from "@chukta/db";
+import { authIdentities, users } from "@chukta/db";
 import { fakeGoogleCode, GoogleSignInError, type GoogleProfile } from "@chukta/integrations";
 import { and, eq, sql } from "drizzle-orm";
 import { Hono, type Context } from "hono";
@@ -12,11 +12,11 @@ import { issueRefreshToken } from "./tokens";
  * Google sign-in (TSD: Registration, login and profile). The API runs the OAuth
  * code flow with PKCE; the web app only follows redirects.
  *
+ * Google is the only way to sign in.
+ *
  * - A linked Google account signs straight in.
- * - Any other Google account is remembered for 15 minutes in a sealed cookie
- *   while its owner verifies a mobile number. That number either has an account,
- *   which Google is then connected to, or signs up with Google attached. A
- *   matching email alone never connects Google to an account.
+ * - Any other Google account is remembered for 15 minutes in a signed cookie
+ *   while its owner fills in sign-up (POST /auth/register).
  */
 
 const OAUTH_COOKIE = "chukta_oauth";
@@ -38,25 +38,9 @@ export function clearPendingGoogle(c: Context, deps: Deps): void {
   deleteCookie(c, PENDING_COOKIE, { path: PENDING_PATH, secure: deps.config.cookieSecure, httpOnly: true, sameSite: "Lax" });
 }
 
-/** Connects `google` to the owner. Refuses to replace another Google account, or to take one linked elsewhere. */
-export async function linkGoogle(tx: Tx, userId: string, google: PendingGoogle, now: Date): Promise<void> {
-  const existing = await tx.query.authIdentities.findFirst({
-    where: and(eq(authIdentities.provider, "google"), sql`(${authIdentities.userId} = ${userId} or ${authIdentities.subject} = ${google.sub})`),
-  });
-  if (existing?.userId === userId && existing.subject === google.sub) return;
-  if (existing?.userId === userId) {
-    throw new ApiError(409, "google_already_linked", "This account is already connected to a different Google account.");
-  }
-  if (existing) throw new ApiError(409, "google_in_use", "This Google account is connected to another Chukta account.");
-  await tx.insert(authIdentities).values({
-    userId,
-    provider: "google",
-    subject: google.sub,
-    email: google.email,
-    pictureUrl: google.picture,
-    lastUsedAt: now,
-  });
-}
+/** No Google sign-in is waiting: it never happened, or its 15 minutes ran out. */
+export const googlePendingMissing = (status: 401 | 404) =>
+  new ApiError(status, "google_pending_missing", "Your Google sign-in has expired. Continue with Google again.");
 
 export function googleRoutes(deps: Deps, setRefreshCookie: (c: Context, token: string) => void) {
   const routes = new Hono<AppEnv>();
@@ -120,6 +104,12 @@ export function googleRoutes(deps: Deps, setRefreshCookie: (c: Context, token: s
       return c.redirect(web("/dashboard/"), 302);
     }
 
+    // An account from before Google sign-in has this email. A matching email
+    // alone never connects Google to an account, so it can't be signed into.
+    if (await deps.db.query.users.findFirst({ where: sql`lower(${users.email}) = ${profile.email}` })) {
+      return loginWithError(c, "email_in_use");
+    }
+
     const pending: PendingGoogle = { sub: profile.sub, email: profile.email, name: profile.name, picture: profile.picture };
     setCookie(c, PENDING_COOKIE, await seal(deps.config.jwtSecret, "google-pending", pending, inSeconds(deps, PENDING_TTL_SECONDS)), {
       httpOnly: true,
@@ -128,13 +118,12 @@ export function googleRoutes(deps: Deps, setRefreshCookie: (c: Context, token: s
       path: PENDING_PATH,
       maxAge: PENDING_TTL_SECONDS,
     });
-    const emailInUse = await deps.db.query.users.findFirst({ where: sql`lower(${users.email}) = ${profile.email}` });
-    return c.redirect(web(`/login/?via=google${emailInUse ? "&hint=email_in_use" : ""}`), 302);
+    return c.redirect(web("/signup/"), 302);
   });
 
   routes.get("/pending", async (c) => {
     const pending = await readPendingGoogle(c, deps);
-    if (!pending) throw new ApiError(404, "google_pending_missing", "Your Google sign-in has expired. Try again.");
+    if (!pending) throw googlePendingMissing(404);
     return c.json({ email: pending.email, name: pending.name });
   });
 

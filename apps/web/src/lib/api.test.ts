@@ -6,11 +6,11 @@ import {
   createBatch,
   getCentre,
   listBatches,
+  getGooglePending,
   logout,
   refreshSession,
-  requestOtp,
+  registerOwner,
   updateBatch,
-  verifyOtp,
 } from "./api";
 
 const fetchMock = vi.fn<typeof fetch>();
@@ -44,15 +44,24 @@ describe("API client", () => {
     expect(apiBaseUrl()).toBe("https://api.example/api/v1");
   });
 
-  it("requests an OTP with the phone number, sending cookies", async () => {
-    reply(202, { expiresInSeconds: 300, resendAfterSeconds: 30 });
+  it("signs up with the profile, sending the Google sign-in cookie", async () => {
+    const session = { status: "signed_in", accessToken: "t", expiresIn: 900, isNewAccount: true, user: {}, centre: {} };
+    reply(201, session);
+    const profile = {
+      fullName: "Asha Sharma",
+      phone: "98765 43210",
+      centreName: "Sunrise Classes",
+      city: "Pune",
+      centreType: "coaching",
+      acceptedTerms: true,
+    };
 
-    await expect(requestOtp("+919876543210")).resolves.toEqual({ expiresInSeconds: 300, resendAfterSeconds: 30 });
+    await expect(registerOwner(profile)).resolves.toEqual(session);
 
     const [url, init] = fetchMock.mock.calls[0]!;
-    expect(url).toBe("http://localhost:8787/api/v1/auth/otp/request");
+    expect(url).toBe("http://localhost:8787/api/v1/auth/register");
     expect(init).toMatchObject({ method: "POST", credentials: "include" });
-    expect(JSON.parse(init!.body as string)).toEqual({ phone: "+919876543210" });
+    expect(JSON.parse(init!.body as string)).toEqual(profile);
   });
 
   it("never answers from the browser's cache, so lists are always current", async () => {
@@ -61,38 +70,36 @@ describe("API client", () => {
     expect(fetchMock.mock.calls[0]![1]).toMatchObject({ cache: "no-store" });
   });
 
-  it("verifies an OTP and returns the session", async () => {
-    const session = { accessToken: "t", expiresIn: 900, isNewAccount: true, user: {}, centre: {} };
-    reply(200, session);
+  it("reads the Google account waiting to sign up", async () => {
+    reply(200, { email: "asha@example.com", name: "Asha Sharma" });
 
-    await expect(verifyOtp("+919876543210", "123456")).resolves.toEqual(session);
-    expect(JSON.parse(fetchMock.mock.calls[0]![1]!.body as string)).toEqual({ phone: "+919876543210", code: "123456" });
+    await expect(getGooglePending()).resolves.toEqual({ email: "asha@example.com", name: "Asha Sharma" });
+    expect(fetchMock.mock.calls[0]![0]).toBe("http://localhost:8787/api/v1/auth/google/pending");
   });
 
   it("turns an error response into an ApiRequestError with the server's message", async () => {
-    reply(400, { error: { code: "invalid_otp", message: "That code is not right. 4 attempts left.", attemptsLeft: 4 } });
+    reply(409, { error: { code: "google_in_use", message: "This Google account already has a Chukta account." } });
 
-    const error = await verifyOtp("+919876543210", "000000").catch((e: unknown) => e);
+    const error = await getGooglePending().catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(ApiRequestError);
     expect(error).toMatchObject({
-      status: 400,
-      code: "invalid_otp",
-      message: "That code is not right. 4 attempts left.",
-      attemptsLeft: 4,
+      status: 409,
+      code: "google_in_use",
+      message: "This Google account already has a Chukta account.",
     });
   });
 
   it("reads Retry-After on rate limits", async () => {
-    reply(429, { error: { code: "otp_resend_too_soon", message: "Wait 20 seconds." } }, { "retry-after": "20" });
+    reply(429, { error: { code: "rate_limited", message: "Wait 20 seconds." } }, { "retry-after": "20" });
 
-    await expect(requestOtp("+919876543210")).rejects.toMatchObject({ code: "otp_resend_too_soon", retryAfterSeconds: 20 });
+    await expect(getGooglePending()).rejects.toMatchObject({ code: "rate_limited", retryAfterSeconds: 20 });
   });
 
   it("explains a lost connection in plain words", async () => {
     fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
 
-    await expect(requestOtp("+919876543210")).rejects.toMatchObject({
+    await expect(getGooglePending()).rejects.toMatchObject({
       code: "network_error",
       message: "Can't reach Chukta. Check your connection and try again.",
     });
@@ -101,7 +108,7 @@ describe("API client", () => {
   it("copes with an error response that isn't JSON", async () => {
     fetchMock.mockResolvedValueOnce(new Response("Bad gateway", { status: 502 }));
 
-    await expect(requestOtp("+919876543210")).rejects.toMatchObject({
+    await expect(getGooglePending()).rejects.toMatchObject({
       status: 502,
       code: "http_502",
       message: "Something went wrong. Try again.",

@@ -223,7 +223,7 @@ describe("tenant isolation", () => {
   it("never lets one owner see, change or archive another owner's batch", async () => {
     const { batch } = await (await create({ ...maths, name: "Asha's batch" })).json();
     app.clock.advance(31_000);
-    const ravi = (await app.login("9123456789")).body.accessToken;
+    const ravi = (await app.login("ravi@example.com")).body.accessToken;
 
     expect((await app.call("GET", `/batches/${batch.id}`, { token: ravi })).status).toBe(404);
     expect((await app.call("PATCH", `/batches/${batch.id}`, { token: ravi, body: { name: "Mine" } })).status).toBe(404);

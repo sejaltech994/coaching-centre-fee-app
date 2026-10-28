@@ -34,9 +34,23 @@ describe("migrations", () => {
     expect(user.lastLoginAt).toBeNull();
   });
 
-  it("allow each phone number one user only", async () => {
+  it("let a typed, unconfirmed number appear on more than one owner", async () => {
     const { centre } = await insertOwner("+919876543210");
-    await expect(db.insert(users).values({ centreId: centre.id, phone: "+919876543210" })).rejects.toThrow();
+    await expect(db.insert(users).values({ centreId: centre.id, phone: "+919876543210" })).resolves.toBeDefined();
+  });
+
+  it("give each confirmed phone number to one owner only", async () => {
+    const confirmed = new Date();
+    const { centre } = await insertOwner("+919876543210");
+    await db.insert(users).values({ centreId: centre.id, phone: "+919876543211", phoneVerifiedAt: confirmed });
+    await expect(
+      db.insert(users).values({ centreId: centre.id, phone: "+919876543211", phoneVerifiedAt: confirmed }),
+    ).rejects.toThrow();
+  });
+
+  it("start a new owner's number unconfirmed", async () => {
+    const { user } = await insertOwner();
+    expect(user.phoneVerifiedAt).toBeNull();
   });
 
   it("only allow known plans", async () => {
