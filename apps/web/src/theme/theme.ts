@@ -1,5 +1,4 @@
 import { createTheme, type PaletteOptions } from "@mui/material/styles";
-import "./mui.d";
 import { tokens } from "./tokens";
 
 /**
