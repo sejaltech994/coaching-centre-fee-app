@@ -62,7 +62,7 @@ Still to do, by the project owner:
    API › Tokens › Add API token. Name it `GitHub Actions builds`, with **Viewer** permissions.
 2. **GitHub:** under Settings › Secrets and variables › Actions, add:
    - the repository **variable** `SANITY_PROJECT_ID` = `hshda1j7`;
-   - the repository **secret** `SANITY_READ_TOKEN` = the token.
+   - the repository **secret** `CMS_SANITY` = the token (the build reads it as `SANITY_READ_TOKEN`).
 
    Every environment needs the token, because the dataset is private. A build with the
    project ID but no token fails, rather than quietly using the built-in text.
