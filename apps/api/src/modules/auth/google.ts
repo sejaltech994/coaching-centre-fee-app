@@ -30,7 +30,7 @@ type OAuthState = { state: string; nonce: string; verifier: string };
 export type PendingGoogle = Pick<GoogleProfile, "sub" | "email" | "name" | "picture">;
 
 /** The Google account waiting for a mobile number, if any. */
-export function readPendingGoogle(c: Context, deps: Deps): PendingGoogle | null {
+export function readPendingGoogle(c: Context, deps: Deps): Promise<PendingGoogle | null> {
   return unseal<PendingGoogle>(deps.config.jwtSecret, "google-pending", getCookie(c, PENDING_COOKIE), deps.now());
 }
 
@@ -64,10 +64,10 @@ export function googleRoutes(deps: Deps, setRefreshCookie: (c: Context, token: s
   const loginWithError = (c: Context, error: string) => c.redirect(web(`/login/?google_error=${error}`), 302);
   const callbackUrl = (c: Context) => new URL("/api/v1/auth/google/callback", c.req.url).toString();
 
-  routes.get("/start", (c) => {
+  routes.get("/start", async (c) => {
     if (!deps.google) return loginWithError(c, "unavailable");
     const oauth: OAuthState = { state: randomToken(), nonce: randomToken(), verifier: randomToken() };
-    setCookie(c, OAUTH_COOKIE, seal(deps.config.jwtSecret, "google-oauth", oauth, inSeconds(deps, OAUTH_TTL_SECONDS)), {
+    setCookie(c, OAUTH_COOKIE, await seal(deps.config.jwtSecret, "google-oauth", oauth, inSeconds(deps, OAUTH_TTL_SECONDS)), {
       httpOnly: true,
       secure: deps.config.cookieSecure,
       // Lax: the cookie must come back on Google's top-level redirect to the callback.
@@ -87,7 +87,7 @@ export function googleRoutes(deps: Deps, setRefreshCookie: (c: Context, token: s
   });
 
   routes.get("/callback", async (c) => {
-    const oauth = unseal<OAuthState>(deps.config.jwtSecret, "google-oauth", getCookie(c, OAUTH_COOKIE), deps.now());
+    const oauth = await unseal<OAuthState>(deps.config.jwtSecret, "google-oauth", getCookie(c, OAUTH_COOKIE), deps.now());
     deleteCookie(c, OAUTH_COOKIE, { path: OAUTH_PATH, secure: deps.config.cookieSecure, httpOnly: true, sameSite: "Lax" });
     const { state, code, error } = c.req.query();
     if (!deps.google || !oauth || !state || state !== oauth.state) return loginWithError(c, "failed");
@@ -121,7 +121,7 @@ export function googleRoutes(deps: Deps, setRefreshCookie: (c: Context, token: s
     }
 
     const pending: PendingGoogle = { sub: profile.sub, email: profile.email, name: profile.name, picture: profile.picture };
-    setCookie(c, PENDING_COOKIE, seal(deps.config.jwtSecret, "google-pending", pending, inSeconds(deps, PENDING_TTL_SECONDS)), {
+    setCookie(c, PENDING_COOKIE, await seal(deps.config.jwtSecret, "google-pending", pending, inSeconds(deps, PENDING_TTL_SECONDS)), {
       httpOnly: true,
       secure: deps.config.cookieSecure,
       sameSite: "Lax",
@@ -132,8 +132,8 @@ export function googleRoutes(deps: Deps, setRefreshCookie: (c: Context, token: s
     return c.redirect(web(`/login/?via=google${emailInUse ? "&hint=email_in_use" : ""}`), 302);
   });
 
-  routes.get("/pending", (c) => {
-    const pending = readPendingGoogle(c, deps);
+  routes.get("/pending", async (c) => {
+    const pending = await readPendingGoogle(c, deps);
     if (!pending) throw new ApiError(404, "google_pending_missing", "Your Google sign-in has expired. Try again.");
     return c.json({ email: pending.email, name: pending.name });
   });

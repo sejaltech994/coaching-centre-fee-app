@@ -88,7 +88,7 @@ export function authRoutes(deps: Deps) {
     const body = await readJson(c, verifyBody);
     const verified = await verifyOtp(deps, { phone: parsePhone(body.phone), code: body.code });
     // A Google sign-in waiting for this mobile number to be verified.
-    const google = readPendingGoogle(c, deps);
+    const google = await readPendingGoogle(c, deps);
     if (verified.status === "signup_required") {
       return c.json({
         status: verified.status,
@@ -111,7 +111,7 @@ export function authRoutes(deps: Deps) {
     const body = await readJson(c, registerBody);
     const checked = validateProfile(body);
     if (!checked.ok) throw invalidFields(checked.fields);
-    const google = readPendingGoogle(c, deps);
+    const google = await readPendingGoogle(c, deps);
     const { user, centre } = await register(deps, {
       ticket: typeof body.signupTicket === "string" ? body.signupTicket : "",
       profile: checked.value,

@@ -1,7 +1,8 @@
 import { authIdentities, users } from "@chukta/db";
 import { GoogleSignInError, type GoogleSignIn } from "@chukta/integrations";
+import { decodeProtectedHeader } from "jose";
 import { describe, expect, it, vi } from "vitest";
-import { keyedHash, pkceChallenge, unseal } from "../../lib/crypto";
+import { pkceChallenge, seal, unseal } from "../../lib/crypto";
 import { createTestApp, PROFILE, refreshCookie, type JsonResponse } from "../../test/harness";
 
 type App = Awaited<ReturnType<typeof createTestApp>>;
@@ -311,10 +312,27 @@ describe("verifying a mobile number after Google", () => {
   });
 });
 
-describe("unseal", () => {
-  it("rejects a correctly signed value whose content isn't readable", () => {
-    const body = "bm90LWpzb24";
-    expect(unseal("s", "p", `${body}.${keyedHash("s", "p", body)}`, new Date())).toBeNull();
+describe("seal and unseal", () => {
+  const now = new Date("2026-10-28T10:00:00Z");
+  const later = (seconds: number) => new Date(now.getTime() + seconds * 1000);
+
+  it("is a standard signed JWT (HS256), not home-made crypto", async () => {
+    const sealed = await seal("s", "p", { a: 1 }, later(60));
+    expect(decodeProtectedHeader(sealed).alg).toBe("HS256");
+    expect(await unseal("s", "p", sealed, now)).toEqual({ a: 1 });
+  });
+
+  it.each([
+    ["another purpose", "s", "q", 0],
+    ["another secret", "t", "p", 0],
+    ["expiry", "s", "p", 61],
+  ])("refuses a value past its %s", async (_, secret, purpose, wait) => {
+    const sealed = await seal("s", "p", { a: 1 }, later(60));
+    expect(await unseal(secret, purpose, sealed, later(wait))).toBeNull();
+  });
+
+  it.each([undefined, "", "not-a-jwt", "a.b.c"])("refuses %j", async (value) => {
+    expect(await unseal("s", "p", value, now)).toBeNull();
   });
 });
 

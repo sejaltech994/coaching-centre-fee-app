@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
+import { jwtVerify, SignJWT, type JWTPayload } from "jose";
 
 /** A uniformly random 6-digit code, leading zeros kept. */
 export function randomOtp(): string {
@@ -29,23 +30,33 @@ export function pkceChallenge(verifier: string): string {
   return createHash("sha256").update(verifier).digest("base64url");
 }
 
+const sealKey = (secret: string) => new TextEncoder().encode(secret);
+const sealAudience = (purpose: string) => `chukta:${purpose}`;
+
 /**
- * A value the browser holds but can't alter or reuse after `expiresAt`: the
- * payload readable, with a keyed hash over it. For short-lived cookies only.
+ * A value the browser holds but can't alter or reuse after `expiresAt`: a signed
+ * JWT (HS256) whose audience is `purpose`, so one kind can't stand in for another.
+ * The payload is readable. For short-lived cookies only.
  */
-export function seal(secret: string, purpose: string, payload: object, expiresAt: Date): string {
-  const body = Buffer.from(JSON.stringify({ ...payload, exp: expiresAt.getTime() })).toString("base64url");
-  return `${body}.${keyedHash(secret, purpose, body)}`;
+export function seal(secret: string, purpose: string, payload: JWTPayload, expiresAt: Date): Promise<string> {
+  return new SignJWT(payload)
+    .setProtectedHeader({ alg: "HS256" })
+    .setAudience(sealAudience(purpose))
+    .setExpirationTime(expiresAt)
+    .sign(sealKey(secret));
 }
 
-/** The payload of a sealed value, or null if it was altered, expired or is missing. */
-export function unseal<T>(secret: string, purpose: string, value: string | undefined, now: Date): T | null {
-  const [body, mac, extra] = value?.split(".") ?? [];
-  if (!body || !mac || extra !== undefined || !/^[0-9a-f]{64}$/.test(mac)) return null;
-  if (!sameHash(mac, keyedHash(secret, purpose, body))) return null;
+/** The payload of a sealed value, or null if it was altered, expired, for another purpose or is missing. */
+export async function unseal<T>(secret: string, purpose: string, value: string | undefined, now: Date): Promise<T | null> {
+  if (!value) return null;
   try {
-    const { exp, ...payload } = JSON.parse(Buffer.from(body, "base64url").toString()) as { exp: number };
-    return typeof exp === "number" && exp > now.getTime() ? (payload as T) : null;
+    const { payload } = await jwtVerify(value, sealKey(secret), {
+      algorithms: ["HS256"],
+      audience: sealAudience(purpose),
+      currentDate: now,
+    });
+    const { aud: _aud, exp: _exp, ...rest } = payload;
+    return rest as T;
   } catch {
     return null;
   }
