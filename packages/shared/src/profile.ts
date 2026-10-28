@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { normalizeIndianMobile, type IndianMobile } from "./phone";
+import { INVALID_PHONE_MESSAGE, normalizeIndianMobile, type IndianMobile } from "./phone";
 
 /** Centre types from the TSD (Registration, login and profile). */
 export const CENTRE_TYPES = ["tuition", "coaching", "dance", "music", "sports", "other"] as const;
@@ -30,19 +30,17 @@ export type ProfileInput = {
 const text = (missing: string, max: number, tooLong: string) =>
   z.string({ error: missing }).trim().min(1, missing).max(max, tooLong);
 
-const PHONE_MESSAGE = "Enter a 10-digit Indian mobile number.";
-
 const profileSchema = z.object({
   fullName: text("Enter your name.", 80, "Keep your name to 80 characters or fewer."),
   centreName: text("Enter your centre’s name.", 100, "Keep the centre’s name to 100 characters or fewer."),
   city: text("Enter your city.", 60, "Keep the city to 60 characters or fewer."),
   centreType: z.enum(CENTRE_TYPES, { error: "Pick the type of centre." }),
   phone: z
-    .string({ error: PHONE_MESSAGE })
+    .string({ error: INVALID_PHONE_MESSAGE })
     .transform((raw, ctx) => {
       const phone = normalizeIndianMobile(raw);
       if (!phone) {
-        ctx.addIssue({ code: "custom", message: PHONE_MESSAGE });
+        ctx.addIssue({ code: "custom", message: INVALID_PHONE_MESSAGE });
         return z.NEVER;
       }
       return phone;

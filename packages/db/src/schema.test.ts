@@ -57,6 +57,18 @@ describe("migrations", () => {
     await expect(db.insert(centres).values({ ownerPhone: "+919876543210", plan: "gold" as never })).rejects.toThrow();
   });
 
+  it("tie an OTP challenge to the owner confirming the number, and drop it with them", async () => {
+    const { user } = await insertOwner();
+    const [challenge] = await db
+      .insert(otpChallenges)
+      .values({ userId: user.id, phone: "+919876543211", codeHash: "h", requestedIp: "203.0.113.7", expiresAt: new Date() })
+      .returning();
+    expect(challenge!.userId).toBe(user.id);
+
+    await db.delete(users).where(eq(users.id, user.id));
+    expect(await db.select().from(otpChallenges)).toEqual([]);
+  });
+
   it("start an OTP challenge with no attempts", async () => {
     const [challenge] = await db
       .insert(otpChallenges)

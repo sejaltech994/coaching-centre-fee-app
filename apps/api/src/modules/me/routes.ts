@@ -1,15 +1,24 @@
 import { authIdentities, centres, users } from "@chukta/db";
-import { validateOwner } from "@chukta/shared";
+import { INVALID_PHONE_MESSAGE, normalizeIndianMobile, validateOwner } from "@chukta/shared";
 import { asc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv, Deps } from "../../deps";
 import { invalidFields, unauthenticated } from "../../lib/errors";
-import { readJson } from "../../lib/request";
+import { clientIp, readJson } from "../../lib/request";
 import { requireAuth } from "../../middleware/auth";
 import { centreDto, userDto } from "../auth/routes";
+import { confirmCode, OTP_RULES, sendCode } from "./phone";
 
 const anyJson = z.record(z.string(), z.unknown());
+const phoneBody = z.object({ phone: z.unknown() });
+const confirmBody = z.object({ phone: z.unknown(), code: z.string().regex(/^\d{6}$/) });
+
+function parsePhone(raw: unknown) {
+  const phone = typeof raw === "string" ? normalizeIndianMobile(raw) : null;
+  if (!phone) throw invalidFields({ phone: INVALID_PHONE_MESSAGE });
+  return phone;
+}
 
 /** The signed-in owner: who they are, their centre, and how they sign in (Settings). */
 export function meRoutes(deps: Deps) {
@@ -46,6 +55,26 @@ export function meRoutes(deps: Deps) {
       .where(eq(authIdentities.userId, c.var.auth.userId))
       .orderBy(asc(authIdentities.createdAt));
     return c.json({ identities: rows });
+  });
+
+  /** Texts a code to confirm `phone`: the owner's number, or one they're switching to. */
+  routes.post("/phone/verify", async (c) => {
+    const { phone } = await readJson(c, phoneBody);
+    await sendCode(deps, {
+      userId: c.var.auth.userId,
+      phone: parsePhone(phone),
+      ip: clientIp(c, deps.config.trustProxyHeaders),
+    });
+    return c.json(
+      { expiresInSeconds: OTP_RULES.ttlMs / 1000, resendAfterSeconds: OTP_RULES.resendAfterMs / 1000 },
+      202,
+    );
+  });
+
+  routes.post("/phone/confirm", async (c) => {
+    const { phone, code } = await readJson(c, confirmBody);
+    const user = await confirmCode(deps, { userId: c.var.auth.userId, phone: parsePhone(phone), code });
+    return c.json({ user: userDto(user) });
   });
 
   return routes;

@@ -145,11 +145,14 @@ export const signupTickets = pgTable("signup_tickets", {
   createdAt: createdAt(),
 });
 
-/** One login code sent by SMS. Only a hash of the code is stored. */
+/** One code sent by SMS to confirm an owner's mobile number. Only a hash of the code is stored. */
 export const otpChallenges = pgTable(
   "otp_challenges",
   {
     id: id(),
+    // The owner confirming this number. Empty on codes from before Google
+    // sign-in, when codes were for logging in.
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
     phone: text("phone").notNull(),
     codeHash: text("code_hash").notNull(),
     requestedIp: text("requested_ip").notNull(),

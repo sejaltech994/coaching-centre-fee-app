@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiRequestError, getIdentities, getMe, updateCentre, updateMe, type Me } from "@/lib/api";
+import { ApiRequestError, confirmPhone, getIdentities, getMe, sendPhoneCode, updateCentre, updateMe, type Me } from "@/lib/api";
 import { ThemeRegistry } from "@/theme/ThemeRegistry";
 import { Settings } from "./Settings";
 
@@ -11,6 +11,8 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   getIdentities: vi.fn(),
   updateMe: vi.fn(),
   updateCentre: vi.fn(),
+  sendPhoneCode: vi.fn(),
+  confirmPhone: vi.fn(),
 }));
 
 const me: Me = {
@@ -68,6 +70,40 @@ describe("Settings", () => {
     expect(within(profile).getAllByText("Confirmed")).toHaveLength(2);
     expect(profile).not.toHaveTextContent("Not confirmed");
     expect(profile).not.toHaveTextContent("Fee reminders go out on WhatsApp once you confirm it.");
+  });
+
+  it("asks for the mobile number to be confirmed, and confirms it with a code", async () => {
+    vi.mocked(sendPhoneCode).mockResolvedValue({ expiresInSeconds: 300, resendAfterSeconds: 30 });
+    vi.mocked(confirmPhone).mockResolvedValue({ user: { ...me.user, phoneVerified: true } });
+    const { user } = setup();
+    expect(await screen.findByText("Confirm your mobile number to start sending fee reminders on WhatsApp.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Confirm mobile number" }));
+    await user.click(screen.getByRole("button", { name: "Send code" }));
+    await user.click(await screen.findByLabelText("Digit 1"));
+    await user.keyboard("482913");
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+
+    expect(await screen.findByText("Mobile number confirmed.")).toBeInTheDocument();
+    expect(section("Profile")).not.toHaveTextContent("Not confirmed");
+    expect(screen.queryByText(/Confirm your mobile number to start/)).not.toBeInTheDocument();
+  });
+
+  it("opens the same steps from the banner", async () => {
+    const { user } = setup();
+
+    await user.click(await screen.findByRole("button", { name: "Confirm number" }));
+
+    expect(within(section("Profile")).getByRole("button", { name: "Send code" })).toBeInTheDocument();
+  });
+
+  it("offers to change a confirmed number", async () => {
+    vi.mocked(getMe).mockResolvedValue({ ...me, user: { ...me.user, phoneVerified: true } });
+    const { user } = setup();
+
+    await user.click(await screen.findByRole("button", { name: "Change mobile number" }));
+
+    expect(within(section("Profile")).getByLabelText("Mobile number")).toHaveValue("98765 43210");
   });
 
   it("changes the owner's name", async () => {

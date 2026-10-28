@@ -26,6 +26,20 @@ export function errorMessage(err: unknown): string {
   switch (err.code) {
     case "network_error":
       return e.network;
+    case "invalid_otp":
+      return err.attemptsLeft === 1 ? e.invalidOtpLastTry : fill(e.invalidOtp, { tries: err.attemptsLeft ?? "" });
+    case "otp_resend_too_soon":
+      return fill(e.resendTooSoon, { seconds: err.retryAfterSeconds ?? 30 });
+    case "too_many_attempts":
+      return e.tooManyAttempts;
+    case "otp_expired":
+      return e.otpExpired;
+    case "rate_limited":
+      return e.rateLimited;
+    case "sms_unavailable":
+      return e.smsUnavailable;
+    case "phone_taken":
+      return e.phoneTaken;
     case "google_in_use":
       return e.googleInUse;
     case "email_in_use":
