@@ -2,7 +2,7 @@
 # run the full CI suite, migrate the database, deploy, then smoke-test the site
 # and the API. One Cloudflare Worker per env serves the web app and, at /api/*,
 # the API (apps/api/src/worker.ts), backed by that env's Neon Postgres branch.
-# Secrets: CLOUDFLARE_API_TOKEN and SANITY_READ_TOKEN (repository); DATABASE_URL
+# Secrets: CLOUDFLARE_API_TOKEN and CMS_SANITY (repository; the Sanity read token); DATABASE_URL
 # and JWT_SECRET (per GitHub environment). Variable: SANITY_PROJECT_ID.
 # See docs/deployment.md, docs/ci-cd.md and docs/content.md.
 name: Deploy
@@ -62,7 +62,7 @@ jobs:
           SANITY_PROJECT_ID: ${{ vars.SANITY_PROJECT_ID }}
           SANITY_DATASET: ${{ vars.SANITY_DATASET }}
           SANITY_PERSPECTIVE: ${{ env.DEPLOY_ENV == 'prod' && 'published' || 'drafts' }}
-          SANITY_READ_TOKEN: ${{ secrets.SANITY_READ_TOKEN }}
+          SANITY_READ_TOKEN: ${{ secrets.CMS_SANITY }}
           # Shows "Continue with Google" only where this environment has an OAuth client.
           NEXT_PUBLIC_GOOGLE_SIGN_IN: ${{ vars.GOOGLE_CLIENT_ID != '' && 'on' || '' }}
 
