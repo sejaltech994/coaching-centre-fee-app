@@ -45,4 +45,36 @@ describe("loadCopyForBuild", () => {
       loadCopyForBuild({ SANITY_PROJECT_ID: "abc123", SANITY_READ_TOKEN: "sk" }, { fetch: respond({}, 503), log: vi.fn() }),
     ).rejects.toThrow("Couldn't read copy from Sanity: Sanity answered 503");
   });
+
+  // Workflow logs are admin-only; annotations show on the run page to anyone.
+  it("reports why the CMS couldn't be read as a GitHub error on CI", async () => {
+    const log = vi.fn();
+    const env = { SANITY_PROJECT_ID: "abc123", SANITY_READ_TOKEN: "sk", GITHUB_ACTIONS: "true" };
+
+    await expect(loadCopyForBuild(env, { fetch: respond({}, 401), log })).rejects.toThrow();
+
+    expect(log).toHaveBeenCalledWith(
+      "::error title=CMS copy::Couldn't read copy from Sanity: Sanity answered 401 for project abc123",
+    );
+  });
+
+  it("reports a missing read token as a GitHub error on CI", async () => {
+    const log = vi.fn();
+
+    await expect(
+      loadCopyForBuild({ SANITY_PROJECT_ID: "abc123", GITHUB_ACTIONS: "true" }, { fetch: respond({ result: [] }), log }),
+    ).rejects.toThrow("SANITY_READ_TOKEN is not");
+
+    expect(log).toHaveBeenCalledWith(
+      "::error title=CMS copy::SANITY_PROJECT_ID is set but SANITY_READ_TOKEN is not: the dataset is private.",
+    );
+  });
+
+  it("keeps errors out of annotation syntax off CI", async () => {
+    const log = vi.fn();
+
+    await expect(loadCopyForBuild({ SANITY_PROJECT_ID: "abc123" }, { log })).rejects.toThrow();
+
+    expect(log).not.toHaveBeenCalledWith(expect.stringContaining("::error"));
+  });
 });
