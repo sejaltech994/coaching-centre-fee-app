@@ -13,8 +13,12 @@ export { formatIndianMobile, maskPhone, normalizeIndianMobile, type IndianMobile
 export {
   CENTRE_TYPE_LABELS,
   CENTRE_TYPES,
+  validateCentre,
+  validateOwner,
   validateProfile,
+  type CentreInput,
   type CentreType,
+  type OwnerInput,
   type ProfileInput,
   type ProfileValidation,
 } from "./profile";

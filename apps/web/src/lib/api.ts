@@ -41,6 +41,9 @@ export type RegisterInput = {
   acceptedTerms: boolean;
 };
 
+/** A way the owner signs in; Google is the only one. */
+export type Identity = { provider: "google"; email: string; lastUsedAt: string | null };
+
 export type CentreResponse = {
   centre: { id: string; name: string | null; plan: "free" | "pro"; timezone: string };
 };
@@ -124,6 +127,11 @@ export const registerOwner = (input: RegisterInput) =>
 
 export const getMe = (token: string) => call<Me>("/me", { token });
 
+export const updateMe = (token: string, changes: { fullName: string }) =>
+  call<{ user: Me["user"] }>("/me", { method: "PATCH", body: changes, token });
+
+export const getIdentities = (token: string) => call<{ identities: Identity[] }>("/me/identities", { token });
+
 /** Where "Continue with Google" goes: the API runs the OAuth flow and redirects back. */
 export const googleStartUrl = () => `${apiBaseUrl()}/auth/google/start`;
 
@@ -135,6 +143,9 @@ export const refreshSession = () =>
 export const logout = () => call<void>("/auth/logout", { method: "POST" });
 
 export const getCentre = (token: string) => call<CentreResponse>("/centre", { token });
+
+export const updateCentre = (token: string, changes: { centreName: string; city: string; centreType: string }) =>
+  call<{ centre: Me["centre"] }>("/centre", { method: "PATCH", body: changes, token });
 
 // --- Batches ---
 

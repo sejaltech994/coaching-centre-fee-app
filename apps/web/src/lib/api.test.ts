@@ -7,10 +7,13 @@ import {
   getCentre,
   listBatches,
   getGooglePending,
+  getIdentities,
   logout,
   refreshSession,
   registerOwner,
   updateBatch,
+  updateCentre,
+  updateMe,
 } from "./api";
 
 const fetchMock = vi.fn<typeof fetch>();
@@ -163,6 +166,23 @@ describe("API client", () => {
     await expect(
       createBatch("t", { name: "Yoga", subject: null, days: ["mon"], startTime: "07:00", endTime: "08:00" }),
     ).rejects.toMatchObject({ status: 409, fields: { name: "Taken." } });
+  });
+
+  it("saves the owner's name and the centre's details from Settings", async () => {
+    reply(200, { user: { fullName: "Asha S. Sharma" } });
+    reply(200, { centre: { name: "Sunrise Academy" } });
+    reply(200, { identities: [] });
+
+    await updateMe("t", { fullName: "Asha S. Sharma" });
+    await updateCentre("t", { centreName: "Sunrise Academy", city: "Patna", centreType: "tuition" });
+    await getIdentities("t");
+
+    const sent = fetchMock.mock.calls.map(([url, init]) => [url, init!.method, init!.body && JSON.parse(init!.body as string)]);
+    expect(sent).toEqual([
+      ["http://localhost:8787/api/v1/me", "PATCH", { fullName: "Asha S. Sharma" }],
+      ["http://localhost:8787/api/v1/centre", "PATCH", { centreName: "Sunrise Academy", city: "Patna", centreType: "tuition" }],
+      ["http://localhost:8787/api/v1/me/identities", "GET", undefined],
+    ]);
   });
 
   it("reads the centre with the access token", async () => {

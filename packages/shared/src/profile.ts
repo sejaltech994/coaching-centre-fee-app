@@ -50,15 +50,13 @@ const profileSchema = z.object({
   acceptedTerms: z.literal(true, { error: "Accept the terms and privacy notice to continue." }),
 });
 
-export type ProfileValidation = { ok: true; value: ProfileInput } | { ok: false; fields: Record<string, string> };
+type Validation<T> = { ok: true; value: T } | { ok: false; fields: Record<string, string> };
+export type ProfileValidation = Validation<ProfileInput>;
 
-/** Checks and normalises a profile. On failure, one message per field at fault. */
-export function validateProfile(input: unknown): ProfileValidation {
-  const parsed = profileSchema.safeParse(input);
-  if (parsed.success) {
-    const { acceptedTerms: _accepted, ...value } = parsed.data;
-    return { ok: true, value };
-  }
+/** Parses `input`; on failure, one message per field at fault. */
+function check<T>(schema: z.ZodType<T>, input: unknown): Validation<T> {
+  const parsed = schema.safeParse(input);
+  if (parsed.success) return { ok: true, value: parsed.data };
 
   const fields: Record<string, string> = {};
   for (const issue of parsed.error.issues) {
@@ -67,3 +65,22 @@ export function validateProfile(input: unknown): ProfileValidation {
   }
   return { ok: false, fields };
 }
+
+/** Checks and normalises a sign-up. */
+export function validateProfile(input: unknown): ProfileValidation {
+  const checked = check(profileSchema, input);
+  if (!checked.ok) return checked;
+  const { acceptedTerms: _accepted, ...value } = checked.value;
+  return { ok: true, value };
+}
+
+export type OwnerInput = Pick<ProfileInput, "fullName">;
+export type CentreInput = Pick<ProfileInput, "centreName" | "city" | "centreType">;
+
+/** The owner's own details, as edited in Settings; same rules as sign-up. */
+export const validateOwner = (input: unknown): Validation<OwnerInput> =>
+  check(profileSchema.pick({ fullName: true }), input);
+
+/** The centre's details, as edited in Settings; same rules as sign-up. */
+export const validateCentre = (input: unknown): Validation<CentreInput> =>
+  check(profileSchema.pick({ centreName: true, city: true, centreType: true }), input);

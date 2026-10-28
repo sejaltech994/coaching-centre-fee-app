@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CENTRE_TYPE_LABELS, CENTRE_TYPES, validateProfile } from "./profile";
+import { CENTRE_TYPE_LABELS, CENTRE_TYPES, validateCentre, validateOwner, validateProfile } from "./profile";
 
 const valid = {
   fullName: "Asha Sharma",
@@ -57,5 +57,36 @@ describe("centre types", () => {
   it("lists the TSD's types with labels for the form", () => {
     expect(CENTRE_TYPES).toEqual(["tuition", "coaching", "dance", "music", "sports", "other"]);
     expect(CENTRE_TYPES.map((t) => CENTRE_TYPE_LABELS[t])).toEqual(["Tuition", "Coaching", "Dance", "Music", "Sports", "Other"]);
+  });
+});
+
+describe("validateOwner", () => {
+  it("accepts a trimmed name", () => {
+    expect(validateOwner({ fullName: "  Asha S. Sharma " })).toEqual({ ok: true, value: { fullName: "Asha S. Sharma" } });
+  });
+
+  it("uses sign-up's messages", () => {
+    expect(validateOwner({ fullName: " " })).toEqual({ ok: false, fields: { fullName: "Enter your name." } });
+  });
+});
+
+describe("validateCentre", () => {
+  it("accepts a centre's name, city and type", () => {
+    expect(validateCentre({ centreName: " Sunrise Academy ", city: "Patna", centreType: "tuition" })).toEqual({
+      ok: true,
+      value: { centreName: "Sunrise Academy", city: "Patna", centreType: "tuition" },
+    });
+  });
+
+  it("names every field at fault, with sign-up's messages", () => {
+    const result = validateCentre({ centreName: "", city: "x".repeat(61), centreType: "bakery" });
+    expect(result).toEqual({
+      ok: false,
+      fields: {
+        centreName: "Enter your centre’s name.",
+        city: "Keep the city to 60 characters or fewer.",
+        centreType: "Pick the type of centre.",
+      },
+    });
   });
 });
