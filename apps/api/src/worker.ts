@@ -6,6 +6,7 @@ import { createDb, type DbHandle } from "@chukta/db";
 import { createConsoleSmsProvider } from "@chukta/integrations";
 import { createApp } from "./app";
 import { loadConfig } from "./config";
+import { googleFromConfig } from "./google";
 
 /** The Worker's bindings: vars and secrets from wrangler.jsonc, plus the static assets. */
 export type WorkerEnv = {
@@ -49,7 +50,13 @@ export function createWorker(makeDb: (url: string) => DbHandle = (url) => create
 
       const handle = makeDb(config.databaseUrl);
       try {
-        const app = createApp({ db: handle.db, sms: createConsoleSmsProvider(), now: () => new Date(), config });
+        const app = createApp({
+          db: handle.db,
+          sms: createConsoleSmsProvider(),
+          google: googleFromConfig(config.google),
+          now: () => new Date(),
+          config,
+        });
         return await app.fetch(request, env, ctx as never);
       } finally {
         ctx.waitUntil(handle.close());

@@ -13,6 +13,8 @@ export type Config = {
   trustProxyHeaders: boolean;
   /** Hourly OTP limits. The TSD's values; only non-production may raise them (automated test runs). */
   otpLimits: { perPhonePerHour: number; perIpPerHour: number };
+  /** Google sign-in: the environment's OAuth client, the fake chooser (never production), or off. */
+  google: { provider: "google"; clientId: string; clientSecret: string } | { provider: "fake" } | null;
 };
 
 const SMS_PROVIDERS = ["console"] as const;
@@ -44,6 +46,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     perIpPerHour: limit("OTP_PER_IP_PER_HOUR", 10),
   };
 
+  const google = loadGoogle(env, nodeEnv);
+
   const smsProvider = env.SMS_PROVIDER ?? "console";
   if (!SMS_PROVIDERS.includes(smsProvider as (typeof SMS_PROVIDERS)[number])) {
     throw new Error(`SMS_PROVIDER "${smsProvider}" is not supported`);
@@ -65,5 +69,23 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     cookieSecure: nodeEnv !== "development",
     trustProxyHeaders: env.TRUST_PROXY_HEADERS === "true",
     otpLimits,
+    google,
   };
+}
+
+function loadGoogle(env: Record<string, string | undefined>, nodeEnv: Config["env"]): Config["google"] {
+  const provider = env.GOOGLE_PROVIDER ?? (env.GOOGLE_CLIENT_ID || env.GOOGLE_CLIENT_SECRET ? "google" : undefined);
+  if (provider === undefined) return null;
+  if (provider === "fake") {
+    if (nodeEnv === "production") {
+      throw new Error("GOOGLE_PROVIDER=fake lets anyone sign in as any Google account and is not allowed in production");
+    }
+    return { provider: "fake" };
+  }
+  if (provider !== "google") throw new Error(`GOOGLE_PROVIDER "${provider}" is not supported`);
+  const clientId = env.GOOGLE_CLIENT_ID;
+  const clientSecret = env.GOOGLE_CLIENT_SECRET;
+  if (!clientId) throw new Error("GOOGLE_CLIENT_ID is not set");
+  if (!clientSecret) throw new Error("GOOGLE_CLIENT_SECRET is not set");
+  return { provider: "google", clientId, clientSecret };
 }

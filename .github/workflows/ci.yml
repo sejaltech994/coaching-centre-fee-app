@@ -153,11 +153,12 @@ jobs:
       - name: Install and build the app
         env:
           NEXT_PUBLIC_API_URL: ${{ env.API_URL }}
+          NEXT_PUBLIC_GOOGLE_SIGN_IN: "on"
         run: |
           npm ci
           npm run build -w apps/web
 
-      - name: Start the API (embedded database, console SMS)
+      - name: Start the API (embedded database, console SMS, fake Google)
         working-directory: apps/api
         env:
           NODE_ENV: development
@@ -166,8 +167,10 @@ jobs:
           JWT_SECRET: e2e-only-secret-not-used-anywhere-else-0123456789
           SMS_PROVIDER: console
           WEB_ORIGINS: ${{ env.WEB_URL }}
-          # Every scenario logs in from the same IP; the TSD's 20/hour would cap the suite.
+          # Every scenario logs in from the same IP; the TSD's 10/hour would cap the suite.
           OTP_PER_IP_PER_HOUR: "1000"
+          # The API's own account chooser in place of Google (refused in production).
+          GOOGLE_PROVIDER: fake
         run: nohup npx tsx src/server.ts > "$OTP_LOG_FILE" 2>&1 &
 
       - name: Serve the web build

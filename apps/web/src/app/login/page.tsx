@@ -7,11 +7,17 @@ import { LoginFlow } from "@/components/auth/LoginFlow";
 
 function LoginScreen() {
   const router = useRouter();
-  // The landing page's "Get OTP" form sends ?phone=…
-  const phone = useSearchParams().get("phone") ?? "";
+  const params = useSearchParams();
   return (
     <LoginFlow
-      initialPhone={phone}
+      // The landing page's sign-up form sends ?phone=…
+      initialPhone={params.get("phone") ?? ""}
+      // The API's Google callback sends ?via=google[&hint=…] or ?google_error=…
+      via={params.get("via") ?? undefined}
+      hint={params.get("hint") ?? undefined}
+      googleError={params.get("google_error") ?? undefined}
+      // Inlined at build time: on where the environment has a Google OAuth client.
+      googleEnabled={process.env.NEXT_PUBLIC_GOOGLE_SIGN_IN === "on"}
       // A new centre has nothing to show yet: its first job is adding batches.
       onSignedIn={(session) => router.replace(session.isNewAccount ? "/batches" : "/dashboard")}
     />

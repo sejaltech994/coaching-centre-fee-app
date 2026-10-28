@@ -7,6 +7,7 @@ import type { AppEnv, Deps } from "../../deps";
 import { ApiError, invalidFields, unauthenticated } from "../../lib/errors";
 import { clientIp, readJson } from "../../lib/request";
 import { OTP_RULES, requestOtp, verifyOtp } from "./otp";
+import { clearPendingGoogle, googleRoutes, linkGoogle, readPendingGoogle } from "./google";
 import { issueSignupTicket, register, SIGNUP_TICKET_TTL_SECONDS } from "./signup";
 import {
   ACCESS_TOKEN_TTL_SECONDS,
@@ -86,13 +87,22 @@ export function authRoutes(deps: Deps) {
   routes.post("/otp/verify", async (c) => {
     const body = await readJson(c, verifyBody);
     const verified = await verifyOtp(deps, { phone: parsePhone(body.phone), code: body.code });
+    // A Google sign-in waiting for this mobile number to be verified.
+    const google = await readPendingGoogle(c, deps);
     if (verified.status === "signup_required") {
       return c.json({
         status: verified.status,
         signupTicket: await issueSignupTicket(deps, verified.phone),
         phone: verified.phone,
         expiresIn: SIGNUP_TICKET_TTL_SECONDS,
+        ...(google && { google: { email: google.email, name: google.name } }),
       });
+    }
+    if (google) {
+      // The code to this account's own number proves it is theirs: connect Google.
+      await deps.db.transaction((tx) => linkGoogle(tx, verified.user.id, google, deps.now()));
+      clearPendingGoogle(c, deps);
+      return c.json({ ...(await signIn(c, verified.user, verified.centre, false)), linkedGoogle: true });
     }
     return c.json(await signIn(c, verified.user, verified.centre, false));
   });
@@ -101,12 +111,15 @@ export function authRoutes(deps: Deps) {
     const body = await readJson(c, registerBody);
     const checked = validateProfile(body);
     if (!checked.ok) throw invalidFields(checked.fields);
+    const google = await readPendingGoogle(c, deps);
     const { user, centre } = await register(deps, {
       ticket: typeof body.signupTicket === "string" ? body.signupTicket : "",
       profile: checked.value,
       ip: clientIp(c, deps.config.trustProxyHeaders),
       userAgent: c.req.header("user-agent"),
+      google,
     });
+    if (google) clearPendingGoogle(c, deps);
     return c.json(await signIn(c, user, centre, true), 201);
   });
 
@@ -124,6 +137,8 @@ export function authRoutes(deps: Deps) {
     deleteCookie(c, REFRESH_COOKIE, { path: COOKIE_PATH, secure: deps.config.cookieSecure, httpOnly: true, sameSite: "Strict" });
     return c.body(null, 204);
   });
+
+  routes.route("/google", googleRoutes(deps, setRefreshCookie));
 
   return routes;
 }

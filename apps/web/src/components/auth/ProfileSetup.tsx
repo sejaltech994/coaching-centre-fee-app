@@ -8,6 +8,8 @@ import { copy, errorMessage, fill, withParts } from "@/lib/copy";
 import styles from "./auth.module.css";
 
 type Props = {
+  /** Pre-filled values, e.g. the name and email from Google. */
+  initial?: { fullName?: string; email?: string };
   signupTicket: string;
   /** The verified number, E.164. */
   phone: string;
@@ -29,9 +31,15 @@ const TYPE_LABEL: Record<CentreType, keyof typeof copy.profile> = {
 };
 
 /** Profile setup (A5): only for numbers with no account. TSD: Registration, login and profile. */
-export function ProfileSetup({ signupTicket, phone, onRegistered, onStartOver }: Props) {
+export function ProfileSetup({ initial, signupTicket, phone, onRegistered, onStartOver }: Props) {
   const t = copy.profile;
-  const [form, setForm] = useState({ fullName: "", centreName: "", city: "", centreType: "", email: "" });
+  const [form, setForm] = useState({
+    fullName: initial?.fullName ?? "",
+    centreName: "",
+    city: "",
+    centreType: "",
+    email: initial?.email ?? "",
+  });
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);

@@ -1,8 +1,9 @@
 import { createTestDb } from "@chukta/db/testing";
-import type { SmsProvider } from "@chukta/integrations";
+import type { GoogleSignIn, SmsProvider } from "@chukta/integrations";
 import { vi } from "vitest";
 import { createApp } from "../app";
 import type { Config } from "../config";
+import { googleFromConfig } from "../google";
 
 export const testConfig: Config = {
   env: "test",
@@ -14,10 +15,11 @@ export const testConfig: Config = {
   cookieSecure: true,
   trustProxyHeaders: true,
   otpLimits: { perPhonePerHour: 5, perIpPerHour: 10 },
+  google: null,
 };
 
 /** The API wired to an in-memory Postgres, a recording SMS fake and a clock the test controls. */
-export async function createTestApp(config: Partial<Config> = {}) {
+export async function createTestApp(config: Partial<Config> = {}, options: { google?: GoogleSignIn } = {}) {
   const db = await createTestDb();
   const sent: { to: string; code: string }[] = [];
   const sms = {
@@ -32,7 +34,10 @@ export async function createTestApp(config: Partial<Config> = {}) {
       now = new Date(now.getTime() + ms);
     },
   };
-  const app = createApp({ db, sms, now: clock.now, config: { ...testConfig, ...config } });
+  const fullConfig = { ...testConfig, ...config };
+  const google = options.google ?? googleFromConfig(fullConfig.google);
+  const app = createApp({ db, sms, google, now: clock.now, config: fullConfig });
+  let lastSignupTicket: string | undefined;
 
   function call(
     method: string,
@@ -50,11 +55,13 @@ export async function createTestApp(config: Partial<Config> = {}) {
     }) as Promise<JsonResponse>;
   }
 
-  /** Requests and verifies an OTP; returns the raw verify response. */
-  async function verify(phone = "9876543210", ip?: string): Promise<JsonResponse> {
+  /** Requests and verifies an OTP; returns the raw verify response. `cookie` carries e.g. a pending Google sign-in. */
+  async function verify(phone = "9876543210", ip?: string, cookie?: string): Promise<JsonResponse> {
     const requested = await call("POST", "/auth/otp/request", { body: { phone }, ip });
     if (requested.status !== 202) throw new Error(`OTP request failed: ${requested.status}`);
-    return call("POST", "/auth/otp/verify", { body: { phone, code: sent.at(-1)!.code }, ip });
+    const res = await call("POST", "/auth/otp/verify", { body: { phone, code: sent.at(-1)!.code }, ip, cookie });
+    lastSignupTicket = ((await res.clone().json()) as { signupTicket?: string }).signupTicket ?? lastSignupTicket;
+    return res;
   }
 
   /**
@@ -72,7 +79,7 @@ export async function createTestApp(config: Partial<Config> = {}) {
     return { res, body: body as LoginBody, cookie: refreshCookie(res) };
   }
 
-  return { app, db, sms, sent, clock, call, verify, login, lastCode: () => sent.at(-1)!.code };
+  return { app, db, sms, sent, clock, call, verify, login, lastSignupTicket: () => lastSignupTicket, lastCode: () => sent.at(-1)!.code };
 }
 
 /** Tests assert on response bodies field by field, so they read them untyped. */

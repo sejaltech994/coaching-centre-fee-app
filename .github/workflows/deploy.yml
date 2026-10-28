@@ -37,6 +37,9 @@ jobs:
       # Per-environment secrets (Settings › Environments › <env>).
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      # Each environment's own Google OAuth client (variable + secret); unset = no Google sign-in.
+      GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
     defaults:
       run:
         working-directory: apps/web
@@ -60,6 +63,8 @@ jobs:
           SANITY_DATASET: ${{ vars.SANITY_DATASET }}
           SANITY_PERSPECTIVE: ${{ env.DEPLOY_ENV == 'prod' && 'published' || 'drafts' }}
           SANITY_READ_TOKEN: ${{ secrets.CMS_SANITY }}
+          # Shows "Continue with Google" only where this environment has an OAuth client.
+          NEXT_PUBLIC_GOOGLE_SIGN_IN: ${{ vars.GOOGLE_CLIENT_ID != '' && 'on' || '' }}
 
       # Before the new code goes live, so it never runs against an older schema.
       # Migrations only add; they are safe for the running version too.
@@ -104,7 +109,12 @@ jobs:
             exit 0
           fi
           umask 077
-          node -e 'process.stdout.write(JSON.stringify({ DATABASE_URL: process.env.DATABASE_URL, JWT_SECRET: process.env.JWT_SECRET }))' > "$RUNNER_TEMP/secrets.json"
+          # Google's client ID isn't secret, but travels with its secret so the two always match.
+          node -e '
+            const { DATABASE_URL, JWT_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } = process.env;
+            const google = GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET ? { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } : {};
+            process.stdout.write(JSON.stringify({ DATABASE_URL, JWT_SECRET, ...google }));
+          ' > "$RUNNER_TEMP/secrets.json"
           npx wrangler secret bulk "$RUNNER_TEMP/secrets.json" --env "$DEPLOY_ENV"
           rm -f "$RUNNER_TEMP/secrets.json"
 

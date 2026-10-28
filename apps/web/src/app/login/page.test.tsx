@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { registerOwner, requestOtp, verifyOtp } from "@/lib/api";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { getGooglePending, registerOwner, requestOtp, verifyOtp } from "@/lib/api";
 import LoginPage from "./page";
 
 const replace = vi.fn();
@@ -17,6 +17,7 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   requestOtp: vi.fn(),
   verifyOtp: vi.fn(),
   registerOwner: vi.fn(),
+  getGooglePending: vi.fn(),
 }));
 
 const session = {
@@ -75,5 +76,33 @@ describe("/login", () => {
     await user.click(screen.getByRole("button", { name: "Create my centre" }));
 
     expect(replace).toHaveBeenCalledWith("/batches");
+  });
+
+  describe("Google", () => {
+    afterEach(() => vi.unstubAllEnvs());
+
+    it("is offered only when the build turns it on", () => {
+      vi.stubEnv("NEXT_PUBLIC_GOOGLE_SIGN_IN", "on");
+      const { unmount } = render(<LoginPage />);
+      expect(screen.getByRole("button", { name: "Continue with Google" })).toBeInTheDocument();
+      unmount();
+
+      vi.stubEnv("NEXT_PUBLIC_GOOGLE_SIGN_IN", "");
+      render(<LoginPage />);
+      expect(screen.queryByRole("button", { name: "Continue with Google" })).not.toBeInTheDocument();
+    });
+
+    it("shows why Google sent the owner back", () => {
+      search = new URLSearchParams({ google_error: "cancelled" });
+      render(<LoginPage />);
+      expect(screen.getByRole("alert")).toHaveTextContent("Google sign-in was cancelled.");
+    });
+
+    it("picks up a Google account waiting for a mobile number", async () => {
+      vi.mocked(getGooglePending).mockResolvedValue({ email: "asha@example.com", name: "Asha Sharma" });
+      search = new URLSearchParams({ via: "google", hint: "email_in_use" });
+      render(<LoginPage />);
+      expect(await screen.findByText(/This email already has a Chukta account/)).toBeInTheDocument();
+    });
   });
 });
