@@ -1,9 +1,15 @@
 import { centres } from "@chukta/db";
+import { validateCentre } from "@chukta/shared";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
+import { z } from "zod";
 import type { AppEnv, Deps } from "../../deps";
-import { unauthenticated } from "../../lib/errors";
+import { invalidFields, unauthenticated } from "../../lib/errors";
+import { readJson } from "../../lib/request";
 import { requireAuth } from "../../middleware/auth";
+import { centreDto } from "../auth/routes";
+
+const anyJson = z.record(z.string(), z.unknown());
 
 export function centreRoutes(deps: Deps) {
   const routes = new Hono<AppEnv>();
@@ -14,6 +20,20 @@ export function centreRoutes(deps: Deps) {
     const centre = await deps.db.query.centres.findFirst({ where: eq(centres.id, c.var.auth.centreId) });
     if (!centre) throw unauthenticated();
     return c.json({ centre: { id: centre.id, name: centre.name, plan: centre.plan, timezone: centre.timezone } });
+  });
+
+  /** The centre's name, city and type, edited in Settings. */
+  routes.patch("/", async (c) => {
+    const checked = validateCentre(await readJson(c, anyJson));
+    if (!checked.ok) throw invalidFields(checked.fields);
+    const { centreName, city, centreType } = checked.value;
+    const [centre] = await deps.db
+      .update(centres)
+      .set({ name: centreName, city, centreType, updatedAt: deps.now() })
+      .where(eq(centres.id, c.var.auth.centreId))
+      .returning();
+    if (!centre) throw unauthenticated();
+    return c.json({ centre: centreDto(centre) });
   });
 
   return routes;

@@ -22,6 +22,7 @@ describe("AppShell", () => {
     const nav = screen.getByRole("navigation", { name: "Main" });
 
     expect(within(nav).getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/dashboard");
+    expect(within(nav).getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
     const batches = within(nav).getByRole("link", { name: "Batches" });
     expect(batches).toHaveAttribute("href", "/batches");
     expect(batches).toHaveAttribute("aria-current", "page");

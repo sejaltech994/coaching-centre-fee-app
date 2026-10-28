@@ -55,6 +55,59 @@ describe("GET /centre", () => {
   });
 });
 
+describe("PATCH /centre", () => {
+  const SUNRISE_ACADEMY = { centreName: " Sunrise Academy ", city: "Patna", centreType: "tuition" };
+
+  it("changes the centre's name, city and type, and returns it", async () => {
+    const { login, call } = await createTestApp();
+    const { body } = await login();
+
+    const res = await call("PATCH", "/centre", { token: body.accessToken, body: SUNRISE_ACADEMY });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      centre: {
+        id: body.centre.id,
+        name: "Sunrise Academy",
+        city: "Patna",
+        centreType: "tuition",
+        plan: "free",
+        timezone: "Asia/Kolkata",
+      },
+    });
+    expect((await (await call("GET", "/me", { token: body.accessToken })).json()).centre.name).toBe("Sunrise Academy");
+  });
+
+  it("names every field at fault and changes nothing", async () => {
+    const { login, call } = await createTestApp();
+    const { body } = await login();
+
+    const res = await call("PATCH", "/centre", {
+      token: body.accessToken,
+      body: { centreName: "", city: "", centreType: "bakery" },
+    });
+
+    expect(res.status).toBe(400);
+    expect(Object.keys((await res.json()).error.fields).sort()).toEqual(["centreName", "centreType", "city"]);
+    expect((await (await call("GET", "/me", { token: body.accessToken })).json()).centre.name).toBe("Sunrise Classes");
+  });
+
+  it("only ever changes the owner's own centre", async () => {
+    const { login, call } = await createTestApp();
+    const asha = await login("asha@example.com");
+    const ravi = await login("ravi@example.com");
+
+    await call("PATCH", "/centre", { token: ravi.body.accessToken, body: SUNRISE_ACADEMY });
+
+    expect((await (await call("GET", "/me", { token: asha.body.accessToken })).json()).centre.name).toBe("Sunrise Classes");
+  });
+
+  it("requires a valid access token", async () => {
+    const { call } = await createTestApp();
+    expect((await call("PATCH", "/centre", { body: SUNRISE_ACADEMY })).status).toBe(401);
+  });
+});
+
 describe("the API", () => {
   it("answers unknown routes with a JSON 404", async () => {
     const { call } = await createTestApp();
