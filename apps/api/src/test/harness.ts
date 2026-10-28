@@ -42,9 +42,10 @@ export async function createTestApp(config: Partial<Config> = {}, options: { goo
   function call(
     method: string,
     path: string,
-    init: { body?: unknown; ip?: string; cookie?: string; token?: string } = {},
+    init: { body?: unknown; ip?: string; cookie?: string; token?: string; userAgent?: string } = {},
   ): Promise<JsonResponse> {
     const headers: Record<string, string> = { "x-forwarded-for": init.ip ?? "203.0.113.10" };
+    if (init.userAgent) headers["user-agent"] = init.userAgent;
     if (init.body !== undefined) headers["content-type"] = "application/json";
     if (init.cookie) headers.cookie = init.cookie;
     if (init.token) headers.authorization = `Bearer ${init.token}`;
@@ -62,7 +63,7 @@ export async function createTestApp(config: Partial<Config> = {}, options: { goo
   }
 
   /** The whole trip through the fake account chooser: where the callback sent the browser, and its cookies. */
-  async function googleLogin(account: { email: string; name?: string } = { email: OWNER_EMAIL }) {
+  async function googleLogin(account: { email: string; name?: string } = { email: OWNER_EMAIL }, userAgent?: string) {
     const { to, cookie } = await startGoogle();
     const approve = await call(
       "GET",
@@ -75,7 +76,7 @@ export async function createTestApp(config: Partial<Config> = {}, options: { goo
       })}`,
     );
     const back = location(approve);
-    const callback = await call("GET", `${back.pathname.replace("/api/v1", "")}${back.search}`, { cookie });
+    const callback = await call("GET", `${back.pathname.replace("/api/v1", "")}${back.search}`, { cookie, userAgent });
     return {
       callback,
       to: location(callback),
@@ -88,18 +89,22 @@ export async function createTestApp(config: Partial<Config> = {}, options: { goo
    * A signed-in owner, by Google: a new account is registered with PROFILE.
    * Returns the session response, its body and its refresh cookie.
    */
-  async function login(email = OWNER_EMAIL, profile: Partial<typeof PROFILE> = {}, ip?: string) {
-    const google = await googleLogin({ email, name: profile.fullName });
+  async function login(
+    email = OWNER_EMAIL,
+    profile: Partial<typeof PROFILE> = {},
+    { ip, userAgent }: { ip?: string; userAgent?: string } = {},
+  ) {
+    const google = await googleLogin({ email, name: profile.fullName }, userAgent);
     if (google.session) {
       // A returning owner: the callback only sets the refresh cookie, as for the browser.
-      const res = await call("POST", "/auth/refresh", { cookie: google.session, ip });
+      const res = await call("POST", "/auth/refresh", { cookie: google.session, ip, userAgent });
       const { accessToken, expiresIn } = (await res.clone().json()) as { accessToken: string; expiresIn: number };
       const me = await (await call("GET", "/me", { token: accessToken })).json();
       const body: LoginBody = { status: "signed_in", accessToken, expiresIn, isNewAccount: false, ...me };
       return { res, body, cookie: refreshCookie(res) };
     }
     if (!google.pending) throw new Error(`Google sign-in went to ${google.to.href}`);
-    const res = await call("POST", "/auth/register", { body: { ...PROFILE, ...profile }, cookie: google.pending, ip });
+    const res = await call("POST", "/auth/register", { body: { ...PROFILE, ...profile }, cookie: google.pending, ip, userAgent });
     const body = await res.clone().json();
     if (res.status >= 300) throw new Error(`Sign-up failed: ${res.status} ${JSON.stringify(body)}`);
     return { res, body: body as LoginBody, cookie: refreshCookie(res) };

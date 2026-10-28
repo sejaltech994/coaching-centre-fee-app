@@ -16,8 +16,19 @@ import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
 import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
 import { GoogleMark } from "@/components/auth/GoogleMark";
-import { ApiRequestError, getIdentities, getMe, updateCentre, updateMe, type Identity, type Me } from "@/lib/api";
+import {
+  ApiRequestError,
+  getIdentities,
+  getMe,
+  listSessions,
+  updateCentre,
+  updateMe,
+  type DeviceSession,
+  type Identity,
+  type Me,
+} from "@/lib/api";
 import { copy, errorMessage, fill } from "@/lib/copy";
+import { Devices } from "./Devices";
 import { PhoneBanner } from "./PhoneBanner";
 import { PhoneConfirm } from "./PhoneConfirm";
 
@@ -54,16 +65,18 @@ export function Settings({ token, onCentreChanged, onSignOut }: Props) {
   const t = copy.settings;
   const [me, setMe] = useState<Me | null>(null);
   const [identities, setIdentities] = useState<Identity[]>([]);
+  const [sessions, setSessions] = useState<DeviceSession[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [confirmingPhone, setConfirmingPhone] = useState(false);
   // A short note after a save, e.g. "Saved."
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([getMe(token), getIdentities(token)]).then(
-      ([loaded, { identities: methods }]) => {
+    Promise.all([getMe(token), getIdentities(token), listSessions(token)]).then(
+      ([loaded, { identities: methods }, { sessions: devices }]) => {
         setMe(loaded);
         setIdentities(methods);
+        setSessions(devices);
       },
       (err: unknown) => setLoadError(errorMessage(err)),
     );
@@ -150,6 +163,10 @@ export function Settings({ token, onCentreChanged, onSignOut }: Props) {
           </Stack>
         </Section>
       )}
+
+      <Section title={t.devices}>
+        <Devices token={token} sessions={sessions} onNotice={setNotice} />
+      </Section>
 
       <Box>
         <Button variant="outlined" onClick={onSignOut}>

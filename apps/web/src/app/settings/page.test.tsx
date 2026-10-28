@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getIdentities, getMe, logout, updateCentre } from "@/lib/api";
+import { getIdentities, getMe, listSessions, logout, updateCentre } from "@/lib/api";
 import { getCachedCentre, setAccessToken } from "@/lib/session";
 import { useSession } from "@/lib/useSession";
 import SettingsPage from "./page";
@@ -13,6 +13,7 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api")>()),
   getMe: vi.fn(),
   getIdentities: vi.fn(),
+  listSessions: vi.fn(),
   updateCentre: vi.fn(),
   logout: vi.fn(),
 }));
@@ -27,6 +28,7 @@ beforeEach(() => {
     centre: { ...centre, city: "Pune", centreType: "coaching" },
   });
   vi.mocked(getIdentities).mockResolvedValue({ identities: [] });
+  vi.mocked(listSessions).mockResolvedValue({ sessions: [] });
   vi.mocked(logout).mockResolvedValue(undefined);
 });
 

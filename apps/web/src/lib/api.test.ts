@@ -13,6 +13,9 @@ import {
   registerOwner,
   updateBatch,
   confirmPhone,
+  listSessions,
+  signOutOtherSessions,
+  signOutSession,
   sendPhoneCode,
   updateCentre,
   updateMe,
@@ -204,6 +207,22 @@ describe("API client", () => {
   it("passes on how many tries a wrong code leaves", async () => {
     reply(400, { error: { code: "invalid_otp", message: "That code didn’t match. 4 tries left.", attemptsLeft: 4 } });
     await expect(confirmPhone("t", "9876543210", "000000")).rejects.toMatchObject({ code: "invalid_otp", attemptsLeft: 4 });
+  });
+
+  it("lists devices and signs them out", async () => {
+    reply(200, { sessions: [] });
+    reply(204);
+    reply(200, { signedOut: 2 });
+
+    await listSessions("t");
+    await signOutSession("t", "s1");
+    await expect(signOutOtherSessions("t")).resolves.toEqual({ signedOut: 2 });
+
+    expect(fetchMock.mock.calls.map(([url, init]) => [url, init!.method])).toEqual([
+      ["http://localhost:8787/api/v1/me/sessions", "GET"],
+      ["http://localhost:8787/api/v1/me/sessions/s1", "DELETE"],
+      ["http://localhost:8787/api/v1/me/sessions/sign-out-others", "POST"],
+    ]);
   });
 
   it("reads the centre with the access token", async () => {

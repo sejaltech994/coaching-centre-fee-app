@@ -1,7 +1,20 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiRequestError, confirmPhone, getIdentities, getMe, sendPhoneCode, updateCentre, updateMe, type Me } from "@/lib/api";
+import {
+  ApiRequestError,
+  confirmPhone,
+  getIdentities,
+  getMe,
+  listSessions,
+  sendPhoneCode,
+  signOutOtherSessions,
+  signOutSession,
+  updateCentre,
+  updateMe,
+  type DeviceSession,
+  type Me,
+} from "@/lib/api";
 import { ThemeRegistry } from "@/theme/ThemeRegistry";
 import { Settings } from "./Settings";
 
@@ -13,7 +26,26 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   updateCentre: vi.fn(),
   sendPhoneCode: vi.fn(),
   confirmPhone: vi.fn(),
+  listSessions: vi.fn(),
+  signOutSession: vi.fn(),
+  signOutOtherSessions: vi.fn(),
 }));
+
+const thisPhone: DeviceSession = {
+  id: "s-phone",
+  device: "Chrome on Android",
+  signedInAt: "2026-10-28T04:30:00.000Z",
+  lastActiveAt: "2026-10-28T04:30:00.000Z",
+  current: true,
+};
+const laptop: DeviceSession = {
+  id: "s-laptop",
+  device: "Chrome on Windows",
+  signedInAt: "2026-10-20T04:30:00.000Z",
+  lastActiveAt: "2026-10-25T10:00:00.000Z",
+  current: false,
+};
+const tablet: DeviceSession = { ...laptop, id: "s-tablet", device: "Safari on iPad" };
 
 const me: Me = {
   user: { id: "u1", phone: "+919876543210", phoneVerified: false, fullName: "Asha Sharma", email: "asha@example.com", role: "owner" },
@@ -26,6 +58,9 @@ beforeEach(() => {
     identities: [{ provider: "google", email: "asha@example.com", lastUsedAt: "2026-10-28T10:00:00.000Z" }],
   });
   vi.mocked(updateMe).mockReset().mockResolvedValue({ user: { ...me.user, fullName: "Asha S. Sharma" } });
+  vi.mocked(listSessions).mockReset().mockResolvedValue({ sessions: [thisPhone, laptop, tablet] });
+  vi.mocked(signOutSession).mockReset().mockResolvedValue(undefined);
+  vi.mocked(signOutOtherSessions).mockReset().mockResolvedValue({ signedOut: 2 });
   vi.mocked(updateCentre)
     .mockReset()
     .mockResolvedValue({ centre: { ...me.centre, name: "Sunrise Academy", city: "Patna", centreType: "tuition" } });
@@ -192,6 +227,58 @@ describe("Settings", () => {
     setup();
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Can't reach Chukta. Check your connection and try again.");
+  });
+
+  it("lists where the owner is signed in, marking this device", async () => {
+    setup();
+
+    const devices = await screen.findByRole("region", { name: "Devices" });
+    const rows = within(devices).getAllByRole("listitem");
+    expect(rows.map((row) => row.textContent)).toEqual([
+      expect.stringMatching(/^Chrome on Android.*This device/),
+      expect.stringMatching(/^Chrome on Windows.*Last active 25 Oct 2026/),
+      expect.stringMatching(/^Safari on iPad.*Last active 25 Oct 2026/),
+    ]);
+    expect(within(rows[0]!).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("signs one other device out", async () => {
+    const { user } = setup();
+
+    await user.click(await screen.findByRole("button", { name: "Sign out Chrome on Windows" }));
+
+    expect(signOutSession).toHaveBeenCalledWith("token", "s-laptop");
+    expect(await screen.findByText("Chrome on Windows signed out.")).toBeInTheDocument();
+    expect(section("Devices")).not.toHaveTextContent("Chrome on Windows");
+  });
+
+  it("signs out of every other device at once", async () => {
+    const { user } = setup();
+
+    await user.click(await screen.findByRole("button", { name: "Sign out of all other devices" }));
+
+    expect(signOutOtherSessions).toHaveBeenCalledWith("token");
+    expect(await screen.findByText("Signed out of your other devices.")).toBeInTheDocument();
+    expect(within(section("Devices")).getAllByRole("listitem")).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Sign out of all other devices" })).not.toBeInTheDocument();
+  });
+
+  it("offers no device sign-outs when this is the only device", async () => {
+    vi.mocked(listSessions).mockResolvedValue({ sessions: [thisPhone] });
+    setup();
+
+    const devices = await screen.findByRole("region", { name: "Devices" });
+    expect(within(devices).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("explains when a device can't be signed out", async () => {
+    vi.mocked(signOutSession).mockRejectedValue(new ApiRequestError(0, "network_error", "x"));
+    const { user } = setup();
+
+    await user.click(await screen.findByRole("button", { name: "Sign out Chrome on Windows" }));
+
+    expect(await within(section("Devices")).findByRole("alert")).toHaveTextContent("Can't reach Chukta.");
+    expect(section("Devices")).toHaveTextContent("Chrome on Windows");
   });
 
   it("signs out", async () => {

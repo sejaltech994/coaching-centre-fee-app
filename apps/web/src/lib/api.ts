@@ -44,6 +44,9 @@ export type RegisterInput = {
 /** A way the owner signs in; Google is the only one. */
 export type Identity = { provider: "google"; email: string; lastUsedAt: string | null };
 
+/** A device the owner is signed in on (one sign-in). */
+export type DeviceSession = { id: string; device: string; signedInAt: string; lastActiveAt: string; current: boolean };
+
 export type CentreResponse = {
   centre: { id: string; name: string | null; plan: "free" | "pro"; timezone: string };
 };
@@ -140,6 +143,14 @@ export const sendPhoneCode = (token: string, phone: string) =>
 
 export const confirmPhone = (token: string, phone: string, code: string) =>
   call<{ user: Me["user"] }>("/me/phone/confirm", { method: "POST", body: { phone, code }, token });
+
+export const listSessions = (token: string) => call<{ sessions: DeviceSession[] }>("/me/sessions", { token });
+
+export const signOutSession = (token: string, id: string) =>
+  call<void>(`/me/sessions/${encodeURIComponent(id)}`, { method: "DELETE", token });
+
+export const signOutOtherSessions = (token: string) =>
+  call<{ signedOut: number }>("/me/sessions/sign-out-others", { method: "POST", token });
 
 export const getIdentities = (token: string) => call<{ identities: Identity[] }>("/me/identities", { token });
 
