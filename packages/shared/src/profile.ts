@@ -1,6 +1,5 @@
 import { z } from "zod";
-import { check, indianMobile, text, type Validation } from "./fields";
-import type { IndianMobile } from "./phone";
+import { check, optionalText, text, type Validation } from "./fields";
 
 /** Centre types from the TSD (Registration, login and profile). */
 export const CENTRE_TYPES = ["tuition", "coaching", "dance", "music", "sports", "other"] as const;
@@ -21,8 +20,8 @@ export const CENTRE_TYPE_LABELS: Record<CentreType, string> = {
  */
 export type ProfileInput = {
   fullName: string;
-  /** For WhatsApp reminders; confirmed later by a code. */
-  phone: IndianMobile;
+  /** The owner's own number, as they typed it; optional and never confirmed. */
+  phone: string | null;
   centreName: string;
   city: string;
   centreType: CentreType;
@@ -33,7 +32,7 @@ const profileSchema = z.object({
   centreName: text("Enter your centre’s name.", 100, "Keep the centre’s name to 100 characters or fewer."),
   city: text("Enter your city.", 60, "Keep the city to 60 characters or fewer."),
   centreType: z.enum(CENTRE_TYPES, { error: "Pick the type of centre." }),
-  phone: indianMobile(),
+  phone: optionalText(20, "Keep the mobile number to 20 characters or fewer."),
   acceptedTerms: z.literal(true, { error: "Accept the terms and privacy notice to continue." }),
 });
 
@@ -47,12 +46,12 @@ export function validateProfile(input: unknown): ProfileValidation {
   return { ok: true, value };
 }
 
-export type OwnerInput = Pick<ProfileInput, "fullName">;
+export type OwnerInput = Pick<ProfileInput, "fullName" | "phone">;
 export type CentreInput = Pick<ProfileInput, "centreName" | "city" | "centreType">;
 
 /** The owner's own details, as edited in Settings; same rules as sign-up. */
 export const validateOwner = (input: unknown): Validation<OwnerInput> =>
-  check(profileSchema.pick({ fullName: true }), input);
+  check(profileSchema.pick({ fullName: true, phone: true }), input);
 
 /** The centre's details, as edited in Settings; same rules as sign-up. */
 export const validateCentre = (input: unknown): Validation<CentreInput> =>

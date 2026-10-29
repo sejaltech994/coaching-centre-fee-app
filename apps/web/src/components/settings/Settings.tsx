@@ -1,6 +1,6 @@
 "use client";
 
-import { CENTRE_TYPES, formatIndianMobile, validateCentre, validateOwner, type CentreType } from "@chukta/shared";
+import { CENTRE_TYPES, validateCentre, validateOwner, type CentreType } from "@chukta/shared";
 import Alert from "@mui/material/Alert";
 import Avatar from "@mui/material/Avatar";
 import Box from "@mui/material/Box";
@@ -29,8 +29,6 @@ import {
 } from "@/lib/api";
 import { copy, errorMessage, fill } from "@/lib/copy";
 import { Devices } from "./Devices";
-import { PhoneBanner } from "./PhoneBanner";
-import { PhoneConfirm } from "./PhoneConfirm";
 
 type Props = {
   token: string;
@@ -59,7 +57,8 @@ const initials = (name: string) =>
 
 /**
  * Profile and account (W11), for Google-only sign-in: the owner's name, their
- * Google email, their mobile number, their centre and their sign-in method.
+ * Google email, their mobile number (as typed, never confirmed), their centre
+ * and their sign-in method.
  */
 export function Settings({ token, onCentreChanged, onSignOut }: Props) {
   const t = copy.settings;
@@ -67,7 +66,6 @@ export function Settings({ token, onCentreChanged, onSignOut }: Props) {
   const [identities, setIdentities] = useState<Identity[]>([]);
   const [sessions, setSessions] = useState<DeviceSession[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [confirmingPhone, setConfirmingPhone] = useState(false);
   // A short note after a save, e.g. "Saved."
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -95,8 +93,6 @@ export function Settings({ token, onCentreChanged, onSignOut }: Props) {
         <Typography color="text.secondary">{t.lead}</Typography>
       </Stack>
 
-      {!user.phoneVerified && !confirmingPhone && <PhoneBanner onConfirm={() => setConfirmingPhone(true)} />}
-
       <Section title={t.profile}>
         <ProfileEditor
           token={token}
@@ -112,30 +108,7 @@ export function Settings({ token, onCentreChanged, onSignOut }: Props) {
           <Chip label={t.confirmed} color="paid" />
         </Row>
         <Divider />
-        {confirmingPhone ? (
-          <PhoneConfirm
-            token={token}
-            phone={user.phone}
-            onCancel={() => setConfirmingPhone(false)}
-            onConfirmed={(changed) => {
-              setMe({ user: changed, centre });
-              setConfirmingPhone(false);
-              setNotice(t.phoneConfirmed);
-            }}
-          />
-        ) : (
-          <Row label={t.mobile} value={formatIndianMobile(user.phone)} hint={user.phoneVerified ? undefined : t.mobileHint}>
-            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-              {user.phoneVerified ? <Chip label={t.confirmed} color="paid" /> : <Chip label={t.notConfirmed} color="pending" />}
-              <Button
-                aria-label={user.phoneVerified ? t.changeNumberName : t.confirmNumberName}
-                onClick={() => setConfirmingPhone(true)}
-              >
-                {user.phoneVerified ? t.changeNumber : t.confirmNumber}
-              </Button>
-            </Stack>
-          </Row>
-        )}
+        <Row label={t.mobile} value={user.phone ?? t.mobileNotAdded} />
       </Section>
 
       <Section title={t.centre}>
@@ -264,14 +237,15 @@ function ProfileEditor({
 }) {
   const t = copy.settings;
   const name = user.fullName ?? "";
+  const current = () => ({ fullName: name, phone: user.phone ?? "" });
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(name);
+  const [draft, setDraft] = useState(current);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   function startEditing() {
-    setDraft(name);
+    setDraft(current());
     setFields({});
     setError(null);
     setEditing(true);
@@ -279,7 +253,7 @@ function ProfileEditor({
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const checked = validateOwner({ fullName: draft });
+    const checked = validateOwner(draft);
     if (!checked.ok) return setFields(checked.fields);
     const result = await save(() => updateMe(token, checked.value), { setBusy, setFields, setError });
     if (result) {
@@ -293,12 +267,21 @@ function ProfileEditor({
       <Stack component="form" spacing={2} noValidate onSubmit={submit} sx={{ p: { xs: 2, md: 3 }, pt: 1 }}>
         <TextField
           label={copy.profile.fullName}
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
+          value={draft.fullName}
+          onChange={(event) => setDraft((d) => ({ ...d, fullName: event.target.value }))}
           error={Boolean(fields.fullName)}
           helperText={fields.fullName}
           autoComplete="name"
           autoFocus
+        />
+        <TextField
+          label={t.mobile}
+          value={draft.phone}
+          onChange={(event) => setDraft((d) => ({ ...d, phone: event.target.value }))}
+          error={Boolean(fields.phone)}
+          helperText={fields.phone ?? copy.profile.phoneHint}
+          type="tel"
+          autoComplete="tel"
         />
         <EditActions busy={busy} error={error} onCancel={() => setEditing(false)} />
       </Stack>

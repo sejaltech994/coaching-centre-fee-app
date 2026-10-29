@@ -12,7 +12,6 @@ import {
   refreshSession,
   registerOwner,
   updateBatch,
-  confirmPhone,
   createFeePlan,
   listFeePlans,
   setDiscount,
@@ -26,7 +25,6 @@ import {
   listSessions,
   signOutOtherSessions,
   signOutSession,
-  sendPhoneCode,
   setSessionHooks,
   updateCentre,
   updateMe,
@@ -185,40 +183,21 @@ describe("API client", () => {
     ).rejects.toMatchObject({ status: 409, fields: { name: "Taken." } });
   });
 
-  it("saves the owner's name and the centre's details from Settings", async () => {
+  it("saves the owner's name and number, and the centre's details, from Settings", async () => {
     reply(200, { user: { fullName: "Asha S. Sharma" } });
     reply(200, { centre: { name: "Sunrise Academy" } });
     reply(200, { identities: [] });
 
-    await updateMe("t", { fullName: "Asha S. Sharma" });
+    await updateMe("t", { fullName: "Asha S. Sharma", phone: "98765 43210" });
     await updateCentre("t", { centreName: "Sunrise Academy", city: "Patna", centreType: "tuition" });
     await getIdentities("t");
 
     const sent = fetchMock.mock.calls.map(([url, init]) => [url, init!.method, init!.body && JSON.parse(init!.body as string)]);
     expect(sent).toEqual([
-      ["http://localhost:8787/api/v1/me", "PATCH", { fullName: "Asha S. Sharma" }],
+      ["http://localhost:8787/api/v1/me", "PATCH", { fullName: "Asha S. Sharma", phone: "98765 43210" }],
       ["http://localhost:8787/api/v1/centre", "PATCH", { centreName: "Sunrise Academy", city: "Patna", centreType: "tuition" }],
       ["http://localhost:8787/api/v1/me/identities", "GET", undefined],
     ]);
-  });
-
-  it("sends and checks the code that confirms a mobile number", async () => {
-    reply(202, { expiresInSeconds: 300, resendAfterSeconds: 30 });
-    reply(200, { user: { phoneVerified: true } });
-
-    await expect(sendPhoneCode("t", "91234 56789")).resolves.toEqual({ expiresInSeconds: 300, resendAfterSeconds: 30 });
-    await expect(confirmPhone("t", "91234 56789", "482913")).resolves.toEqual({ user: { phoneVerified: true } });
-
-    const sent = fetchMock.mock.calls.map(([url, init]) => [url, init!.method, JSON.parse(init!.body as string)]);
-    expect(sent).toEqual([
-      ["http://localhost:8787/api/v1/me/phone/verify", "POST", { phone: "91234 56789" }],
-      ["http://localhost:8787/api/v1/me/phone/confirm", "POST", { phone: "91234 56789", code: "482913" }],
-    ]);
-  });
-
-  it("passes on how many tries a wrong code leaves", async () => {
-    reply(400, { error: { code: "invalid_otp", message: "That code didn’t match. 4 tries left.", attemptsLeft: 4 } });
-    await expect(confirmPhone("t", "9876543210", "000000")).rejects.toMatchObject({ code: "invalid_otp", attemptsLeft: 4 });
   });
 
   it("lists devices and signs them out", async () => {

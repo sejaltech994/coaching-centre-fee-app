@@ -16,7 +16,7 @@
   "account_id": "331f26e5ac81748f2fa5699192fabc53",
   "main": "../api/src/worker.ts",
   "compatibility_date": "2026-10-01",
-  // node:crypto for OTP and token hashing; pg's TCP sockets to Neon.
+  // node:crypto for token hashing; pg's TCP sockets to Neon.
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": "./out",
@@ -36,7 +36,7 @@
       // Pooled, warm connections (no TCP + TLS + login per request). Query cache is
       // off on the Hyperdrive config: writes don't invalidate it, so lists would go stale.
       "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "2d1e1b85b776482087adb790ff4a8990" }],
-      // Workers Logs: console output (e.g. dev login codes) kept in the dashboard.
+      // Workers Logs: console output kept in the dashboard.
       "observability": { "enabled": true, "logs": { "enabled": true, "invocation_logs": true } },
       "vars": {
         "NODE_ENV": "staging",
@@ -51,7 +51,7 @@
       // Pooled, warm connections (no TCP + TLS + login per request). Query cache is
       // off on the Hyperdrive config: writes don't invalidate it, so lists would go stale.
       "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "acfacac4058841f0a8f436ec6db153e7" }],
-      // Workers Logs: console output (e.g. dev login codes) kept in the dashboard.
+      // Workers Logs: console output kept in the dashboard.
       "observability": { "enabled": true, "logs": { "enabled": true, "invocation_logs": true } },
       "vars": {
         "NODE_ENV": "staging",
@@ -66,7 +66,7 @@
       // Pooled, warm connections (no TCP + TLS + login per request). Query cache is
       // off on the Hyperdrive config: writes don't invalidate it, so lists would go stale.
       "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "c3cb8c0275d74bf0929c2af27b879869" }],
-      // Workers Logs: console output (e.g. dev login codes) kept in the dashboard.
+      // Workers Logs: console output kept in the dashboard.
       "observability": { "enabled": true, "logs": { "enabled": true, "invocation_logs": true } },
       "vars": {
         "NODE_ENV": "staging",
@@ -74,10 +74,8 @@
         "WEB_ORIGINS": "https://chukta-web-uat.chukta.workers.dev"
       }
     },
-    // Production refuses the console SMS provider, so its API stays off (503)
-    // until a real SMS provider (MSG91, DLT-registered) is configured.
     "prod": {
-      // Workers Logs: console output (e.g. dev login codes) kept in the dashboard.
+      // Workers Logs: console output kept in the dashboard.
       "observability": { "enabled": true, "logs": { "enabled": true, "invocation_logs": true } },
       "vars": {
         "NODE_ENV": "production",

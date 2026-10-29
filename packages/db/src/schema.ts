@@ -42,7 +42,8 @@ export const centres = pgTable(
     name: text("name"),
     city: text("city"),
     centreType: text("centre_type", { enum: CENTRE_TYPES }),
-    ownerPhone: text("owner_phone").notNull(),
+    // The owner's own number as typed at sign-up; optional, never confirmed.
+    ownerPhone: text("owner_phone"),
     timezone: text("timezone").notNull().default("Asia/Kolkata"),
     gstNumber: text("gst_number"),
     plan: text("plan", { enum: ["free", "pro"] }).notNull().default("free"),
@@ -66,10 +67,8 @@ export const users = pgTable(
     centreId: uuid("centre_id")
       .notNull()
       .references(() => centres.id),
-    // E.164, e.g. +919876543210, for WhatsApp reminders. Typed at sign-up and
-    // confirmed later by a code; only a confirmed number is unique.
-    phone: text("phone").notNull(),
-    phoneVerifiedAt: timestamp("phone_verified_at", { withTimezone: true }),
+    // The owner's own number, as they typed it; optional and never confirmed.
+    phone: text("phone"),
     // The owner's full name, from profile setup.
     name: text("name"),
     // Lower-cased; Google's address. Empty only on accounts from before Google sign-in.
@@ -84,14 +83,12 @@ export const users = pgTable(
     check("users_role_check", sql`${t.role} in ('owner')`),
     index("users_centre_id_idx").on(t.centreId),
     uniqueIndex("users_email_unique").on(sql`lower(${t.email})`),
-    uniqueIndex("users_verified_phone_unique").on(t.phone).where(sql`${t.phoneVerifiedAt} is not null`),
   ],
 );
 
 /**
- * Other ways an owner signs in, besides their phone number (which lives on
- * users). Google: subject = Google's stable account id ("sub"). Google's own
- * tokens are never stored.
+ * How an owner signs in: Google, the only way. Subject = Google's stable
+ * account id ("sub"). Google's own tokens are never stored.
  */
 export const authIdentities = pgTable(
   "auth_identities",
@@ -131,45 +128,6 @@ export const consents = pgTable(
     acceptedAt: timestamp("accepted_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [check("consents_kind_check", sql`${t.kind} in ('terms_and_privacy')`), index("consents_user_id_idx").on(t.userId)],
-);
-
-/**
- * Proof that a phone number was verified, handed out when the number has no
- * account yet. POST /auth/register spends it to create the owner and centre.
- * Only a hash of the ticket is stored.
- */
-export const signupTickets = pgTable("signup_tickets", {
-  id: id(),
-  phone: text("phone").notNull(),
-  tokenHash: text("token_hash").notNull().unique(),
-  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-  consumedAt: timestamp("consumed_at", { withTimezone: true }),
-  createdAt: createdAt(),
-});
-
-/** One code sent by SMS to confirm an owner's mobile number. Only a hash of the code is stored. */
-export const otpChallenges = pgTable(
-  "otp_challenges",
-  {
-    id: id(),
-    // The owner confirming this number. Empty on codes from before Google
-    // sign-in, when codes were for logging in.
-    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
-    phone: text("phone").notNull(),
-    codeHash: text("code_hash").notNull(),
-    requestedIp: text("requested_ip").notNull(),
-    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-    attempts: integer("attempts").notNull().default(0),
-    // Set when the code is used, replaced by a newer one, or locked after too many attempts.
-    consumedAt: timestamp("consumed_at", { withTimezone: true }),
-    createdAt: createdAt(),
-  },
-  (t) => [
-    check("otp_challenges_attempts_check", sql`${t.attempts} >= 0`),
-    // Rate limits count recent requests per phone and per IP.
-    index("otp_challenges_phone_created_idx").on(t.phone, t.createdAt),
-    index("otp_challenges_ip_created_idx").on(t.requestedIp, t.createdAt),
-  ],
 );
 
 /**
@@ -349,10 +307,8 @@ export const enrolments = pgTable(
 
 export type Centre = typeof centres.$inferSelect;
 export type User = typeof users.$inferSelect;
-export type OtpChallenge = typeof otpChallenges.$inferSelect;
 export type Consent = typeof consents.$inferSelect;
 export type AuthIdentity = typeof authIdentities.$inferSelect;
-export type SignupTicket = typeof signupTickets.$inferSelect;
 export type RefreshToken = typeof refreshTokens.$inferSelect;
 export type Batch = typeof batches.$inferSelect;
 export type Student = typeof students.$inferSelect;

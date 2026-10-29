@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getTableConfig, PgTable } from "drizzle-orm/pg-core";
 import { beforeEach, describe, expect, it } from "vitest";
 import * as schema from "./schema";
-import { centres, otpChallenges, refreshTokens, users } from "./schema";
+import { centres, refreshTokens, users } from "./schema";
 import { createTestDb, type TestDb } from "./testing";
 
 let db: TestDb;
@@ -35,49 +35,26 @@ describe("migrations", () => {
     expect(user.lastLoginAt).toBeNull();
   });
 
-  it("let a typed, unconfirmed number appear on more than one owner", async () => {
-    const { centre } = await insertOwner("+919876543210");
-    await expect(db.insert(users).values({ centreId: centre.id, phone: "+919876543210" })).resolves.toBeDefined();
+  it("keep the owner's mobile number optional, as typed, on more than one owner", async () => {
+    const { centre } = await insertOwner("98765 43210");
+    await expect(db.insert(users).values({ centreId: centre.id, phone: "98765 43210" })).resolves.toBeDefined();
+    const [noNumber] = await db.insert(centres).values({}).returning();
+    const [owner] = await db.insert(users).values({ centreId: noNumber!.id }).returning();
+    expect([noNumber!.ownerPhone, owner!.phone]).toEqual([null, null]);
   });
 
-  it("give each confirmed phone number to one owner only", async () => {
-    const confirmed = new Date();
-    const { centre } = await insertOwner("+919876543210");
-    await db.insert(users).values({ centreId: centre.id, phone: "+919876543211", phoneVerifiedAt: confirmed });
-    await expect(
-      db.insert(users).values({ centreId: centre.id, phone: "+919876543211", phoneVerifiedAt: confirmed }),
-    ).rejects.toThrow();
-  });
-
-  it("start a new owner's number unconfirmed", async () => {
-    const { user } = await insertOwner();
-    expect(user.phoneVerifiedAt).toBeNull();
+  it("keep no mobile-number codes: owners don't confirm their number", async () => {
+    const tables = await db.execute<{ table_name: string }>(
+      sql`select table_name from information_schema.tables where table_name in ('otp_challenges', 'signup_tickets')`,
+    );
+    const columns = await db.execute<{ column_name: string }>(
+      sql`select column_name from information_schema.columns where table_name = 'users' and column_name = 'phone_verified_at'`,
+    );
+    expect([tables.rows, columns.rows]).toEqual([[], []]);
   });
 
   it("only allow known plans", async () => {
     await expect(db.insert(centres).values({ ownerPhone: "+919876543210", plan: "gold" as never })).rejects.toThrow();
-  });
-
-  it("tie an OTP challenge to the owner confirming the number, and drop it with them", async () => {
-    const { user } = await insertOwner();
-    const [challenge] = await db
-      .insert(otpChallenges)
-      .values({ userId: user.id, phone: "+919876543211", codeHash: "h", requestedIp: "203.0.113.7", expiresAt: new Date() })
-      .returning();
-    expect(challenge!.userId).toBe(user.id);
-
-    await db.delete(users).where(eq(users.id, user.id));
-    expect(await db.select().from(otpChallenges)).toEqual([]);
-  });
-
-  it("start an OTP challenge with no attempts", async () => {
-    const [challenge] = await db
-      .insert(otpChallenges)
-      .values({ phone: "+919876543210", codeHash: "h", requestedIp: "203.0.113.7", expiresAt: new Date() })
-      .returning();
-
-    expect(challenge!.attempts).toBe(0);
-    expect(challenge!.consumedAt).toBeNull();
   });
 
   it("move updated_at forward on every update", async () => {
@@ -102,7 +79,6 @@ describe("migrations", () => {
     ["users.centre_id", "centres", "no action"],
     ["auth_identities.user_id", "users", "cascade"],
     ["consents.user_id", "users", "cascade"],
-    ["otp_challenges.user_id", "users", "cascade"],
     ["refresh_tokens.user_id", "users", "cascade"],
     ["batches.centre_id", "centres", "no action"],
     ["students.centre_id", "centres", "no action"],
@@ -124,7 +100,7 @@ describe("migrations", () => {
 
     expect(links).toContainEqual({ from: column, to: target, onDelete });
     // Every link in the schema is listed here, so a new one needs a row above.
-    expect(links).toHaveLength(13);
+    expect(links).toHaveLength(12);
   });
 
   it("keep refresh token hashes unique and delete them with their user", async () => {

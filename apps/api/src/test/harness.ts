@@ -1,6 +1,5 @@
 import { createTestDb } from "@chukta/db/testing";
-import type { GoogleSignIn, SmsProvider } from "@chukta/integrations";
-import { vi } from "vitest";
+import type { GoogleSignIn } from "@chukta/integrations";
 import { createApp } from "../app";
 import type { Config } from "../config";
 import { googleFromConfig } from "../google";
@@ -10,24 +9,16 @@ export const testConfig: Config = {
   port: 8787,
   databaseUrl: "unused-in-tests",
   jwtSecret: "test-secret-that-is-at-least-32-characters-long",
-  smsProvider: "console",
   webOrigins: ["http://localhost:3000"],
   cookieSecure: true,
   trustProxyHeaders: true,
-  otpLimits: { perPhonePerHour: 5, perIpPerHour: 10 },
   // Owners sign in only with Google; tests use the fake account chooser.
   google: { provider: "fake" },
 };
 
-/** The API wired to an in-memory Postgres, a recording SMS fake, the fake Google and a clock the test controls. */
+/** The API wired to an in-memory Postgres, the fake Google and a clock the test controls. */
 export async function createTestApp(config: Partial<Config> = {}, options: { google?: GoogleSignIn } = {}) {
   const db = await createTestDb();
-  const sent: { to: string; code: string }[] = [];
-  const sms = {
-    sendOtp: vi.fn<SmsProvider["sendOtp"]>(async (to, code) => {
-      sent.push({ to, code });
-    }),
-  };
   let now = new Date("2026-11-02T04:30:00.000Z");
   const clock = {
     now: () => now,
@@ -37,7 +28,7 @@ export async function createTestApp(config: Partial<Config> = {}, options: { goo
   };
   const fullConfig = { ...testConfig, ...config };
   const google = options.google ?? googleFromConfig(fullConfig.google);
-  const app = createApp({ db, sms, google, now: clock.now, config: fullConfig });
+  const app = createApp({ db, google, now: clock.now, config: fullConfig });
 
   function call(
     method: string,
@@ -110,7 +101,7 @@ export async function createTestApp(config: Partial<Config> = {}, options: { goo
     return { res, body: body as LoginBody, cookie: refreshCookie(res) };
   }
 
-  return { app, db, sms, sent, clock, call, startGoogle, googleLogin, login };
+  return { app, db, clock, call, startGoogle, googleLogin, login };
 }
 
 /** Tests assert on response bodies field by field, so they read them untyped. */
@@ -135,7 +126,7 @@ export type LoginBody = {
   accessToken: string;
   expiresIn: number;
   isNewAccount: boolean;
-  user: { id: string; phone: string; phoneVerified: boolean; fullName: string | null; email: string | null; role: string };
+  user: { id: string; phone: string | null; fullName: string | null; email: string | null; role: string };
   centre: { id: string; name: string | null; city: string | null; centreType: string | null; plan: string };
 };
 

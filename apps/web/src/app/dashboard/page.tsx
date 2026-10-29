@@ -1,29 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import app from "@/components/app/app.module.css";
-import { PhoneBanner } from "@/components/settings/PhoneBanner";
-import { getMe } from "@/lib/api";
 import { useSession } from "@/lib/useSession";
 
 /** Signed-in home. The real dashboard (collected vs pending) arrives in the Launch phase. */
 export default function DashboardPage() {
-  const { token, centre } = useSession();
-  const [phoneUnconfirmed, setPhoneUnconfirmed] = useState(false);
-
-  useEffect(() => {
-    if (!token) return;
-    // The banner is a nudge: if this fails, the dashboard simply goes without it.
-    getMe(token).then(({ user }) => setPhoneUnconfirmed(!user.phoneVerified), () => undefined);
-  }, [token]);
+  const { centre } = useSession();
 
   return (
     <AppShell current="dashboard" centre={centre}>
       {centre ? (
         <>
-          {phoneUnconfirmed && <PhoneBanner href="/settings" />}
           <div className={app.titleGroup}>
             <h1 className={app.title}>{centre.name ?? "Welcome to Chukta"}</h1>
             <p className={app.subtitle}>

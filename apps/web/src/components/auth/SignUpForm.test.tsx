@@ -16,7 +16,7 @@ const session: LoginSession = {
   accessToken: "access-token",
   expiresIn: 900,
   isNewAccount: true,
-  user: { id: "u1", phone: "+919876543210", phoneVerified: false, fullName: "Asha Sharma", email: "asha@example.com", role: "owner" },
+  user: { id: "u1", phone: "98765 43210", fullName: "Asha Sharma", email: "asha@example.com", role: "owner" },
   centre: { id: "c1", name: "Sunrise Classes", city: "Pune", centreType: "coaching", plan: "free", timezone: "Asia/Kolkata" },
 };
 
@@ -52,8 +52,9 @@ describe("SignUpForm", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Tell us about your centre" })).toBeInTheDocument();
     expect(screen.getByText(/Signed in with Google as asha@example\.com\./)).toBeInTheDocument();
     expect(screen.getByLabelText("Your name")).toHaveValue("Asha Sharma");
-    expect(screen.getByText("For fee reminders on WhatsApp. You’ll confirm it later.")).toBeInTheDocument();
-    expect(screen.getByText("+91")).toBeInTheDocument();
+    // The owner's own number: optional, any spelling, no +91 forced on it.
+    expect(screen.getByLabelText("Mobile number")).toHaveAccessibleDescription("Optional.");
+    expect(screen.queryByText("+91")).not.toBeInTheDocument();
   });
 
   it("offers the centre types as a single choice", async () => {
@@ -88,17 +89,29 @@ describe("SignUpForm", () => {
   it("names every field at fault before sending anything, and moves to the first", async () => {
     const { user } = setup();
     await user.clear(await screen.findByLabelText("Your name"));
-    await user.type(screen.getByLabelText("Mobile number"), "12345");
 
     await user.click(screen.getByRole("button", { name: "Create account" }));
 
     expect(registerOwner).not.toHaveBeenCalled();
     expect(screen.getByLabelText("Your name")).toHaveAccessibleDescription("Enter your name.");
-    expect(screen.getByLabelText("Mobile number")).toHaveAccessibleDescription("Enter a 10-digit Indian mobile number.");
+    expect(screen.getByLabelText("Mobile number")).toHaveAccessibleDescription("Optional.");
     expect(screen.getByLabelText("Centre name")).toHaveAccessibleDescription("Enter your centre’s name.");
     expect(screen.getByText("Pick the type of centre.")).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent("Accept the terms and privacy notice to continue.");
     expect(screen.getByLabelText("Your name")).toHaveFocus();
+  });
+
+  it("takes the mobile number as typed, or none at all", async () => {
+    const { user } = setup();
+    await fillIn(user);
+    await user.clear(screen.getByLabelText("Mobile number"));
+    await user.type(screen.getByLabelText("Mobile number"), "12345");
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+    expect(registerOwner).toHaveBeenLastCalledWith(expect.objectContaining({ phone: "12345" }));
+
+    await user.clear(screen.getByLabelText("Mobile number"));
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+    expect(registerOwner).toHaveBeenLastCalledWith(expect.objectContaining({ phone: "" }));
   });
 
   it("shows the server's message for a field", async () => {

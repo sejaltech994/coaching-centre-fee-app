@@ -13,11 +13,9 @@ describe("loadConfig", () => {
       port: 8787,
       databaseUrl: "postgres://localhost/chukta",
       jwtSecret: "x".repeat(32),
-      smsProvider: "console",
       webOrigins: ["http://localhost:3000"],
       cookieSecure: false,
       trustProxyHeaders: false,
-      otpLimits: { perPhonePerHour: 5, perIpPerHour: 10 },
       google: null,
     });
   });
@@ -50,38 +48,16 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ ...valid, JWT_SECRET: "short" })).toThrow("JWT_SECRET");
   });
 
-  it("refuses to print login codes to the console in production", () => {
-    expect(() => loadConfig({ ...valid, NODE_ENV: "production", WEB_ORIGINS: "https://app.example" })).toThrow(
-      "SMS_PROVIDER",
-    );
-  });
-
-  it("runs hosted dev, sit and uat as staging: secure cookies, console SMS still allowed", () => {
+  it("runs hosted dev, sit and uat as staging, with secure cookies", () => {
     const config = loadConfig({ ...valid, NODE_ENV: "staging", TRUST_PROXY_HEADERS: "true" });
-    expect(config).toMatchObject({ env: "staging", cookieSecure: true, smsProvider: "console", trustProxyHeaders: true });
+    expect(config).toMatchObject({ env: "staging", cookieSecure: true, trustProxyHeaders: true });
   });
 
-  it("keeps the TSD's OTP limits by default", () => {
-    expect(loadConfig(valid).otpLimits).toEqual({ perPhonePerHour: 5, perIpPerHour: 10 });
-  });
-
-  it("lets development and test raise the OTP limits, for automated test runs", () => {
-    const config = loadConfig({ ...valid, NODE_ENV: "test", OTP_PER_IP_PER_HOUR: "1000", OTP_PER_PHONE_PER_HOUR: "50" });
-    expect(config.otpLimits).toEqual({ perPhonePerHour: 50, perIpPerHour: 1000 });
-  });
-
-  it("never lets production change the OTP limits", () => {
-    expect(() =>
-      loadConfig({ ...valid, NODE_ENV: "production", SMS_PROVIDER: "console", OTP_PER_IP_PER_HOUR: "1000" }),
-    ).toThrow("OTP_PER_IP_PER_HOUR");
-  });
-
-  it("refuses a limit that isn't a positive whole number", () => {
-    expect(() => loadConfig({ ...valid, OTP_PER_IP_PER_HOUR: "lots" })).toThrow("OTP_PER_IP_PER_HOUR");
-  });
-
-  it("refuses an unknown SMS provider", () => {
-    expect(() => loadConfig({ ...valid, SMS_PROVIDER: "pigeon" })).toThrow("SMS_PROVIDER");
+  it("needs no SMS or code settings, even in production: owners don't confirm their number", () => {
+    const config = loadConfig({ ...valid, NODE_ENV: "production", SMS_PROVIDER: "pigeon", OTP_PER_IP_PER_HOUR: "1000" });
+    expect(config.env).toBe("production");
+    expect(config).not.toHaveProperty("smsProvider");
+    expect(config).not.toHaveProperty("otpLimits");
   });
 
   describe("Google sign-in", () => {
@@ -109,7 +85,7 @@ describe("loadConfig", () => {
 
     it("never fakes Google in production", () => {
       expect(() =>
-        loadConfig({ ...valid, NODE_ENV: "production", SMS_PROVIDER: "console", GOOGLE_PROVIDER: "fake" }),
+        loadConfig({ ...valid, NODE_ENV: "production", GOOGLE_PROVIDER: "fake" }),
       ).toThrow("GOOGLE_PROVIDER=fake");
     });
 

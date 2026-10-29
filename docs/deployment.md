@@ -4,10 +4,10 @@ Each environment is **one Cloudflare Worker** that serves both the web app (stat
 
 | Environment | Branch | Worker and URL | Database | API |
 | --- | --- | --- | --- | --- |
-| dev | `develop` | `chukta-web-dev`, https://chukta-web-dev.chukta.workers.dev | `chukta_dev` (non-prod project) | **Live**; login codes in the Worker log |
+| dev | `develop` | `chukta-web-dev`, https://chukta-web-dev.chukta.workers.dev | `chukta_dev` (non-prod project) | **Live** |
 | sit | `sit` | `chukta-web-sit`, https://chukta-web-sit.chukta.workers.dev | `chukta_sit` (non-prod project) | Ready; goes live on the first promotion to `sit` |
 | uat | `uat` | `chukta-web-uat`, https://chukta-web-uat.chukta.workers.dev | `chukta_uat` (non-prod project) | Ready; goes live on the first promotion to `uat` |
-| prod | `main` | `chukta-web-prod`, https://chukta-web-prod.chukta.workers.dev (custom domain later) | Own Neon project in Mumbai (not created yet) | **Off (503)** until real SMS (MSG91, DLT-registered) is set up |
+| prod | `main` | `chukta-web-prod`, https://chukta-web-prod.chukta.workers.dev (custom domain later) | Own Neon project in Mumbai (not created yet) | Goes live once its database and `JWT_SECRET` are set |
 
 ### Databases
 
@@ -73,7 +73,7 @@ Connection strings use the **direct** host (no `-pooler`) and `sslmode=require`,
    openssl rand -base64 48 | tr -d '\n' | gh secret set JWT_SECRET --env prod
    ```
 
-The next deploy to `main` migrates it. Its API stays off until real SMS is configured.
+The next deploy to `main` migrates it and turns its API on.
 
 ### Rotating a database password
 
@@ -99,7 +99,6 @@ gh workflow run deploy.yml --ref develop
 
 ## Later
 
-- **Real SMS** (MSG91 or similar) needs DLT registration of the sender ID and template. Production's API turns on once it's configured.
 - **Background jobs** (`apps/worker`, BullMQ): Upstash Redis free gives 1 database and 500K commands/month ([pricing](https://upstash.com/pricing/redis)). BullMQ polls Redis constantly, so budget for pay-as-you-go before prod, or use Cloudflare Queues and Cron Triggers instead.
 
 ## Performance

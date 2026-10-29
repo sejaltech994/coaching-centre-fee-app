@@ -4,9 +4,8 @@ import type { BatchInput, CentreType, FeeCycle, FeePlanInput, Weekday } from "@c
 export type Me = {
   user: {
     id: string;
-    phone: string;
-    /** False until the owner confirms the number with a code. */
-    phoneVerified: boolean;
+    /** The owner's own number, as typed; optional and never confirmed. */
+    phone: string | null;
     fullName: string | null;
     email: string | null;
     role: "owner";
@@ -102,8 +101,6 @@ export type StudentInput = { name: string; parentName: string; parentPhone: stri
 export type StudentFilters = { status: "active" | "left" | "all"; batchId?: string; q?: string; cursor?: string };
 
 export class ApiRequestError extends Error {
-  /** After a wrong code: how many tries it has left. */
-  readonly attemptsLeft?: number;
   readonly retryAfterSeconds?: number;
   /** Message per field at fault, for forms. */
   readonly fields?: Record<string, string>;
@@ -112,11 +109,10 @@ export class ApiRequestError extends Error {
     readonly status: number,
     readonly code: string,
     message: string,
-    options: { attemptsLeft?: number; retryAfterSeconds?: number; fields?: Record<string, string> } = {},
+    options: { retryAfterSeconds?: number; fields?: Record<string, string> } = {},
   ) {
     super(message);
     this.name = "ApiRequestError";
-    this.attemptsLeft = options.attemptsLeft;
     this.retryAfterSeconds = options.retryAfterSeconds;
     this.fields = options.fields;
   }
@@ -186,7 +182,7 @@ async function send<T>(path: string, init: CallInit): Promise<T> {
 
   if (res.status === 204) return undefined as T;
   const payload = (await res.json().catch(() => null)) as
-    | (T & { error?: { code: string; message: string; attemptsLeft?: number; fields?: Record<string, string> } })
+    | (T & { error?: { code: string; message: string; fields?: Record<string, string> } })
     | null;
 
   if (!res.ok) {
@@ -196,7 +192,6 @@ async function send<T>(path: string, init: CallInit): Promise<T> {
       payload?.error?.code ?? `http_${res.status}`,
       payload?.error?.message ?? "Something went wrong. Try again.",
       {
-        attemptsLeft: payload?.error?.attemptsLeft,
         retryAfterSeconds: Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined,
         fields: payload?.error?.fields,
       },
@@ -211,15 +206,8 @@ export const registerOwner = (input: RegisterInput) =>
 
 export const getMe = (token: string) => call<Me>("/me", { token });
 
-export const updateMe = (token: string, changes: { fullName: string }) =>
+export const updateMe = (token: string, changes: { fullName: string; phone: string | null }) =>
   call<{ user: Me["user"] }>("/me", { method: "PATCH", body: changes, token });
-
-/** Texts a code to confirm `phone`: the owner's number or one they're switching to. */
-export const sendPhoneCode = (token: string, phone: string) =>
-  call<{ expiresInSeconds: number; resendAfterSeconds: number }>("/me/phone/verify", { method: "POST", body: { phone }, token });
-
-export const confirmPhone = (token: string, phone: string, code: string) =>
-  call<{ user: Me["user"] }>("/me/phone/confirm", { method: "POST", body: { phone, code }, token });
 
 export const listSessions = (token: string) => call<{ sessions: DeviceSession[] }>("/me/sessions", { token });
 

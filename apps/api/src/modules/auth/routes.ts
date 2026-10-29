@@ -26,7 +26,6 @@ const registerBody = z.record(z.string(), z.unknown());
 export const userDto = (user: User) => ({
   id: user.id,
   phone: user.phone,
-  phoneVerified: user.phoneVerifiedAt !== null,
   fullName: user.name,
   email: user.email,
   role: user.role,

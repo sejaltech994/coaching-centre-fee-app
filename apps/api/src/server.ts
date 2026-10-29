@@ -1,5 +1,4 @@
 import { createLocalDb, runMigrations } from "@chukta/db/local";
-import { createConsoleSmsProvider } from "@chukta/integrations";
 import { serve } from "@hono/node-server";
 import { createApp } from "./app";
 import { loadConfig } from "./config";
@@ -13,7 +12,6 @@ if (handle.kind === "pglite") await runMigrations(handle);
 
 const app = createApp({
   db: handle.db,
-  sms: createConsoleSmsProvider(),
   google: googleFromConfig(config.google),
   now: () => new Date(),
   config,

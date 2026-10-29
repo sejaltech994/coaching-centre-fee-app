@@ -11,17 +11,17 @@ const valid = {
 };
 
 describe("validateProfile", () => {
-  it("accepts a complete profile, trimming text and writing the mobile number as +91", () => {
+  it("accepts a complete profile, trimming text", () => {
     const result = validateProfile({ ...valid, fullName: "  Asha Sharma ", centreName: " Sunrise Classes ", city: " Pune " });
 
     expect(result).toEqual({
       ok: true,
-      value: { fullName: "Asha Sharma", phone: "+919876543210", centreName: "Sunrise Classes", city: "Pune", centreType: "coaching" },
+      value: { fullName: "Asha Sharma", phone: "98765 43210", centreName: "Sunrise Classes", city: "Pune", centreType: "coaching" },
     });
   });
 
   it("takes no email: it comes from Google", () => {
-    expect(validateProfile({ ...valid, email: "someone@example.com" })).toMatchObject({ ok: true, value: { phone: "+919876543210" } });
+    expect(validateProfile({ ...valid, email: "someone@example.com" })).toMatchObject({ ok: true, value: { phone: "98765 43210" } });
     expect(validateProfile({ ...valid, email: "someone@example.com" })).not.toHaveProperty("value.email");
   });
 
@@ -34,9 +34,7 @@ describe("validateProfile", () => {
     ["city", { city: "x".repeat(61) }, "Keep the city to 60 characters or fewer."],
     ["centreType", { centreType: "bakery" }, "Pick the type of centre."],
     ["centreType", { centreType: undefined }, "Pick the type of centre."],
-    ["phone", { phone: "" }, "Enter a 10-digit Indian mobile number."],
-    ["phone", { phone: "12345" }, "Enter a 10-digit Indian mobile number."],
-    ["phone", { phone: undefined }, "Enter a 10-digit Indian mobile number."],
+    ["phone", { phone: "9".repeat(21) }, "Keep the mobile number to 20 characters or fewer."],
     ["acceptedTerms", { acceptedTerms: false }, "Accept the terms and privacy notice to continue."],
     ["acceptedTerms", { acceptedTerms: undefined }, "Accept the terms and privacy notice to continue."],
   ])("explains a bad %s", (field, change, message) => {
@@ -47,9 +45,15 @@ describe("validateProfile", () => {
 
   it("names every field at fault at once", () => {
     const result = validateProfile({ fullName: "", phone: "", centreName: "", city: "", centreType: "bakery", acceptedTerms: false });
-    expect(!result.ok && Object.keys(result.fields).sort()).toEqual(
-      ["acceptedTerms", "centreName", "centreType", "city", "fullName", "phone"],
-    );
+    expect(!result.ok && Object.keys(result.fields).sort()).toEqual(["acceptedTerms", "centreName", "centreType", "city", "fullName"]);
+  });
+
+  it.each([
+    ["any spelling, unchecked", " +1 (555) 010-9999 ", "+1 (555) 010-9999"],
+    ["left empty", "  ", null],
+    ["left out", undefined, null],
+  ])("takes the owner's mobile number %s: it's optional and never confirmed", (_case, phone, saved) => {
+    expect(validateProfile({ ...valid, phone })).toMatchObject({ ok: true, value: { phone: saved } });
   });
 });
 
@@ -61,8 +65,12 @@ describe("centre types", () => {
 });
 
 describe("validateOwner", () => {
-  it("accepts a trimmed name", () => {
-    expect(validateOwner({ fullName: "  Asha S. Sharma " })).toEqual({ ok: true, value: { fullName: "Asha S. Sharma" } });
+  it("accepts a trimmed name and mobile number", () => {
+    expect(validateOwner({ fullName: "  Asha S. Sharma ", phone: " 98765 43210 " })).toEqual({
+      ok: true,
+      value: { fullName: "Asha S. Sharma", phone: "98765 43210" },
+    });
+    expect(validateOwner({ fullName: "Asha", phone: "" })).toEqual({ ok: true, value: { fullName: "Asha", phone: null } });
   });
 
   it("uses sign-up's messages", () => {

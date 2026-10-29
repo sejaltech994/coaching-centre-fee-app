@@ -137,8 +137,8 @@ jobs:
           code404=$(curl -s -o /dev/null -w '%{http_code}' "$URL/__smoke-test-missing__/")
           [ "$code404" = 404 ] || { echo "::error::Unknown paths return HTTP $code404 instead of 404"; exit 1; }
 
-          # The API and its database. Prod's API stays off until real SMS exists.
-          if [ "$DEPLOY_ENV" != prod ] && [ -n "$DATABASE_URL" ] && [ -n "$JWT_SECRET" ]; then
+          # The API and its database, once the environment has them.
+          if [ -n "$DATABASE_URL" ] && [ -n "$JWT_SECRET" ]; then
             for attempt in 1 2 3 4 5; do
               ready=$(curl -s -o ready.json -w '%{http_code}' "$URL/api/v1/health/ready") && [ "$ready" = 200 ] && break
               echo "Attempt $attempt: API readiness HTTP $ready, retrying in 5s"; sleep 5

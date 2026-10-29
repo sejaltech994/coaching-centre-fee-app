@@ -3,7 +3,6 @@
 // refresh cookie stays first-party (SameSite=Strict) and no CORS is needed.
 // Local development runs src/server.ts on Node instead.
 import { createDb, type DbHandle } from "@chukta/db";
-import { createConsoleSmsProvider } from "@chukta/integrations";
 import { createApp } from "./app";
 import { loadConfig } from "./config";
 import { googleFromConfig } from "./google";
@@ -52,7 +51,6 @@ export function createWorker(makeDb: (url: string) => DbHandle = (url) => create
       try {
         const app = createApp({
           db: handle.db,
-          sms: createConsoleSmsProvider(),
           google: googleFromConfig(config.google),
           now: () => new Date(),
           config,

@@ -3,11 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ApiRequestError,
-  confirmPhone,
   getIdentities,
   getMe,
   listSessions,
-  sendPhoneCode,
   signOutOtherSessions,
   signOutSession,
   updateCentre,
@@ -24,8 +22,6 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   getIdentities: vi.fn(),
   updateMe: vi.fn(),
   updateCentre: vi.fn(),
-  sendPhoneCode: vi.fn(),
-  confirmPhone: vi.fn(),
   listSessions: vi.fn(),
   signOutSession: vi.fn(),
   signOutOtherSessions: vi.fn(),
@@ -48,7 +44,7 @@ const laptop: DeviceSession = {
 const tablet: DeviceSession = { ...laptop, id: "s-tablet", device: "Safari on iPad" };
 
 const me: Me = {
-  user: { id: "u1", phone: "+919876543210", phoneVerified: false, fullName: "Asha Sharma", email: "asha@example.com", role: "owner" },
+  user: { id: "u1", phone: "98765 43210", fullName: "Asha Sharma", email: "asha@example.com", role: "owner" },
   centre: { id: "c1", name: "Sunrise Classes", city: "Pune", centreType: "coaching", plan: "free", timezone: "Asia/Kolkata" },
 };
 
@@ -91,54 +87,39 @@ describe("Settings", () => {
     expect(profile).toHaveTextContent("asha@example.com");
     expect(profile).toHaveTextContent("Confirmed");
     expect(profile).toHaveTextContent("From your Google account");
-    expect(profile).toHaveTextContent("+91 98765 43210");
-    expect(profile).toHaveTextContent("Not confirmed");
+    expect(profile).toHaveTextContent("98765 43210");
+    expect(profile).not.toHaveTextContent("Not confirmed");
     expect(section("Centre")).toHaveTextContent("Sunrise Classes · Coaching · Pune");
     expect(section("Sign-in methods")).toHaveTextContent("Connected as asha@example.com");
   });
 
-  it("shows a confirmed mobile number as confirmed, without the reminder hint", async () => {
-    vi.mocked(getMe).mockResolvedValue({ ...me, user: { ...me.user, phoneVerified: true } });
+  it("never asks for the mobile number to be confirmed", async () => {
     setup();
-
-    const profile = await screen.findByRole("region", { name: "Profile" });
-    expect(within(profile).getAllByText("Confirmed")).toHaveLength(2);
-    expect(profile).not.toHaveTextContent("Not confirmed");
-    expect(profile).not.toHaveTextContent("Fee reminders go out on WhatsApp once you confirm it.");
+    await screen.findByRole("region", { name: "Profile" });
+    expect(screen.queryByRole("button", { name: /Confirm/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Confirm your mobile number/)).not.toBeInTheDocument();
   });
 
-  it("asks for the mobile number to be confirmed, and confirms it with a code", async () => {
-    vi.mocked(sendPhoneCode).mockResolvedValue({ expiresInSeconds: 300, resendAfterSeconds: 30 });
-    vi.mocked(confirmPhone).mockResolvedValue({ user: { ...me.user, phoneVerified: true } });
-    const { user } = setup();
-    expect(await screen.findByText("Confirm your mobile number to start sending fee reminders on WhatsApp.")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Confirm mobile number" }));
-    await user.click(screen.getByRole("button", { name: "Send code" }));
-    await user.click(await screen.findByLabelText("Digit 1"));
-    await user.keyboard("482913");
-    await user.click(screen.getByRole("button", { name: "Confirm" }));
-
-    expect(await screen.findByText("Mobile number confirmed.")).toBeInTheDocument();
-    expect(section("Profile")).not.toHaveTextContent("Not confirmed");
-    expect(screen.queryByText(/Confirm your mobile number to start/)).not.toBeInTheDocument();
+  it("says when there's no mobile number", async () => {
+    vi.mocked(getMe).mockResolvedValue({ ...me, user: { ...me.user, phone: null } });
+    setup();
+    expect(await screen.findByRole("region", { name: "Profile" })).toHaveTextContent("Not added");
   });
 
-  it("opens the same steps from the banner", async () => {
+  it("changes the mobile number with the name, as typed, with no code", async () => {
+    vi.mocked(updateMe).mockResolvedValue({ user: { ...me.user, phone: "+44 7700 900123" } });
     const { user } = setup();
+    await user.click(await screen.findByRole("button", { name: "Edit profile" }));
+    const phone = within(section("Profile")).getByLabelText("Mobile number");
+    expect(phone).toHaveValue("98765 43210");
 
-    await user.click(await screen.findByRole("button", { name: "Confirm number" }));
+    await user.clear(phone);
+    await user.type(phone, "+44 7700 900123");
+    await user.click(screen.getByRole("button", { name: "Save" }));
 
-    expect(within(section("Profile")).getByRole("button", { name: "Send code" })).toBeInTheDocument();
-  });
-
-  it("offers to change a confirmed number", async () => {
-    vi.mocked(getMe).mockResolvedValue({ ...me, user: { ...me.user, phoneVerified: true } });
-    const { user } = setup();
-
-    await user.click(await screen.findByRole("button", { name: "Change mobile number" }));
-
-    expect(within(section("Profile")).getByLabelText("Mobile number")).toHaveValue("98765 43210");
+    expect(updateMe).toHaveBeenCalledWith("token", { fullName: "Asha Sharma", phone: "+44 7700 900123" });
+    expect(await screen.findByText("Saved.")).toBeInTheDocument();
+    expect(section("Profile")).toHaveTextContent("+44 7700 900123");
   });
 
   it("changes the owner's name", async () => {
@@ -151,7 +132,7 @@ describe("Settings", () => {
     await user.type(name, "Asha S. Sharma");
     await user.click(screen.getByRole("button", { name: "Save" }));
 
-    expect(updateMe).toHaveBeenCalledWith("token", { fullName: "Asha S. Sharma" });
+    expect(updateMe).toHaveBeenCalledWith("token", { fullName: "Asha S. Sharma", phone: "98765 43210" });
     expect(await screen.findByText("Saved.")).toBeInTheDocument();
     expect(section("Profile")).toHaveTextContent("Asha S. Sharma");
     expect(within(section("Profile")).queryByLabelText("Your name")).not.toBeInTheDocument();

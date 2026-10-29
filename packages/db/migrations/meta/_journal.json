@@ -64,6 +64,13 @@
       "when": 1793252146036,
       "tag": "0008_fee_plans",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793270535962,
+      "tag": "0009_owner_phone_unconfirmed",
+      "breakpoints": true
     }
   ]
 }
