@@ -48,4 +48,18 @@ describe("SignIn", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(message);
     expect(screen.getByRole("button", { name: "Continue with Google" })).toBeInTheDocument();
   });
+
+  it.each([
+    ["required", "Log in to continue."],
+    ["expired", "Your login has expired. Log in to continue."],
+  ])("explains a ?session=%s redirect", (session, message) => {
+    render(<SignIn googleEnabled session={session} />);
+    expect(screen.getByRole("status")).toHaveTextContent(message);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("says nothing for a session reason it doesn't know", () => {
+    render(<SignIn googleEnabled session="whatever" />);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
 });

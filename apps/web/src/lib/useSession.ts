@@ -3,13 +3,14 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { getCentre, type CentreResponse } from "./api";
-import { clearSession, ensureAccessToken, getCachedCentre, setCachedCentre } from "./session";
+import { checkLogin, clearSession, ensureAccessToken, getCachedCentre, setCachedCentre } from "./session";
 
 export type Session = { token: string | null; centre: CentreResponse["centre"] | null };
 
 /**
- * For signed-in pages: restores the session (or sends the visitor to /login)
- * and loads the owner's centre. The token is handed over as soon as it's known,
+ * For signed-in pages: restores the session (or sends the visitor to log in)
+ * and loads the owner's centre. When the owner comes back to the tab, it checks
+ * the login is still good, and logs out if it has ended. The token is handed over as soon as it's known,
  * so pages can start loading their own data while the centre is still loading;
  * the centre is remembered between pages.
  */
@@ -23,7 +24,7 @@ export function useSession(): Session {
     let cancelled = false;
     (async () => {
       const token = await ensureAccessToken();
-      if (!token) return routerRef.current.replace("/login");
+      if (!token) return routerRef.current.replace("/login/?session=required");
       if (cancelled) return;
       const cached = getCachedCentre();
       setSession({ token, centre: cached });
@@ -34,12 +35,20 @@ export function useSession(): Session {
         if (!cancelled) setSession({ token, centre });
       } catch {
         clearSession();
-        routerRef.current.replace("/login");
+        routerRef.current.replace("/login/?session=expired");
       }
     })();
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    const onShow = () => {
+      if (document.visibilityState === "visible") void checkLogin();
+    };
+    document.addEventListener("visibilitychange", onShow);
+    return () => document.removeEventListener("visibilitychange", onShow);
   }, []);
 
   return session;

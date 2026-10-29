@@ -13,6 +13,8 @@ function SignInScreen() {
       googleEnabled={process.env.NEXT_PUBLIC_GOOGLE_SIGN_IN === "on"}
       // The API's Google callback, or an expired sign-up, sends ?google_error=…
       googleError={params.get("google_error") ?? undefined}
+      // A signed-in page sends ?session=required (not logged in) or expired (the login ended).
+      session={params.get("session") ?? undefined}
     />
   );
 }

@@ -1,7 +1,7 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiRequestError, getCentre } from "./api";
-import { clearSession, ensureAccessToken, getAccessToken, setAccessToken } from "./session";
+import { checkLogin, clearSession, ensureAccessToken, getAccessToken, setAccessToken } from "./session";
 import { useSession } from "./useSession";
 
 const replace = vi.fn();
@@ -10,6 +10,7 @@ vi.mock("./api", async (importOriginal) => ({ ...(await importOriginal<typeof im
 vi.mock("./session", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./session")>()),
   ensureAccessToken: vi.fn(),
+  checkLogin: vi.fn(),
 }));
 
 const centre = { id: "c1", name: "Sunrise Classes", plan: "free" as const, timezone: "Asia/Kolkata" };
@@ -19,7 +20,13 @@ beforeEach(() => {
   replace.mockReset();
   vi.mocked(ensureAccessToken).mockReset().mockResolvedValue("token");
   vi.mocked(getCentre).mockReset().mockResolvedValue({ centre });
+  vi.mocked(checkLogin).mockReset();
 });
+
+function showTab(state: "visible" | "hidden") {
+  Object.defineProperty(document, "visibilityState", { configurable: true, value: state });
+  document.dispatchEvent(new Event("visibilitychange"));
+}
 
 describe("useSession", () => {
   it("provides the access token and the owner's centre", async () => {
@@ -34,7 +41,7 @@ describe("useSession", () => {
     vi.mocked(ensureAccessToken).mockResolvedValueOnce(null);
     renderHook(() => useSession());
 
-    await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/login/?session=required"));
     expect(getCentre).not.toHaveBeenCalled();
   });
 
@@ -43,7 +50,7 @@ describe("useSession", () => {
     vi.mocked(getCentre).mockRejectedValueOnce(new ApiRequestError(401, "unauthenticated", "Log in to continue."));
     renderHook(() => useSession());
 
-    await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/login/?session=expired"));
     expect(getAccessToken()).toBeNull();
   });
 
@@ -77,5 +84,18 @@ describe("useSession", () => {
     rerender();
     rerender();
     expect(getCentre).toHaveBeenCalledTimes(1);
+  });
+
+  it("checks the login is still good when the owner comes back to the tab", async () => {
+    const { unmount } = renderHook(() => useSession());
+
+    showTab("hidden");
+    expect(checkLogin).not.toHaveBeenCalled();
+    showTab("visible");
+    expect(checkLogin).toHaveBeenCalledTimes(1);
+
+    unmount();
+    showTab("visible");
+    expect(checkLogin).toHaveBeenCalledTimes(1);
   });
 });

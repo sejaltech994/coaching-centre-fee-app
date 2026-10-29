@@ -33,6 +33,11 @@ export const CATALOG = {
         text: "Welcome to Chukta. New here? Continuing with Google creates your account.",
         multiline: true,
       },
+      loginRequired: { label: "Notice: opened a page while logged out", text: "Log in to continue." },
+      loginExpired: {
+        label: "Notice: logged out because the login ended",
+        text: "Your login has expired. Log in to continue.",
+      },
       continueWithGoogle: { label: "Google button", text: "Continue with Google" },
       legalNotice: {
         label: "Legal line under the button ({terms} and {privacy} become links)",
