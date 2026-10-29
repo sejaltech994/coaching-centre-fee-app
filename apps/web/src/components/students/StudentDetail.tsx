@@ -12,7 +12,6 @@ import DialogContentText from "@mui/material/DialogContentText";
 import DialogTitle from "@mui/material/DialogTitle";
 import Link from "@mui/material/Link";
 import List from "@mui/material/List";
-import ListItem from "@mui/material/ListItem";
 import MenuItem from "@mui/material/MenuItem";
 import Snackbar from "@mui/material/Snackbar";
 import Stack from "@mui/material/Stack";
@@ -26,18 +25,17 @@ import {
   getStudent,
   listBatches,
   updateStudent,
+  type Batch,
   type StudentBatch,
   type StudentDetail as Detail,
   type StudentInput,
 } from "@/lib/api";
 import { copy, errorMessage, fill } from "@/lib/copy";
+import { EnrolledBatch } from "./EnrolledBatch";
 import { StudentForm } from "./StudentForm";
 
 // Dates are the centre's (India's), whatever the browser's timezone.
 const todayInIndia = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
-const dayFormat = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
-/** "2 Nov 2026" from "2026-11-02". */
-const showDate = (date: string) => dayFormat.format(new Date(`${date}T00:00:00Z`));
 
 /** One student: their details, their batches, and whether they're still at the centre. */
 export function StudentDetail({ token, id }: { token: string; id: string }) {
@@ -45,7 +43,7 @@ export function StudentDetail({ token, id }: { token: string; id: string }) {
   const batchesId = useId();
   const [student, setStudent] = useState<Detail | null>(null);
   const [missing, setMissing] = useState(!id);
-  const [activeBatches, setActiveBatches] = useState<{ id: string; name: string }[]>([]);
+  const [activeBatches, setActiveBatches] = useState<Batch[]>([]);
   const [joining, setJoining] = useState("");
   const [batchError, setBatchError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -96,7 +94,14 @@ export function StudentDetail({ token, id }: { token: string; id: string }) {
 
   const join = () =>
     batchAction("join", () => enrol(token, id, joining), ({ enrolment }) => {
-      const joined: StudentBatch = { id: enrolment.batch.id, name: enrolment.batch.name, enrolmentId: enrolment.id, since: enrolment.startDate };
+      const joined: StudentBatch = {
+        id: enrolment.batch.id,
+        name: enrolment.batch.name,
+        enrolmentId: enrolment.id,
+        since: enrolment.startDate,
+        feePlan: activeBatches.find((b) => b.id === enrolment.batch.id)?.feePlan ?? null,
+        discountPaise: enrolment.discountPaise,
+      };
       setStudent((current) => current && { ...current, batches: [...current.batches, joined] });
       setJoining("");
       setNotice(fill(t.added, { batch: joined.name }));
@@ -143,21 +148,19 @@ export function StudentDetail({ token, id }: { token: string; id: string }) {
         ) : (
           <List disablePadding>
             {student.batches.map((batch) => (
-              <ListItem key={batch.id} disableGutters divider sx={{ gap: 2, justifyContent: "space-between" }}>
-                <Box>
-                  <Typography sx={{ fontWeight: 600 }}>{batch.name}</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {fill(t.since, { date: showDate(batch.since) })}
-                  </Typography>
-                </Box>
-                <Button
-                  aria-label={fill(t.removeName, { batch: batch.name })}
-                  loading={busy === batch.enrolmentId}
-                  onClick={() => leaveBatch(batch)}
-                >
-                  {t.remove}
-                </Button>
-              </ListItem>
+              <EnrolledBatch
+                key={batch.id}
+                token={token}
+                batch={batch}
+                removing={busy === batch.enrolmentId}
+                onRemove={() => leaveBatch(batch)}
+                onDiscountSaved={(discountPaise) =>
+                  setStudent(
+                    (current) =>
+                      current && { ...current, batches: current.batches.map((b) => (b.id === batch.id ? { ...b, discountPaise } : b)) },
+                  )
+                }
+              />
             ))}
           </List>
         )}

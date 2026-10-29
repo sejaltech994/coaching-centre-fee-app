@@ -1,5 +1,5 @@
 /** Typed client for the Chukta API (apps/api). See the TSD's API section. */
-import type { BatchInput, CentreType, Weekday } from "@chukta/shared";
+import type { BatchInput, CentreType, FeeCycle, FeePlanInput, Weekday } from "@chukta/shared";
 
 export type Me = {
   user: {
@@ -59,11 +59,22 @@ export type Batch = {
   startTime: string;
   endTime: string;
   isActive: boolean;
+  feePlan: FeePlan | null;
   createdAt: string;
 };
 
-/** A batch a student is in now. */
-export type StudentBatch = { id: string; name: string; enrolmentId: string; since: string };
+/** What a batch's students are billed, and when; money in paise. */
+export type FeePlan = FeePlanInput & { id: string; cycle: FeeCycle; isActive: boolean };
+
+/** A batch a student is in now, with the plan they're billed on and their discount. */
+export type StudentBatch = {
+  id: string;
+  name: string;
+  enrolmentId: string;
+  since: string;
+  feePlan: FeePlan | null;
+  discountPaise: number;
+};
 
 export type StudentSummary = {
   id: string;
@@ -75,7 +86,13 @@ export type StudentSummary = {
   batches: StudentBatch[];
 };
 
-export type Enrolment = { id: string; batch: { id: string; name: string }; startDate: string; endDate: string | null };
+export type Enrolment = {
+  id: string;
+  batch: { id: string; name: string };
+  startDate: string;
+  endDate: string | null;
+  discountPaise: number;
+};
 
 /** A student with every batch they've been in. */
 export type StudentDetail = StudentSummary & { enrolments: Enrolment[] };
@@ -200,10 +217,13 @@ export const listBatches = (token: string, { status }: { status: "active" | "arc
 export const getBatch = async (token: string, id: string) =>
   (await call<{ batch: Batch }>(`/batches/${encodeURIComponent(id)}`, { token })).batch;
 
-export const createBatch = async (token: string, input: BatchInput) =>
+/** A batch as saved: its schedule and the fee plan its students are billed on. */
+export type BatchSave = BatchInput & { feePlanId: string | null };
+
+export const createBatch = async (token: string, input: BatchSave) =>
   (await call<{ batch: Batch }>("/batches", { method: "POST", body: input, token })).batch;
 
-export const updateBatch = async (token: string, id: string, changes: Partial<BatchInput> & { isActive?: boolean }) =>
+export const updateBatch = async (token: string, id: string, changes: Partial<BatchSave> & { isActive?: boolean }) =>
   (await call<{ batch: Batch }>(`/batches/${id}`, { method: "PATCH", body: changes, token })).batch;
 
 /** The API archives rather than deletes. */
@@ -231,3 +251,20 @@ export const enrol = (token: string, studentId: string, batchId: string) =>
 /** Takes a student out of a batch on `endDate` (YYYY-MM-DD). */
 export const endEnrolment = (token: string, id: string, endDate: string) =>
   call<{ enrolment: Enrolment }>(`/enrolments/${encodeURIComponent(id)}`, { method: "PATCH", body: { endDate }, token });
+
+export const listFeePlans = (token: string, { status }: { status: "active" | "all" }) =>
+  call<{ feePlans: FeePlan[] }>(`/fee-plans?status=${status}`, { token });
+
+export const createFeePlan = (token: string, input: FeePlanInput) =>
+  call<{ feePlan: FeePlan }>("/fee-plans", { method: "POST", body: input, token });
+
+export const updateFeePlan = (token: string, id: string, changes: Partial<FeePlanInput> & { isActive?: boolean }) =>
+  call<{ feePlan: FeePlan }>(`/fee-plans/${encodeURIComponent(id)}`, { method: "PATCH", body: changes, token });
+
+/** A student's discount on one batch's fee, in paise. */
+export const setDiscount = (token: string, enrolmentId: string, discountPaise: number) =>
+  call<{ enrolment: Enrolment }>(`/enrolments/${encodeURIComponent(enrolmentId)}`, {
+    method: "PATCH",
+    body: { discountPaise },
+    token,
+  });

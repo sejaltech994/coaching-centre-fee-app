@@ -7,7 +7,7 @@ import { AppShell } from "@/components/app/AppShell";
 import app from "@/components/app/app.module.css";
 import { BatchForm } from "@/components/batches/BatchForm";
 import styles from "@/components/batches/batches.module.css";
-import { archiveBatch, getBatch, updateBatch, type Batch } from "@/lib/api";
+import { archiveBatch, getBatch, listFeePlans, updateBatch, type Batch, type FeePlan } from "@/lib/api";
 import { useSession } from "@/lib/useSession";
 
 /**
@@ -20,6 +20,12 @@ function EditBatch() {
   const { token, centre } = useSession();
   const [batch, setBatch] = useState<Batch | null>(null);
   const [missing, setMissing] = useState(!id);
+  const [feePlans, setFeePlans] = useState<FeePlan[]>([]);
+
+  useEffect(() => {
+    if (!token) return;
+    listFeePlans(token, { status: "active" }).then(({ feePlans: plans }) => setFeePlans(plans), () => undefined);
+  }, [token]);
 
   useEffect(() => {
     if (!token || !id) return;
@@ -60,7 +66,11 @@ function EditBatch() {
         ) : (
           <>
             <BatchForm
-              initial={batch}
+              initial={{ ...batch, feePlanId: batch.feePlan?.id ?? null }}
+              // The batch's own plan stays pickable even if it has since been archived.
+              feePlans={
+                batch.feePlan && !feePlans.some((plan) => plan.id === batch.feePlan!.id) ? [batch.feePlan, ...feePlans] : feePlans
+              }
               submitLabel="Save changes"
               onSave={async (input) => {
                 await updateBatch(token!, batch.id, input);

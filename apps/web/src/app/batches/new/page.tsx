@@ -2,17 +2,24 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import app from "@/components/app/app.module.css";
 import { BatchForm } from "@/components/batches/BatchForm";
 import styles from "@/components/batches/batches.module.css";
-import { createBatch } from "@/lib/api";
+import { createBatch, listFeePlans, type FeePlan } from "@/lib/api";
 import { useSession } from "@/lib/useSession";
 
 /** Mobile 3 · New batch, from the Batches design canvas. */
 export default function NewBatchPage() {
   const router = useRouter();
   const { token, centre } = useSession();
+  const [feePlans, setFeePlans] = useState<FeePlan[]>([]);
+
+  useEffect(() => {
+    if (!token) return;
+    listFeePlans(token, { status: "active" }).then(({ feePlans: plans }) => setFeePlans(plans), () => undefined);
+  }, [token]);
 
   return (
     <AppShell current="batches" centre={centre}>
@@ -26,6 +33,7 @@ export default function NewBatchPage() {
           <h1 className={styles.formTitle}>New batch</h1>
         </header>
         <BatchForm
+          feePlans={feePlans}
           submitLabel="Create batch"
           onSave={async (input) => {
             if (!token) return;

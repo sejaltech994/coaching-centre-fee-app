@@ -1,12 +1,13 @@
-import { batches, withCentre, type Batch } from "@chukta/db";
+import { batches, enrolments, feePlans, withCentre, type Batch, type FeePlan, type Tx } from "@chukta/db";
 import { validateBatch } from "@chukta/shared";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv, Deps } from "../../deps";
 import { ApiError, invalidFields, invalidRequest, isUniqueViolation } from "../../lib/errors";
 import { readJson } from "../../lib/request";
 import { requireAuth } from "../../middleware/auth";
+import { feePlanDto, findActivePlan } from "../fee-plans/routes";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -16,8 +17,10 @@ const nameTaken = (name: string) => {
   return new ApiError(409, "batch_name_taken", message, { extra: { fields: { name: message } } });
 };
 
-/** The API's view of a batch. */
-function toDto(row: Batch) {
+const pickPlan = () => invalidFields({ feePlanId: "Pick one of your fee plans." });
+
+/** The API's view of a batch, with the fee plan its students are billed on. */
+function toDto(row: Batch, plan: FeePlan | null) {
   return {
     id: row.id,
     name: row.name,
@@ -26,8 +29,25 @@ function toDto(row: Batch) {
     startTime: row.startTime.slice(0, 5),
     endTime: row.endTime.slice(0, 5),
     isActive: row.isActive,
+    feePlan: plan && feePlanDto(plan),
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+/** Batches with their fee plans (left join: a batch may have none). */
+const withPlans = (tx: Tx) =>
+  tx.select({ batch: batches, plan: feePlans }).from(batches).leftJoin(feePlans, eq(feePlans.id, batches.feePlanId));
+const rowDto = ({ batch, plan }: { batch: Batch; plan: FeePlan | null }) => toDto(batch, plan);
+
+/**
+ * Resolves a feePlanId from a request: undefined leaves it alone, null clears it,
+ * anything else must be one of the centre's active plans.
+ */
+async function resolvePlan(tx: Tx, centreId: string, feePlanId: unknown): Promise<FeePlan | null | undefined> {
+  if (feePlanId === undefined || feePlanId === null) return feePlanId;
+  const plan = typeof feePlanId === "string" ? await findActivePlan(tx, centreId, feePlanId) : null;
+  if (!plan) throw pickPlan();
+  return plan;
 }
 
 const listQuery = z.object({
@@ -48,8 +68,11 @@ function decodeCursor(cursor: string) {
   }
 }
 
+const createBody = z.object({ feePlanId: z.unknown() }).partial().loose();
+
 const patchBody = z
   .object({
+    feePlanId: z.unknown(),
     name: z.unknown(),
     subject: z.unknown(),
     days: z.unknown(),
@@ -86,9 +109,7 @@ export function batchRoutes(deps: Deps) {
     const { centreId } = c.var.auth;
 
     const rows = await inCentre(centreId, (tx) =>
-      tx
-        .select()
-        .from(batches)
+      withPlans(tx)
         .where(
           and(
             eq(batches.centreId, centreId),
@@ -102,38 +123,42 @@ export function batchRoutes(deps: Deps) {
 
     const page = rows.slice(0, limit);
     return c.json({
-      batches: page.map(toDto),
-      nextCursor: rows.length > limit ? encodeCursor(page.at(-1)!) : null,
+      batches: page.map(rowDto),
+      nextCursor: rows.length > limit ? encodeCursor(page.at(-1)!.batch) : null,
     });
   });
 
   routes.post("/", async (c) => {
-    const checked = validateBatch(await readJson(c, z.unknown()));
+    const body = await readJson(c, createBody);
+    const checked = validateBatch(body);
     if (!checked.ok) throw invalidFields(checked.fields);
     const { centreId } = c.var.auth;
 
-    const [row] = await inCentre(
+    const batch = await inCentre(
       centreId,
-      (tx) =>
-        tx
+      async (tx) => {
+        const plan = (await resolvePlan(tx, centreId, body.feePlanId)) ?? null;
+        const [row] = await tx
           .insert(batches)
-          .values({ ...checked.value, centreId, createdAt: deps.now() })
-          .returning(),
+          .values({ ...checked.value, centreId, feePlanId: plan?.id ?? null, createdAt: deps.now() })
+          .returning();
+        return toDto(row!, plan);
+      },
       checked.value.name,
     );
-    return c.json({ batch: toDto(row!) }, 201);
+    return c.json({ batch }, 201);
   });
 
   /** Loads one of the caller's batches by id, or 404. */
   const findBatch = async (centreId: string, id: string) => {
     if (!UUID.test(id)) throw notFound();
-    const [row] = await inCentre(centreId, (tx) => tx.select().from(batches).where(byId(centreId, id)));
+    const [row] = await inCentre(centreId, (tx) => withPlans(tx).where(byId(centreId, id)));
     if (!row) throw notFound();
     return row;
   };
 
   routes.get("/:id", async (c) => {
-    return c.json({ batch: toDto(await findBatch(c.var.auth.centreId, c.req.param("id"))) });
+    return c.json({ batch: rowDto(await findBatch(c.var.auth.centreId, c.req.param("id"))) });
   });
 
   // Read, check and write in ONE transaction: fewer database round trips, and the
@@ -142,7 +167,7 @@ export function batchRoutes(deps: Deps) {
     const { centreId } = c.var.auth;
     const id = c.req.param("id");
     if (!UUID.test(id)) throw notFound();
-    const { isActive, ...scheduleChanges } = await readJson(c, patchBody);
+    const { isActive, feePlanId, ...scheduleChanges } = await readJson(c, patchBody);
     let newName: string | undefined;
 
     const row = await inCentre(
@@ -151,19 +176,31 @@ export function batchRoutes(deps: Deps) {
         const [current] = await tx.select().from(batches).where(byId(centreId, id)).for("update");
         if (!current) throw notFound();
         // Validate the batch as it will be after the change, not just the changed fields.
-        const checked = validateBatch({ ...toDto(current), ...scheduleChanges });
+        const checked = validateBatch({ ...toDto(current, null), ...scheduleChanges });
         if (!checked.ok) throw invalidFields(checked.fields);
         newName = checked.value.name;
-        const [updated] = await tx
+        const plan = await resolvePlan(tx, centreId, feePlanId);
+        await tx
           .update(batches)
-          .set({ ...checked.value, ...(isActive !== undefined && { isActive }) })
-          .where(byId(centreId, id))
-          .returning();
-        return updated!;
+          .set({
+            ...checked.value,
+            ...(isActive !== undefined && { isActive }),
+            ...(plan !== undefined && { feePlanId: plan?.id ?? null }),
+          })
+          .where(byId(centreId, id));
+        // The batch's current students move to its new plan; TSD: from their next billing cycle.
+        if (plan !== undefined) {
+          await tx
+            .update(enrolments)
+            .set({ feePlanId: plan?.id ?? null })
+            .where(and(eq(enrolments.batchId, id), isNull(enrolments.endDate)));
+        }
+        const [shown] = await withPlans(tx).where(byId(centreId, id));
+        return rowDto(shown!);
       },
       () => newName,
     );
-    return c.json({ batch: toDto(row) });
+    return c.json({ batch: row });
   });
 
   // TSD: DELETE archives. History (enrolments, invoices) keeps pointing at the batch.
@@ -171,11 +208,14 @@ export function batchRoutes(deps: Deps) {
     const { centreId } = c.var.auth;
     const id = c.req.param("id");
     if (!UUID.test(id)) throw notFound();
-    const [row] = await inCentre(centreId, (tx) =>
-      tx.update(batches).set({ isActive: false }).where(byId(centreId, id)).returning(),
-    );
+    const row = await inCentre(centreId, async (tx) => {
+      const archived = await tx.update(batches).set({ isActive: false }).where(byId(centreId, id)).returning();
+      if (archived.length === 0) return null;
+      const [shown] = await withPlans(tx).where(byId(centreId, id));
+      return rowDto(shown!);
+    });
     if (!row) throw notFound();
-    return c.json({ batch: toDto(row) });
+    return c.json({ batch: row });
   });
 
   return routes;

@@ -23,3 +23,12 @@ export {
   type ProfileValidation,
 } from "./profile";
 export { validateStudent, type StudentInput } from "./student";
+export {
+  describeFeePlan,
+  FEE_CYCLES,
+  formatRupees,
+  rupeesToPaise,
+  validateFeePlan,
+  type FeeCycle,
+  type FeePlanInput,
+} from "./fee-plan";

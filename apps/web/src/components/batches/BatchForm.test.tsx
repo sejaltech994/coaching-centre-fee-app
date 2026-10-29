@@ -1,7 +1,19 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import type { FeePlan } from "@/lib/api";
 import { BatchForm } from "./BatchForm";
+
+const MONTHLY: FeePlan = {
+  id: "p1",
+  name: "Class 10 monthly",
+  amountPaise: 250000,
+  cycle: "monthly",
+  dueDay: 5,
+  lateFeePaise: null,
+  lateFeeAfterDays: null,
+  isActive: true,
+};
 
 function setup(props: Partial<Parameters<typeof BatchForm>[0]> = {}) {
   const onSave = vi.fn().mockResolvedValue(undefined);
@@ -50,7 +62,25 @@ describe("BatchForm", () => {
       days: ["mon", "fri"],
       startTime: "16:00",
       endTime: "17:30",
+      feePlanId: null,
     });
+  });
+
+  it("bills the batch's students on the fee plan picked", async () => {
+    const { user, onSave } = setup({ feePlans: [MONTHLY] });
+    const plan = screen.getByLabelText("Fee plan");
+    expect([...(plan as HTMLSelectElement).options].map((o) => o.text)).toEqual([
+      "No fee plan yet",
+      "Class 10 monthly — Monthly · ₹2,500 · due on the 5th",
+    ]);
+    expect(plan).toHaveAccessibleDescription("Students added here are billed on this plan. You can give a discount per student.");
+    expect(screen.getByRole("link", { name: "Manage fee plans" })).toHaveAttribute("href", "/fee-plans");
+
+    await fill(user, { name: "Class 10 Maths", days: ["Monday"] });
+    await user.selectOptions(plan, "p1");
+    await user.click(screen.getByRole("button", { name: "Create batch" }));
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ feePlanId: "p1" }));
   });
 
   it.each([
@@ -70,8 +100,11 @@ describe("BatchForm", () => {
   it("starts from the batch being edited", () => {
     setup({
       submitLabel: "Save changes",
-      initial: { name: "Class 8 Science", subject: null, days: ["tue", "thu"], startTime: "16:00", endTime: "17:00" },
+      initial: { name: "Class 8 Science", subject: null, days: ["tue", "thu"], startTime: "16:00", endTime: "17:00", feePlanId: "p1" },
+      feePlans: [MONTHLY],
     });
+
+    expect(screen.getByLabelText("Fee plan")).toHaveValue("p1");
 
     expect(screen.getByLabelText("Batch name")).toHaveValue("Class 8 Science");
     expect(day("Tuesday")).toHaveAttribute("aria-pressed", "true");

@@ -21,6 +21,7 @@ const batch = (over: Partial<Batch> = {}): Batch => ({
   startTime: "16:00",
   endTime: "17:30",
   isActive: true,
+  feePlan: null,
   createdAt: "2026-11-02T04:30:00.000Z",
   ...over,
 });
@@ -56,6 +57,16 @@ describe("/batches", () => {
     expect(cells.getByText("Mathematics")).toBeVisible();
     expect(cells.getByText("Mon · Wed · Fri")).toBeVisible();
     expect(cells.getByText("4:00–5:30 pm")).toBeVisible();
+  });
+
+  it("shows each batch's fee plan, and links to the fee plans", async () => {
+    const feePlan = { id: "p1", name: "Monthly", amountPaise: 250000, cycle: "monthly" as const, dueDay: 5, lateFeePaise: null, lateFeeAfterDays: null, isActive: true };
+    vi.mocked(listBatches).mockResolvedValueOnce({ batches: [batch({ feePlan })], nextCursor: null });
+    render(<BatchesPage />);
+
+    await screen.findByRole("link", { name: "Class 10 Maths" });
+    expect(within(row("Class 10 Maths")).getByText("Monthly · ₹2,500 · due on the 5th")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Fee plans" })).toHaveAttribute("href", "/fee-plans");
   });
 
   it("switches between active and archived batches, with counts", async () => {

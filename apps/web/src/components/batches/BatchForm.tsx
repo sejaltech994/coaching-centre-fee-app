@@ -1,7 +1,10 @@
 "use client";
 
-import { validateBatch, WEEKDAYS, type BatchInput, type Weekday } from "@chukta/shared";
+import { describeFeePlan, validateBatch, WEEKDAYS, type Weekday } from "@chukta/shared";
+import Link from "next/link";
 import { useState, type FormEvent } from "react";
+import type { BatchSave, FeePlan } from "@/lib/api";
+import { copy } from "@/lib/copy";
 import app from "../app/app.module.css";
 import styles from "./batches.module.css";
 
@@ -20,18 +23,22 @@ const FIELD_ORDER = ["name", "subject", "days", "startTime", "endTime"];
 
 type Props = {
   /** The batch being edited; empty for a new one. */
-  initial?: BatchInput;
+  initial?: Partial<BatchSave>;
+  /** The centre's active fee plans, to pick from. */
+  feePlans?: FeePlan[];
   submitLabel: string;
-  onSave: (input: BatchInput) => Promise<void>;
+  onSave: (input: BatchSave) => Promise<void>;
 };
 
-/** The design's "New batch" form: name, optional subject, class days and timing. */
-export function BatchForm({ initial, submitLabel, onSave }: Props) {
+/** The design's "New batch" form: name, optional subject, class days, timing and fee plan. */
+export function BatchForm({ initial, feePlans = [], submitLabel, onSave }: Props) {
+  const t = copy.feePlans;
   const [name, setName] = useState(initial?.name ?? "");
   const [subject, setSubject] = useState(initial?.subject ?? "");
   const [days, setDays] = useState<Weekday[]>(initial?.days ?? []);
   const [startTime, setStartTime] = useState(initial?.startTime ?? "17:00");
   const [endTime, setEndTime] = useState(initial?.endTime ?? "18:30");
+  const [feePlanId, setFeePlanId] = useState(initial?.feePlanId ?? "");
   const [error, setError] = useState<{ field?: string; message: string } | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -49,7 +56,7 @@ export function BatchForm({ initial, submitLabel, onSave }: Props) {
     setError(null);
     setSaving(true);
     try {
-      await onSave(checked.value);
+      await onSave({ ...checked.value, feePlanId: feePlanId || null });
     } catch (err) {
       setError({ message: err instanceof Error ? err.message : "Something went wrong. Try again." });
     } finally {
@@ -135,6 +142,32 @@ export function BatchForm({ initial, submitLabel, onSave }: Props) {
             aria-invalid={invalid("endTime")}
           />
         </div>
+      </div>
+
+      <div className={styles.field}>
+        <label htmlFor="batch-fee-plan" className={styles.label}>
+          {t.picker}
+        </label>
+        <select
+          id="batch-fee-plan"
+          className={styles.input}
+          value={feePlanId}
+          onChange={(e) => setFeePlanId(e.target.value)}
+          aria-describedby="batch-fee-plan-hint"
+        >
+          <option value="">{t.pickerNone}</option>
+          {feePlans.map((plan) => (
+            <option key={plan.id} value={plan.id}>
+              {`${plan.name} — ${describeFeePlan(plan)}`}
+            </option>
+          ))}
+        </select>
+        <span id="batch-fee-plan-hint" className={styles.hint}>
+          {t.pickerHint}
+        </span>
+        <Link href="/fee-plans" className={styles.hintLink}>
+          {t.manage}
+        </Link>
       </div>
 
       {error && (

@@ -205,6 +205,47 @@ const centreIsolation = (name: string, centreId: AnyPgColumn) =>
     withCheck: sql`${centreId} = ${currentCentre}`,
   });
 
+/**
+ * A fee and when it falls due (TSD: fee plans): monthly or quarterly on a day of
+ * the month, or once. Money is in paise. Archived (is_active = false) rather
+ * than deleted, as batches and enrolments keep pointing at it.
+ */
+export const feePlans = pgTable(
+  "fee_plans",
+  {
+    id: id(),
+    centreId: uuid("centre_id")
+      .notNull()
+      .references(() => centres.id),
+    name: text("name").notNull(),
+    amountPaise: integer("amount_paise").notNull(),
+    cycle: text("cycle", { enum: ["monthly", "quarterly", "one_time"] }).notNull(),
+    // 1–28, so it exists in every month; none for a one-time fee.
+    dueDay: integer("due_day"),
+    lateFeePaise: integer("late_fee_paise"),
+    lateFeeAfterDays: integer("late_fee_after_days"),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("fee_plans_centre_id_idx").on(t.centreId),
+    check("fee_plans_name_check", sql`length(trim(${t.name})) > 0`),
+    check("fee_plans_amount_check", sql`${t.amountPaise} > 0`),
+    check("fee_plans_cycle_check", sql`${t.cycle} in ('monthly', 'quarterly', 'one_time')`),
+    check(
+      "fee_plans_due_day_check",
+      // "is not null" matters: a check that comes out NULL counts as passed.
+      sql`(${t.cycle} = 'one_time' and ${t.dueDay} is null) or (${t.cycle} <> 'one_time' and ${t.dueDay} is not null and ${t.dueDay} between 1 and 28)`,
+    ),
+    check(
+      "fee_plans_late_fee_check",
+      sql`(${t.lateFeePaise} is null and ${t.lateFeeAfterDays} is null) or (${t.lateFeePaise} is not null and ${t.lateFeeAfterDays} is not null and ${t.lateFeePaise} between 1 and ${t.amountPaise} and ${t.lateFeeAfterDays} between 1 and 60)`,
+    ),
+    centreIsolation("fee_plans_centre_isolation", t.centreId),
+  ],
+).enableRLS();
+
 /** A class group with a weekly schedule. Archived (is_active = false) rather than deleted. */
 export const batches = pgTable(
   "batches",
@@ -220,6 +261,8 @@ export const batches = pgTable(
     startTime: time("start_time").notNull(),
     endTime: time("end_time").notNull(),
     isActive: boolean("is_active").notNull().default(true),
+    // Students who join the batch are billed on this plan.
+    feePlanId: uuid("fee_plan_id").references(() => feePlans.id),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -270,8 +313,8 @@ export const students = pgTable(
 ).enableRLS();
 
 /**
- * A student in a batch from start_date until end_date (open while null). The fee
- * plan and discount arrive with fee plans; fee_plan_id gets its foreign key then.
+ * A student in a batch from start_date until end_date (open while null), billed
+ * on fee_plan_id (the batch's plan when they joined) less discount_paise.
  */
 export const enrolments = pgTable(
   "enrolments",
@@ -286,7 +329,7 @@ export const enrolments = pgTable(
     batchId: uuid("batch_id")
       .notNull()
       .references(() => batches.id),
-    feePlanId: uuid("fee_plan_id"),
+    feePlanId: uuid("fee_plan_id").references(() => feePlans.id),
     startDate: date("start_date").notNull(),
     endDate: date("end_date"),
     discountPaise: integer("discount_paise").notNull().default(0),
@@ -314,3 +357,4 @@ export type RefreshToken = typeof refreshTokens.$inferSelect;
 export type Batch = typeof batches.$inferSelect;
 export type Student = typeof students.$inferSelect;
 export type Enrolment = typeof enrolments.$inferSelect;
+export type FeePlan = typeof feePlans.$inferSelect;
