@@ -22,3 +22,4 @@ export {
   type ProfileInput,
   type ProfileValidation,
 } from "./profile";
+export { validateStudent, type StudentInput } from "./student";

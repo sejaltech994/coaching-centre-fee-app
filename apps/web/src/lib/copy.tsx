@@ -40,6 +40,10 @@ export function errorMessage(err: unknown): string {
       return e.smsUnavailable;
     case "phone_taken":
       return e.phoneTaken;
+    case "already_enrolled":
+      return e.alreadyEnrolled;
+    case "student_left":
+      return e.studentLeft;
     case "google_in_use":
       return e.googleInUse;
     case "email_in_use":

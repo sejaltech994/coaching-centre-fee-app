@@ -50,6 +50,13 @@
       "when": 1793192058041,
       "tag": "0006_otp_owner",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793248325471,
+      "tag": "0007_students",
+      "breakpoints": true
     }
   ]
 }
