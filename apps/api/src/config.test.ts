@@ -17,6 +17,7 @@ describe("loadConfig", () => {
       cookieSecure: false,
       trustProxyHeaders: false,
       google: null,
+      razorpay: "razorpay",
     });
   });
 
@@ -91,6 +92,18 @@ describe("loadConfig", () => {
 
     it("refuses an unknown provider", () => {
       expect(() => loadConfig({ ...valid, GOOGLE_PROVIDER: "yahoo" })).toThrow("GOOGLE_PROVIDER");
+    });
+  });
+
+  describe("Razorpay", () => {
+    it("calls the real Razorpay, with each centre's own keys, unless told to fake it", () => {
+      expect(loadConfig(valid).razorpay).toBe("razorpay");
+      expect(loadConfig({ ...valid, RAZORPAY_PROVIDER: "fake" }).razorpay).toBe("fake");
+    });
+
+    it("never fakes payments in production, and refuses unknown providers", () => {
+      expect(() => loadConfig({ ...valid, NODE_ENV: "production", RAZORPAY_PROVIDER: "fake" })).toThrow("RAZORPAY_PROVIDER=fake");
+      expect(() => loadConfig({ ...valid, RAZORPAY_PROVIDER: "paypal" })).toThrow("RAZORPAY_PROVIDER");
     });
   });
 });

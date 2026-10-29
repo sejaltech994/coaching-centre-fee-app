@@ -5,6 +5,7 @@ import {
   date,
   index,
   integer,
+  jsonb,
   pgPolicy,
   pgRole,
   pgTable,
@@ -381,6 +382,11 @@ export const paymentSettings = pgTable(
       .references(() => centres.id),
     upiId: text("upi_id"),
     payeeName: text("payee_name"),
+    // The centre's own Razorpay account (optional). The secrets are stored only
+    // encrypted (AES-GCM, see apps/api lib/secrets); the key id is not secret.
+    razorpayKeyId: text("razorpay_key_id"),
+    razorpayKeySecret: text("razorpay_key_secret"),
+    razorpayWebhookSecret: text("razorpay_webhook_secret"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -440,6 +446,49 @@ export const receipts = pgTable(
   ],
 ).enableRLS();
 
+/** A Razorpay Payment Link made for a bill on the centre's own account; reused until it expires. */
+export const paymentLinks = pgTable(
+  "payment_links",
+  {
+    id: id(),
+    centreId: uuid("centre_id")
+      .notNull()
+      .references(() => centres.id),
+    invoiceId: uuid("invoice_id")
+      .notNull()
+      .references(() => invoices.id),
+    gateway: text("gateway", { enum: ["razorpay"] }).notNull().default("razorpay"),
+    gatewayLinkId: text("gateway_link_id").notNull().unique(),
+    shortUrl: text("short_url").notNull(),
+    // The amount it asks for: a late fee added later needs a new link.
+    amountPaise: integer("amount_paise").notNull(),
+    status: text("status").notNull().default("created"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("payment_links_invoice_idx").on(t.invoiceId),
+    index("payment_links_centre_status_idx").on(t.centreId, t.status),
+    centreIsolation("payment_links_centre_isolation", t.centreId),
+  ],
+).enableRLS();
+
+/** Every webhook received, once per (source, event id): an audit log that makes repeats harmless (TSD). */
+export const webhookEvents = pgTable(
+  "webhook_events",
+  {
+    id: id(),
+    source: text("source").notNull(),
+    eventId: text("event_id").notNull(),
+    centreId: uuid("centre_id").references(() => centres.id),
+    payload: jsonb("payload").notNull(),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("webhook_events_source_event_unique").on(t.source, t.eventId)],
+);
+
 export type Centre = typeof centres.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Consent = typeof consents.$inferSelect;
@@ -452,4 +501,5 @@ export type FeePlan = typeof feePlans.$inferSelect;
 export type Invoice = typeof invoices.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
 export type Receipt = typeof receipts.$inferSelect;
+export type PaymentLink = typeof paymentLinks.$inferSelect;
 export type PaymentSettings = typeof paymentSettings.$inferSelect;

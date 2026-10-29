@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiRequestError, getPublicInvoice, type PublicInvoice } from "@/lib/api";
+import { ApiRequestError, getPublicInvoice, startCheckout, type PublicInvoice } from "@/lib/api";
+import { navigate } from "@/lib/navigate";
 import PayPage from "./page";
 
 let search = new URLSearchParams({ t: "a".repeat(32) });
@@ -8,7 +9,9 @@ vi.mock("next/navigation", () => ({ useSearchParams: () => search }));
 vi.mock("@/lib/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api")>()),
   getPublicInvoice: vi.fn(),
+  startCheckout: vi.fn(),
 }));
+vi.mock("@/lib/navigate", () => ({ navigate: vi.fn() }));
 
 const due: PublicInvoice = {
   centre: { name: "Sunrise Classes" },
@@ -25,6 +28,7 @@ const due: PublicInvoice = {
   },
   upi: { upiId: "sunrise@okicici", payeeName: "Sunrise Classes", link: "upi://pay?pa=sunrise%40okicici&am=2600.00" },
   receiptUrl: null,
+  card: false,
 };
 
 beforeEach(() => {
@@ -82,5 +86,18 @@ describe("/pay", () => {
     render(<PayPage />);
     expect(await screen.findByRole("alert")).toHaveTextContent("This link isn't valid. Ask the centre for a new one.");
     expect(getPublicInvoice).not.toHaveBeenCalled();
+  });
+
+  it("sends the parent to the centre's own Razorpay checkout for cards and net banking", async () => {
+    vi.mocked(getPublicInvoice).mockResolvedValue({ ...due, card: true });
+    vi.mocked(startCheckout).mockResolvedValue({ url: "https://rzp.io/i/abc" });
+    const { default: userEvent } = await import("@testing-library/user-event");
+    const user = userEvent.setup();
+    render(<PayPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Pay by card, UPI or net banking" }));
+
+    expect(startCheckout).toHaveBeenCalledWith("a".repeat(32));
+    expect(navigate).toHaveBeenCalledWith("https://rzp.io/i/abc");
   });
 });

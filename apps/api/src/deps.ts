@@ -1,5 +1,5 @@
 import type { Database } from "@chukta/db";
-import type { GoogleSignIn } from "@chukta/integrations";
+import type { FakeGateway, GoogleSignIn, PaymentGateway } from "@chukta/integrations";
 import type { Config } from "./config";
 
 /** Everything the API needs from the outside world, injected so tests can control it. */
@@ -7,6 +7,8 @@ export type Deps = {
   db: Database;
   /** Google sign-in, or null when it isn't configured for this environment. */
   google: GoogleSignIn | null;
+  /** Payments on each centre's own Razorpay account; the fake one has a checkout of its own. */
+  gateway: PaymentGateway | FakeGateway;
   now: () => Date;
   config: Config;
 };

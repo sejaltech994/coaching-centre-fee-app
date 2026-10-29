@@ -8,6 +8,7 @@ import { batchRoutes } from "./modules/batches/routes";
 import { centreRoutes } from "./modules/centre/routes";
 import { feePlanRoutes } from "./modules/fee-plans/routes";
 import { invoiceRoutes } from "./modules/invoices/routes";
+import { fakeCheckoutRoutes, razorpaySettingsRoutes, razorpayWebhookRoutes } from "./modules/payments/razorpay";
 import { paymentSettingsRoutes } from "./modules/payments/routes";
 import { publicRoutes } from "./modules/public/routes";
 import { receiptRoutes } from "./modules/receipts/routes";
@@ -43,6 +44,7 @@ export function createApp(deps: Deps) {
   app.route("/auth", authRoutes(deps));
   app.route("/me", meRoutes(deps));
   app.route("/centre/payment-settings", paymentSettingsRoutes(deps));
+  app.route("/centre/razorpay", razorpaySettingsRoutes(deps));
   app.route("/centre", centreRoutes(deps));
   app.route("/batches", batchRoutes(deps));
   app.route("/fee-plans", feePlanRoutes(deps));
@@ -52,6 +54,10 @@ export function createApp(deps: Deps) {
   app.route("/receipts", receiptRoutes(deps));
   // No sign-in: a parent's pay link and receipt, keyed by the bill's secret token.
   app.route("/public", publicRoutes(deps));
+  // Signed by each centre's own Razorpay webhook secret.
+  app.route("/webhooks/razorpay", razorpayWebhookRoutes(deps));
+  // Only with RAZORPAY_PROVIDER=fake (never production): the test checkout.
+  app.route("/dev/fake-razorpay", fakeCheckoutRoutes(deps));
 
   app.notFound(notFound);
   app.onError(handleError);

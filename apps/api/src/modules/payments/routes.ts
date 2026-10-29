@@ -7,6 +7,7 @@ import type { AppEnv, Deps } from "../../deps";
 import { invalidFields } from "../../lib/errors";
 import { readJson } from "../../lib/request";
 import { requireAuth } from "../../middleware/auth";
+import { webhookUrl } from "./razorpay";
 
 const body = z.object({ upiId: z.unknown(), payeeName: z.unknown() }).partial();
 
@@ -20,7 +21,13 @@ export function paymentSettingsRoutes(deps: Deps) {
     const [row] = await withCentre(deps.db, centreId, (tx) =>
       tx.select().from(paymentSettings).where(eq(paymentSettings.centreId, centreId)),
     );
-    return c.json({ paymentSettings: { upiId: row?.upiId ?? null, payeeName: row?.payeeName ?? null } });
+    return c.json({
+      paymentSettings: {
+        upiId: row?.upiId ?? null,
+        payeeName: row?.payeeName ?? null,
+        razorpay: row?.razorpayKeyId ? { keyId: row.razorpayKeyId, webhookUrl: webhookUrl(deps, centreId) } : null,
+      },
+    });
   });
 
   routes.put("/", async (c) => {

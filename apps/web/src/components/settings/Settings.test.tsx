@@ -56,7 +56,7 @@ beforeEach(() => {
     identities: [{ provider: "google", email: "asha@example.com", lastUsedAt: "2026-10-28T10:00:00.000Z" }],
   });
   vi.mocked(updateMe).mockReset().mockResolvedValue({ user: { ...me.user, fullName: "Asha S. Sharma" } });
-  vi.mocked(getPaymentSettings).mockReset().mockResolvedValue({ paymentSettings: { upiId: "sunrise@okicici", payeeName: "Sunrise Classes" } });
+  vi.mocked(getPaymentSettings).mockReset().mockResolvedValue({ paymentSettings: { upiId: "sunrise@okicici", payeeName: "Sunrise Classes", razorpay: null } });
   vi.mocked(listSessions).mockReset().mockResolvedValue({ sessions: [thisPhone, laptop, tablet] });
   vi.mocked(signOutSession).mockReset().mockResolvedValue(undefined);
   vi.mocked(signOutOtherSessions).mockReset().mockResolvedValue({ signedOut: 2 });

@@ -138,6 +138,9 @@ export type PaymentInput = { method: "upi" | "cash" | "bank_transfer"; reference
 
 export type PaymentSettings = { upiId: string | null; payeeName: string | null };
 
+/** The centre's own Razorpay account, once connected: where to point its webhooks. */
+export type RazorpayAccount = { keyId: string; webhookUrl: string };
+
 /** A bill as its parent sees it from the pay link. */
 export type PublicInvoice = {
   centre: { name: string | null };
@@ -155,6 +158,8 @@ export type PublicInvoice = {
   /** The centre's own UPI, while the bill is unpaid and the centre has set it up. */
   upi: { upiId: string; payeeName: string; link: string } | null;
   receiptUrl: string | null;
+  /** Cards, net banking and UPI through the centre's own Razorpay account. */
+  card: boolean;
 };
 
 export type InvoiceFilters = {
@@ -379,7 +384,17 @@ export const recordPayment = (token: string, id: string, input: PaymentInput) =>
 export const receiptPdf = (token: string, id: string) =>
   call<Blob>(`/receipts/${encodeURIComponent(id)}/pdf`, { token, as: "blob" });
 
-export const getPaymentSettings = (token: string) => call<{ paymentSettings: PaymentSettings }>("/centre/payment-settings", { token });
+export const getPaymentSettings = (token: string) =>
+  call<{ paymentSettings: PaymentSettings & { razorpay: RazorpayAccount | null } }>("/centre/payment-settings", { token });
+
+export const connectRazorpay = (token: string, keys: { keyId: string; keySecret: string; webhookSecret: string }) =>
+  call<{ razorpay: RazorpayAccount }>("/centre/razorpay", { method: "PUT", body: keys, token });
+
+export const disconnectRazorpay = (token: string) => call<void>("/centre/razorpay", { method: "DELETE", token });
+
+/** The Razorpay checkout for a parent's bill, on the centre's own account. */
+export const startCheckout = (token: string) =>
+  call<{ url: string }>(`/public/invoices/${encodeURIComponent(token)}/checkout`, { method: "POST" });
 
 export const savePaymentSettings = (token: string, settings: PaymentSettings) =>
   call<{ paymentSettings: PaymentSettings }>("/centre/payment-settings", { method: "PUT", body: settings, token });

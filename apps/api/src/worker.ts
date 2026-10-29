@@ -5,6 +5,7 @@
 import { createDb, type DbHandle } from "@chukta/db";
 import { createApp } from "./app";
 import { loadConfig, type Config } from "./config";
+import { gatewayFromConfig } from "./gateway";
 import { googleFromConfig } from "./google";
 import { runScheduledJobs } from "./jobs";
 
@@ -57,6 +58,7 @@ export function createWorker(makeDb: (url: string) => DbHandle = (url) => create
         const app = createApp({
           db: handle.db,
           google: googleFromConfig(config.google),
+          gateway: gatewayFromConfig(config, `${new URL(request.url).origin}/api/v1`),
           now: () => new Date(),
           config,
         });
@@ -72,7 +74,7 @@ export function createWorker(makeDb: (url: string) => DbHandle = (url) => create
       if (!config) return;
       const handle = makeDb(config.databaseUrl);
       try {
-        await runScheduledJobs({ db: handle.db, google: null, now: () => new Date(), config });
+        await runScheduledJobs({ db: handle.db, google: null, gateway: gatewayFromConfig(config, ""), now: () => new Date(), config });
       } finally {
         ctx.waitUntil(handle.close());
       }

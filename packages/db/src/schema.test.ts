@@ -99,6 +99,9 @@ describe("migrations", () => {
     ["payments.recorded_by", "users", "set null"],
     ["receipts.centre_id", "centres", "no action"],
     ["receipts.payment_id", "payments", "no action"],
+    ["payment_links.centre_id", "centres", "no action"],
+    ["payment_links.invoice_id", "invoices", "no action"],
+    ["webhook_events.centre_id", "centres", "no action"],
   ])("link %s to %s (on delete: %s)", (column, target, onDelete) => {
     const tables = Object.values(schema).filter((value) => value instanceof PgTable);
     const links = tables.flatMap((table) => {
@@ -111,7 +114,7 @@ describe("migrations", () => {
 
     expect(links).toContainEqual({ from: column, to: target, onDelete });
     // Every link in the schema is listed here, so a new one needs a row above.
-    expect(links).toHaveLength(23);
+    expect(links).toHaveLength(26);
   });
 
   it("keep refresh token hashes unique and delete them with their user", async () => {

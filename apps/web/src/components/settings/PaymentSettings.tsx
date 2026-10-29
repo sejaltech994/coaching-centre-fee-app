@@ -9,8 +9,9 @@ import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { useEffect, useId, useState, type FormEvent } from "react";
-import { ApiRequestError, getPaymentSettings, savePaymentSettings, type PaymentSettings as Settings } from "@/lib/api";
+import { ApiRequestError, getPaymentSettings, savePaymentSettings, type PaymentSettings as Settings, type RazorpayAccount } from "@/lib/api";
 import { copy, errorMessage, fill } from "@/lib/copy";
+import { RazorpayConnect } from "./RazorpayConnect";
 
 /**
  * Settings › Payments: the centre's own UPI ID. Each bill's pay link then opens
@@ -20,6 +21,7 @@ export function PaymentSettings({ token, onSaved }: { token: string; onSaved: ()
   const t = copy.payments;
   const titleId = useId();
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [razorpay, setRazorpay] = useState<RazorpayAccount | null>(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ upiId: "", payeeName: "" });
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -28,7 +30,10 @@ export function PaymentSettings({ token, onSaved }: { token: string; onSaved: ()
 
   useEffect(() => {
     getPaymentSettings(token).then(
-      ({ paymentSettings }) => setSettings(paymentSettings),
+      ({ paymentSettings: { razorpay: account, ...upi } }) => {
+        setSettings(upi);
+        setRazorpay(account);
+      },
       (err: unknown) => setError(errorMessage(err)),
     );
   }, [token]);
@@ -112,6 +117,7 @@ export function PaymentSettings({ token, onSaved }: { token: string; onSaved: ()
           {error}
         </Alert>
       )}
+      {settings && <RazorpayConnect token={token} account={razorpay} onChange={setRazorpay} />}
     </Card>
   );
 }

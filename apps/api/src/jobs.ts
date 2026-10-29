@@ -2,6 +2,7 @@ import { centres, withCentre } from "@chukta/db";
 import type { Deps } from "./deps";
 import { localDate } from "./lib/dates";
 import { billEnrolments, markOverdue } from "./modules/invoices/billing";
+import { razorpayCentres, reconcileRazorpay } from "./modules/payments/razorpay";
 
 /**
  * The scheduled work (TSD: background jobs), run every hour by a Cron Trigger on
@@ -22,6 +23,15 @@ export async function runScheduledJobs(deps: Deps): Promise<{ centres: number; f
     } catch (err) {
       failed += 1;
       console.error(`Scheduled jobs failed for centre ${centre.id}:`, err);
+    }
+  }
+  // Payments a missed webhook didn't report (TSD: reconcile-payments).
+  for (const centreId of await razorpayCentres(deps)) {
+    try {
+      await reconcileRazorpay(deps, centreId);
+    } catch (err) {
+      failed += 1;
+      console.error(`Razorpay reconcile failed for centre ${centreId}:`, err);
     }
   }
   return { centres: all.length, failed };

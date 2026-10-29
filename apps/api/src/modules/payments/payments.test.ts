@@ -13,12 +13,12 @@ async function billed() {
 describe("GET and PUT /centre/payment-settings", () => {
   it("starts with no UPI ID, and saves the centre's own", async () => {
     const { json } = await owner();
-    expect(await json("GET", "/centre/payment-settings")).toEqual({ paymentSettings: { upiId: null, payeeName: null } });
+    expect(await json("GET", "/centre/payment-settings")).toEqual({ paymentSettings: { upiId: null, payeeName: null, razorpay: null } });
 
     expect(await json("PUT", "/centre/payment-settings", { upiId: " Sunrise@OKICICI ", payeeName: "Sunrise Classes" })).toEqual({
       paymentSettings: UPI,
     });
-    expect(await json("GET", "/centre/payment-settings")).toEqual({ paymentSettings: UPI });
+    expect(await json("GET", "/centre/payment-settings")).toEqual({ paymentSettings: { ...UPI, razorpay: null } });
 
     expect(await json("PUT", "/centre/payment-settings", { upiId: "", payeeName: "" })).toEqual({
       paymentSettings: { upiId: null, payeeName: null },
@@ -174,6 +174,7 @@ describe("the parent's pay link", () => {
         link: "upi://pay?pa=sunrise%40okicici&pn=Sunrise%20Classes&am=2500.00&cu=INR&tn=Bill%20%231%20Aarav%20Sharma",
       },
       receiptUrl: null,
+      card: false,
     });
   });
 

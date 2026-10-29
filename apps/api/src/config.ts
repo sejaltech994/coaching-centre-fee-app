@@ -12,6 +12,8 @@ export type Config = {
   trustProxyHeaders: boolean;
   /** Google sign-in: the environment's OAuth client, the fake chooser (never production), or off. */
   google: { provider: "google"; clientId: string; clientSecret: string } | { provider: "fake" } | null;
+  /** Payments on each centre's own Razorpay account, or the fake checkout (never production). */
+  razorpay: "razorpay" | "fake";
 };
 
 const ENVS = ["development", "test", "staging", "production"] as const;
@@ -29,6 +31,12 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
 
   const google = loadGoogle(env, nodeEnv);
 
+  const razorpay = env.RAZORPAY_PROVIDER ?? "razorpay";
+  if (razorpay !== "razorpay" && razorpay !== "fake") throw new Error(`RAZORPAY_PROVIDER "${razorpay}" is not supported`);
+  if (razorpay === "fake" && nodeEnv === "production") {
+    throw new Error("RAZORPAY_PROVIDER=fake marks bills paid without real money and is not allowed in production");
+  }
+
   return {
     env: nodeEnv,
     port: Number(env.PORT ?? 8787),
@@ -41,6 +49,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     cookieSecure: nodeEnv !== "development",
     trustProxyHeaders: env.TRUST_PROXY_HEADERS === "true",
     google,
+    razorpay,
   };
 }
 

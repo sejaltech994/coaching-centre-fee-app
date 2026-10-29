@@ -12,8 +12,9 @@ import Typography from "@mui/material/Typography";
 import { useSearchParams } from "next/navigation";
 import QRCode from "qrcode";
 import { Suspense, useEffect, useState } from "react";
-import { apiBaseUrl, getPublicInvoice, type PublicInvoice } from "@/lib/api";
+import { apiBaseUrl, getPublicInvoice, startCheckout, type PublicInvoice } from "@/lib/api";
 import { copy, errorMessage, fill } from "@/lib/copy";
+import { navigate } from "@/lib/navigate";
 
 const dayFormat = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 const showDate = (date: string) => dayFormat.format(new Date(`${date}T00:00:00Z`));
@@ -28,6 +29,30 @@ function UpiQr({ link, label }: { link: string; label: string }) {
     );
   }, [link]);
   return src ? <Box component="img" src={src} alt={label} sx={{ width: 200, height: 200 }} /> : null;
+}
+
+/** Cards, net banking and UPI on the centre's own Razorpay checkout. */
+function CardButton({ token }: { token: string }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function go() {
+    setBusy(true);
+    setError(null);
+    try {
+      navigate((await startCheckout(token)).url);
+    } catch (err) {
+      setError(errorMessage(err));
+      setBusy(false);
+    }
+  }
+  return (
+    <Stack spacing={1} sx={{ alignItems: "flex-start" }}>
+      <Button variant="outlined" size="large" onClick={go} loading={busy}>
+        {copy.pay.payByCard}
+      </Button>
+      {error && <Alert severity="error">{error}</Alert>}
+    </Stack>
+  );
 }
 
 function Bill({ data, token }: { data: PublicInvoice; token: string }) {
@@ -87,10 +112,10 @@ function Bill({ data, token }: { data: PublicInvoice; token: string }) {
           </Typography>
         </Stack>
       ) : (
-        (invoice.status === "pending" || invoice.status === "overdue") && (
-          <Typography>{fill(t.noUpi, { centre: centreName })}</Typography>
-        )
+        (invoice.status === "pending" || invoice.status === "overdue") &&
+        !data.card && <Typography>{fill(t.noUpi, { centre: centreName })}</Typography>
       )}
+      {data.card && <CardButton token={token} />}
 
       <Typography variant="caption" color="text.secondary">
         {t.footer}

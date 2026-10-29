@@ -2,6 +2,7 @@ import { createLocalDb, runMigrations } from "@chukta/db/local";
 import { serve } from "@hono/node-server";
 import { createApp } from "./app";
 import { loadConfig } from "./config";
+import { gatewayFromConfig } from "./gateway";
 import { googleFromConfig } from "./google";
 import { runScheduledJobs } from "./jobs";
 
@@ -11,7 +12,8 @@ const handle = createLocalDb(config.databaseUrl);
 // migrated by `npm run db:migrate` before a deploy.
 if (handle.kind === "pglite") await runMigrations(handle);
 
-const deps = { db: handle.db, google: googleFromConfig(config.google), now: () => new Date(), config };
+const gateway = gatewayFromConfig(config, `http://localhost:${config.port}/api/v1`);
+const deps = { db: handle.db, google: googleFromConfig(config.google), gateway, now: () => new Date(), config };
 const app = createApp(deps);
 
 // The hourly scheduled jobs, as the Workers' Cron Trigger runs them; also once at start.

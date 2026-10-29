@@ -2,6 +2,7 @@ import { createTestDb } from "@chukta/db/testing";
 import type { GoogleSignIn } from "@chukta/integrations";
 import { createApp } from "../app";
 import type { Config } from "../config";
+import { gatewayFromConfig } from "../gateway";
 import { googleFromConfig } from "../google";
 import { runScheduledJobs } from "../jobs";
 
@@ -15,6 +16,7 @@ export const testConfig: Config = {
   trustProxyHeaders: true,
   // Owners sign in only with Google; tests use the fake account chooser.
   google: { provider: "fake" },
+  razorpay: "fake",
 };
 
 /** The API wired to an in-memory Postgres, the fake Google and a clock the test controls. */
@@ -29,7 +31,8 @@ export async function createTestApp(config: Partial<Config> = {}, options: { goo
   };
   const fullConfig = { ...testConfig, ...config };
   const google = options.google ?? googleFromConfig(fullConfig.google);
-  const deps = { db, google, now: clock.now, config: fullConfig };
+  const gateway = gatewayFromConfig(fullConfig, "http://localhost:8787/api/v1");
+  const deps = { db, google, gateway, now: clock.now, config: fullConfig };
   const app = createApp(deps);
   /** Runs the hourly scheduled jobs now, at the test clock's time. */
   const runJobs = () => runScheduledJobs(deps);
@@ -105,7 +108,7 @@ export async function createTestApp(config: Partial<Config> = {}, options: { goo
     return { res, body: body as LoginBody, cookie: refreshCookie(res) };
   }
 
-  return { app, db, clock, call, startGoogle, googleLogin, login, runJobs };
+  return { app, db, clock, gateway, call, startGoogle, googleLogin, login, runJobs };
 }
 
 /** Tests assert on response bodies field by field, so they read them untyped. */

@@ -186,6 +186,8 @@ jobs:
           WEB_ORIGINS: ${{ env.WEB_URL }}
           # The API's own account chooser in place of Google (refused in production).
           GOOGLE_PROVIDER: fake
+          # A test checkout in place of each centre's Razorpay (refused in production).
+          RAZORPAY_PROVIDER: fake
         run: nohup npx tsx src/server.ts > /tmp/chukta-api.log 2>&1 &
 
       - name: Serve the web build

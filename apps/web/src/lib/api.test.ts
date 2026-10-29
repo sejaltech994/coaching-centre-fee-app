@@ -17,6 +17,9 @@ import {
   listInvoices,
   getPaymentSettings,
   getPublicInvoice,
+  connectRazorpay,
+  disconnectRazorpay,
+  startCheckout,
   recordPayment,
   receiptPdf,
   savePaymentSettings,
@@ -319,6 +322,23 @@ describe("API client", () => {
     await getPublicInvoice("abc");
     expect(fetchMock.mock.calls[0]![0]).toBe("http://localhost:8787/api/v1/public/invoices/abc");
     expect(new Headers(fetchMock.mock.calls[0]![1]!.headers).get("authorization")).toBeNull();
+  });
+
+  it("connects and disconnects Razorpay, and starts a parent's checkout without signing in", async () => {
+    reply(200, { razorpay: { keyId: "rzp_test_a", webhookUrl: "u" } });
+    reply(204);
+    reply(200, { url: "https://rzp.io/i/a" });
+
+    await connectRazorpay("t", { keyId: "rzp_test_a", keySecret: "s", webhookSecret: "w" });
+    await disconnectRazorpay("t");
+    await expect(startCheckout("abc")).resolves.toEqual({ url: "https://rzp.io/i/a" });
+
+    const sent = fetchMock.mock.calls.map(([url, init]) => [url, init!.method, init!.body && JSON.parse(init!.body as string)]);
+    expect(sent).toEqual([
+      ["http://localhost:8787/api/v1/centre/razorpay", "PUT", { keyId: "rzp_test_a", keySecret: "s", webhookSecret: "w" }],
+      ["http://localhost:8787/api/v1/centre/razorpay", "DELETE", undefined],
+      ["http://localhost:8787/api/v1/public/invoices/abc/checkout", "POST", undefined],
+    ]);
   });
 
   it("reads the centre with the access token", async () => {

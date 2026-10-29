@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { withCentre } from "./client";
-import { batches, centres, enrolments, invoices, payments, paymentSettings, receipts, students } from "./schema";
+import { batches, centres, enrolments, invoices, paymentLinks, payments, paymentSettings, receipts, students, webhookEvents } from "./schema";
 import { createTestDb, type TestDb } from "./testing";
 
 let db: TestDb;
@@ -96,5 +96,33 @@ describe("payments and receipts tables", () => {
     await withCentre(db, centreA, (tx) => tx.insert(payments).values(payment()));
     expect(await withCentre(db, centreB, (tx) => tx.select().from(payments))).toEqual([]);
     await expect(withCentre(db, centreB, (tx) => tx.insert(payments).values(payment()))).rejects.toThrow();
+  });
+});
+
+describe("the centre's own Razorpay account", () => {
+  it("keeps its keys beside the UPI ID, the secrets only ever encrypted", async () => {
+    const [row] = await withCentre(db, centreA, (tx) =>
+      tx
+        .insert(paymentSettings)
+        .values({ centreId: centreA, razorpayKeyId: "rzp_test_abc", razorpayKeySecret: "v1.iv.ct", razorpayWebhookSecret: "v1.iv.ct2" })
+        .returning(),
+    );
+    expect(row).toMatchObject({ upiId: null, razorpayKeyId: "rzp_test_abc" });
+  });
+
+  it("keeps one payment link per gateway link id, for a centre's own bills", async () => {
+    const link = { centreId: centreA, invoiceId, gatewayLinkId: "plink_1", shortUrl: "https://rzp.io/i/a", amountPaise: 250000 };
+    const [row] = await withCentre(db, centreA, (tx) => tx.insert(paymentLinks).values(link).returning());
+    expect(row).toMatchObject({ status: "created", expiresAt: null });
+    await expect(withCentre(db, centreA, (tx) => tx.insert(paymentLinks).values(link))).rejects.toThrow();
+    expect(await withCentre(db, centreB, (tx) => tx.select().from(paymentLinks))).toEqual([]);
+  });
+
+  it("stores each webhook event once, by its source and id", async () => {
+    const event = { source: "razorpay", eventId: "evt_1", centreId: centreA, payload: { event: "payment_link.paid" } };
+    const [row] = await db.insert(webhookEvents).values(event).returning();
+    expect(row).toMatchObject({ processedAt: null, payload: { event: "payment_link.paid" } });
+    await expect(db.insert(webhookEvents).values(event)).rejects.toThrow();
+    await expect(db.insert(webhookEvents).values({ ...event, source: "whatsapp" })).resolves.toBeDefined();
   });
 });
