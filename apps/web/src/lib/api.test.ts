@@ -6,11 +6,25 @@ import {
   createBatch,
   getCentre,
   listBatches,
+  getGooglePending,
+  getIdentities,
   logout,
   refreshSession,
-  requestOtp,
+  registerOwner,
   updateBatch,
-  verifyOtp,
+  confirmPhone,
+  createStudent,
+  endEnrolment,
+  enrol,
+  getStudent,
+  listStudents,
+  updateStudent,
+  listSessions,
+  signOutOtherSessions,
+  signOutSession,
+  sendPhoneCode,
+  updateCentre,
+  updateMe,
 } from "./api";
 
 const fetchMock = vi.fn<typeof fetch>();
@@ -44,15 +58,24 @@ describe("API client", () => {
     expect(apiBaseUrl()).toBe("https://api.example/api/v1");
   });
 
-  it("requests an OTP with the phone number, sending cookies", async () => {
-    reply(202, { expiresInSeconds: 300, resendAfterSeconds: 30 });
+  it("signs up with the profile, sending the Google sign-in cookie", async () => {
+    const session = { status: "signed_in", accessToken: "t", expiresIn: 900, isNewAccount: true, user: {}, centre: {} };
+    reply(201, session);
+    const profile = {
+      fullName: "Asha Sharma",
+      phone: "98765 43210",
+      centreName: "Sunrise Classes",
+      city: "Pune",
+      centreType: "coaching",
+      acceptedTerms: true,
+    };
 
-    await expect(requestOtp("+919876543210")).resolves.toEqual({ expiresInSeconds: 300, resendAfterSeconds: 30 });
+    await expect(registerOwner(profile)).resolves.toEqual(session);
 
     const [url, init] = fetchMock.mock.calls[0]!;
-    expect(url).toBe("http://localhost:8787/api/v1/auth/otp/request");
+    expect(url).toBe("http://localhost:8787/api/v1/auth/register");
     expect(init).toMatchObject({ method: "POST", credentials: "include" });
-    expect(JSON.parse(init!.body as string)).toEqual({ phone: "+919876543210" });
+    expect(JSON.parse(init!.body as string)).toEqual(profile);
   });
 
   it("never answers from the browser's cache, so lists are always current", async () => {
@@ -61,38 +84,36 @@ describe("API client", () => {
     expect(fetchMock.mock.calls[0]![1]).toMatchObject({ cache: "no-store" });
   });
 
-  it("verifies an OTP and returns the session", async () => {
-    const session = { accessToken: "t", expiresIn: 900, isNewAccount: true, user: {}, centre: {} };
-    reply(200, session);
+  it("reads the Google account waiting to sign up", async () => {
+    reply(200, { email: "asha@example.com", name: "Asha Sharma" });
 
-    await expect(verifyOtp("+919876543210", "123456")).resolves.toEqual(session);
-    expect(JSON.parse(fetchMock.mock.calls[0]![1]!.body as string)).toEqual({ phone: "+919876543210", code: "123456" });
+    await expect(getGooglePending()).resolves.toEqual({ email: "asha@example.com", name: "Asha Sharma" });
+    expect(fetchMock.mock.calls[0]![0]).toBe("http://localhost:8787/api/v1/auth/google/pending");
   });
 
   it("turns an error response into an ApiRequestError with the server's message", async () => {
-    reply(400, { error: { code: "invalid_otp", message: "That code is not right. 4 attempts left.", attemptsLeft: 4 } });
+    reply(409, { error: { code: "google_in_use", message: "This Google account already has a Chukta account." } });
 
-    const error = await verifyOtp("+919876543210", "000000").catch((e: unknown) => e);
+    const error = await getGooglePending().catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(ApiRequestError);
     expect(error).toMatchObject({
-      status: 400,
-      code: "invalid_otp",
-      message: "That code is not right. 4 attempts left.",
-      attemptsLeft: 4,
+      status: 409,
+      code: "google_in_use",
+      message: "This Google account already has a Chukta account.",
     });
   });
 
   it("reads Retry-After on rate limits", async () => {
-    reply(429, { error: { code: "otp_resend_too_soon", message: "Wait 20 seconds." } }, { "retry-after": "20" });
+    reply(429, { error: { code: "rate_limited", message: "Wait 20 seconds." } }, { "retry-after": "20" });
 
-    await expect(requestOtp("+919876543210")).rejects.toMatchObject({ code: "otp_resend_too_soon", retryAfterSeconds: 20 });
+    await expect(getGooglePending()).rejects.toMatchObject({ code: "rate_limited", retryAfterSeconds: 20 });
   });
 
   it("explains a lost connection in plain words", async () => {
     fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
 
-    await expect(requestOtp("+919876543210")).rejects.toMatchObject({
+    await expect(getGooglePending()).rejects.toMatchObject({
       code: "network_error",
       message: "Can't reach Chukta. Check your connection and try again.",
     });
@@ -101,7 +122,7 @@ describe("API client", () => {
   it("copes with an error response that isn't JSON", async () => {
     fetchMock.mockResolvedValueOnce(new Response("Bad gateway", { status: 502 }));
 
-    await expect(requestOtp("+919876543210")).rejects.toMatchObject({
+    await expect(getGooglePending()).rejects.toMatchObject({
       status: 502,
       code: "http_502",
       message: "Something went wrong. Try again.",
@@ -156,6 +177,88 @@ describe("API client", () => {
     await expect(
       createBatch("t", { name: "Yoga", subject: null, days: ["mon"], startTime: "07:00", endTime: "08:00" }),
     ).rejects.toMatchObject({ status: 409, fields: { name: "Taken." } });
+  });
+
+  it("saves the owner's name and the centre's details from Settings", async () => {
+    reply(200, { user: { fullName: "Asha S. Sharma" } });
+    reply(200, { centre: { name: "Sunrise Academy" } });
+    reply(200, { identities: [] });
+
+    await updateMe("t", { fullName: "Asha S. Sharma" });
+    await updateCentre("t", { centreName: "Sunrise Academy", city: "Patna", centreType: "tuition" });
+    await getIdentities("t");
+
+    const sent = fetchMock.mock.calls.map(([url, init]) => [url, init!.method, init!.body && JSON.parse(init!.body as string)]);
+    expect(sent).toEqual([
+      ["http://localhost:8787/api/v1/me", "PATCH", { fullName: "Asha S. Sharma" }],
+      ["http://localhost:8787/api/v1/centre", "PATCH", { centreName: "Sunrise Academy", city: "Patna", centreType: "tuition" }],
+      ["http://localhost:8787/api/v1/me/identities", "GET", undefined],
+    ]);
+  });
+
+  it("sends and checks the code that confirms a mobile number", async () => {
+    reply(202, { expiresInSeconds: 300, resendAfterSeconds: 30 });
+    reply(200, { user: { phoneVerified: true } });
+
+    await expect(sendPhoneCode("t", "91234 56789")).resolves.toEqual({ expiresInSeconds: 300, resendAfterSeconds: 30 });
+    await expect(confirmPhone("t", "91234 56789", "482913")).resolves.toEqual({ user: { phoneVerified: true } });
+
+    const sent = fetchMock.mock.calls.map(([url, init]) => [url, init!.method, JSON.parse(init!.body as string)]);
+    expect(sent).toEqual([
+      ["http://localhost:8787/api/v1/me/phone/verify", "POST", { phone: "91234 56789" }],
+      ["http://localhost:8787/api/v1/me/phone/confirm", "POST", { phone: "91234 56789", code: "482913" }],
+    ]);
+  });
+
+  it("passes on how many tries a wrong code leaves", async () => {
+    reply(400, { error: { code: "invalid_otp", message: "That code didn’t match. 4 tries left.", attemptsLeft: 4 } });
+    await expect(confirmPhone("t", "9876543210", "000000")).rejects.toMatchObject({ code: "invalid_otp", attemptsLeft: 4 });
+  });
+
+  it("lists devices and signs them out", async () => {
+    reply(200, { sessions: [] });
+    reply(204);
+    reply(200, { signedOut: 2 });
+
+    await listSessions("t");
+    await signOutSession("t", "s1");
+    await expect(signOutOtherSessions("t")).resolves.toEqual({ signedOut: 2 });
+
+    expect(fetchMock.mock.calls.map(([url, init]) => [url, init!.method])).toEqual([
+      ["http://localhost:8787/api/v1/me/sessions", "GET"],
+      ["http://localhost:8787/api/v1/me/sessions/s1", "DELETE"],
+      ["http://localhost:8787/api/v1/me/sessions/sign-out-others", "POST"],
+    ]);
+  });
+
+  it("lists, adds, reads and changes students, and their batches", async () => {
+    for (let i = 0; i < 6; i++) reply(200, {});
+
+    await listStudents("t", { status: "left", batchId: "b1", q: "rao", cursor: "c1" });
+    await createStudent("t", { name: "Aarav", parentName: "Neha", parentPhone: "98765 43210", whatsappOptIn: true, batchIds: ["b1"] });
+    await getStudent("t", "s1");
+    await updateStudent("t", "s1", { status: "left" });
+    await enrol("t", "s1", "b2");
+    await endEnrolment("t", "e1", "2026-11-02");
+
+    expect(fetchMock.mock.calls.map(([url, init]) => [url, init!.method, init!.body && JSON.parse(init!.body as string)])).toEqual([
+      ["http://localhost:8787/api/v1/students?status=left&batchId=b1&q=rao&cursor=c1", "GET", undefined],
+      [
+        "http://localhost:8787/api/v1/students",
+        "POST",
+        { name: "Aarav", parentName: "Neha", parentPhone: "98765 43210", whatsappOptIn: true, batchIds: ["b1"] },
+      ],
+      ["http://localhost:8787/api/v1/students/s1", "GET", undefined],
+      ["http://localhost:8787/api/v1/students/s1", "PATCH", { status: "left" }],
+      ["http://localhost:8787/api/v1/enrolments", "POST", { studentId: "s1", batchId: "b2" }],
+      ["http://localhost:8787/api/v1/enrolments/e1", "PATCH", { endDate: "2026-11-02" }],
+    ]);
+  });
+
+  it("leaves out list filters that aren't set", async () => {
+    reply(200, { students: [], nextCursor: null });
+    await listStudents("t", { status: "active" });
+    expect(fetchMock.mock.calls[0]![0]).toBe("http://localhost:8787/api/v1/students?status=active");
   });
 
   it("reads the centre with the access token", async () => {

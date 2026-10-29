@@ -1,8 +1,9 @@
 import { createTestDb } from "@chukta/db/testing";
-import type { SmsProvider } from "@chukta/integrations";
+import type { GoogleSignIn, SmsProvider } from "@chukta/integrations";
 import { vi } from "vitest";
 import { createApp } from "../app";
 import type { Config } from "../config";
+import { googleFromConfig } from "../google";
 
 export const testConfig: Config = {
   env: "test",
@@ -14,10 +15,12 @@ export const testConfig: Config = {
   cookieSecure: true,
   trustProxyHeaders: true,
   otpLimits: { perPhonePerHour: 5, perIpPerHour: 10 },
+  // Owners sign in only with Google; tests use the fake account chooser.
+  google: { provider: "fake" },
 };
 
-/** The API wired to an in-memory Postgres, a recording SMS fake and a clock the test controls. */
-export async function createTestApp(config: Partial<Config> = {}) {
+/** The API wired to an in-memory Postgres, a recording SMS fake, the fake Google and a clock the test controls. */
+export async function createTestApp(config: Partial<Config> = {}, options: { google?: GoogleSignIn } = {}) {
   const db = await createTestDb();
   const sent: { to: string; code: string }[] = [];
   const sms = {
@@ -32,14 +35,17 @@ export async function createTestApp(config: Partial<Config> = {}) {
       now = new Date(now.getTime() + ms);
     },
   };
-  const app = createApp({ db, sms, now: clock.now, config: { ...testConfig, ...config } });
+  const fullConfig = { ...testConfig, ...config };
+  const google = options.google ?? googleFromConfig(fullConfig.google);
+  const app = createApp({ db, sms, google, now: clock.now, config: fullConfig });
 
   function call(
     method: string,
     path: string,
-    init: { body?: unknown; ip?: string; cookie?: string; token?: string } = {},
+    init: { body?: unknown; ip?: string; cookie?: string; token?: string; userAgent?: string } = {},
   ): Promise<JsonResponse> {
     const headers: Record<string, string> = { "x-forwarded-for": init.ip ?? "203.0.113.10" };
+    if (init.userAgent) headers["user-agent"] = init.userAgent;
     if (init.body !== undefined) headers["content-type"] = "application/json";
     if (init.cookie) headers.cookie = init.cookie;
     if (init.token) headers.authorization = `Bearer ${init.token}`;
@@ -50,38 +56,74 @@ export async function createTestApp(config: Partial<Config> = {}) {
     }) as Promise<JsonResponse>;
   }
 
-  /** Requests and verifies an OTP; returns the raw verify response. */
-  async function verify(phone = "9876543210", ip?: string): Promise<JsonResponse> {
-    const requested = await call("POST", "/auth/otp/request", { body: { phone }, ip });
-    if (requested.status !== 202) throw new Error(`OTP request failed: ${requested.status}`);
-    return call("POST", "/auth/otp/verify", { body: { phone, code: sent.at(-1)!.code }, ip });
+  /** Sends the browser to Google; returns where it went and the OAuth cookie to bring back. */
+  async function startGoogle() {
+    const res = await call("GET", "/auth/google/start");
+    return { res, to: location(res), cookie: sendable(cookieNamed(res, "chukta_oauth")) };
+  }
+
+  /** The whole trip through the fake account chooser: where the callback sent the browser, and its cookies. */
+  async function googleLogin(account: { email: string; name?: string } = { email: OWNER_EMAIL }, userAgent?: string) {
+    const { to, cookie } = await startGoogle();
+    const approve = await call(
+      "GET",
+      `/auth/google/fake/approve?${new URLSearchParams({
+        redirect_uri: to.searchParams.get("redirect_uri")!,
+        state: to.searchParams.get("state")!,
+        nonce: to.searchParams.get("nonce")!,
+        email: account.email,
+        name: account.name ?? PROFILE.fullName,
+      })}`,
+    );
+    const back = location(approve);
+    const callback = await call("GET", `${back.pathname.replace("/api/v1", "")}${back.search}`, { cookie, userAgent });
+    return {
+      callback,
+      to: location(callback),
+      pending: sendable(cookieNamed(callback, "chukta_google")),
+      session: refreshCookie(callback),
+    };
   }
 
   /**
-   * A signed-in owner: verifies the number and, when it has no account yet,
-   * registers it with PROFILE. Returns the session response and its refresh cookie.
+   * A signed-in owner, by Google: a new account is registered with PROFILE.
+   * Returns the session response, its body and its refresh cookie.
    */
-  async function login(phone = "9876543210", profile: Partial<typeof PROFILE> & { email?: string } = {}, ip?: string) {
-    let res = await verify(phone, ip);
-    let body = (await res.json()) as LoginBody | { status: "signup_required"; signupTicket: string };
-    if (body.status === "signup_required") {
-      res = await call("POST", "/auth/register", { body: { signupTicket: body.signupTicket, ...PROFILE, ...profile }, ip });
-      body = (await res.json()) as LoginBody;
+  async function login(
+    email = OWNER_EMAIL,
+    profile: Partial<typeof PROFILE> = {},
+    { ip, userAgent }: { ip?: string; userAgent?: string } = {},
+  ) {
+    const google = await googleLogin({ email, name: profile.fullName }, userAgent);
+    if (google.session) {
+      // A returning owner: the callback only sets the refresh cookie, as for the browser.
+      const res = await call("POST", "/auth/refresh", { cookie: google.session, ip, userAgent });
+      const { accessToken, expiresIn } = (await res.clone().json()) as { accessToken: string; expiresIn: number };
+      const me = await (await call("GET", "/me", { token: accessToken })).json();
+      const body: LoginBody = { status: "signed_in", accessToken, expiresIn, isNewAccount: false, ...me };
+      return { res, body, cookie: refreshCookie(res) };
     }
-    if (res.status >= 300) throw new Error(`Login failed: ${res.status} ${JSON.stringify(body)}`);
+    if (!google.pending) throw new Error(`Google sign-in went to ${google.to.href}`);
+    const res = await call("POST", "/auth/register", { body: { ...PROFILE, ...profile }, cookie: google.pending, ip, userAgent });
+    const body = await res.clone().json();
+    if (res.status >= 300) throw new Error(`Sign-up failed: ${res.status} ${JSON.stringify(body)}`);
     return { res, body: body as LoginBody, cookie: refreshCookie(res) };
   }
 
-  return { app, db, sms, sent, clock, call, verify, login, lastCode: () => sent.at(-1)!.code };
+  return { app, db, sms, sent, clock, call, startGoogle, googleLogin, login };
 }
 
 /** Tests assert on response bodies field by field, so they read them untyped. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type JsonResponse = Omit<Response, "json"> & { json(): Promise<any> };
 
-/** The profile `login()` signs new numbers up with. */
+/** The Google account `login()` uses unless told otherwise. */
+export const OWNER_EMAIL = "asha@example.com";
+
+/** The profile `login()` signs new owners up with. */
 export const PROFILE = {
   fullName: "Asha Sharma",
+  phone: "98765 43210",
   centreName: "Sunrise Classes",
   city: "Pune",
   centreType: "coaching",
@@ -93,7 +135,7 @@ export type LoginBody = {
   accessToken: string;
   expiresIn: number;
   isNewAccount: boolean;
-  user: { id: string; phone: string; fullName: string | null; email: string | null; role: string };
+  user: { id: string; phone: string; phoneVerified: boolean; fullName: string | null; email: string | null; role: string };
   centre: { id: string; name: string | null; city: string | null; centreType: string | null; plan: string };
 };
 
@@ -103,3 +145,13 @@ export function refreshCookie(res: Pick<Response, "headers">): string {
   const match = /chukta_rt=([^;]*)/.exec(header);
   return match ? `chukta_rt=${match[1]}` : "";
 }
+
+/** A response's Set-Cookie line for `name`, if it set one. */
+export const cookieNamed = (res: Pick<Response, "headers">, name: string) =>
+  res.headers.getSetCookie().find((c) => c.startsWith(`${name}=`));
+
+/** "name=value" from a Set-Cookie line, ready to send back; "" when absent. */
+export const sendable = (setCookie: string | undefined) => setCookie?.split(";")[0] ?? "";
+
+/** Where a redirect points, as a URL. */
+export const location = (res: Pick<Response, "headers">) => new URL(res.headers.get("location")!, "http://localhost");

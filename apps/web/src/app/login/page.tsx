@@ -1,19 +1,18 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { AuthShell } from "@/components/auth/AuthShell";
-import { LoginFlow } from "@/components/auth/LoginFlow";
+import { SignIn } from "@/components/auth/SignIn";
 
-function LoginScreen() {
-  const router = useRouter();
-  // The landing page's "Get OTP" form sends ?phone=…
-  const phone = useSearchParams().get("phone") ?? "";
+function SignInScreen() {
+  const params = useSearchParams();
   return (
-    <LoginFlow
-      initialPhone={phone}
-      // A new centre has nothing to show yet: its first job is adding batches.
-      onSignedIn={(session) => router.replace(session.isNewAccount ? "/batches" : "/dashboard")}
+    <SignIn
+      // Inlined at build time: on where the environment has a Google OAuth client.
+      googleEnabled={process.env.NEXT_PUBLIC_GOOGLE_SIGN_IN === "on"}
+      // The API's Google callback, or an expired sign-up, sends ?google_error=…
+      googleError={params.get("google_error") ?? undefined}
     />
   );
 }
@@ -23,7 +22,7 @@ export default function LoginPage() {
     <AuthShell>
       {/* useSearchParams needs a Suspense boundary in a statically exported page. */}
       <Suspense fallback={null}>
-        <LoginScreen />
+        <SignInScreen />
       </Suspense>
     </AuthShell>
   );

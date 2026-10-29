@@ -86,7 +86,7 @@ gh workflow run deploy.yml --ref develop
 
 ## Day to day
 
-- **Log in on hosted dev, sit or uat:** SMS isn't connected yet, so the 6-digit code goes to the Worker's log. In Cloudflare, open **Workers & Pages › chukta-web-dev › Logs › Live** (or run `npx wrangler tail --env dev` in `apps/web`), press **Get OTP**, and read the code from the line `[sms:console] Chukta login code for +91******1234: 482913`.
+- **Sign in on hosted dev, sit or uat:** with Google, once that environment has its own OAuth client ([google-sign-in.md](google-sign-in.md)). While the Google app is in *Testing*, only the test users listed in Google Cloud can sign in.
 - **Browse the data:** the Neon console's **Tables** and **SQL Editor**, or `DATABASE_URL=<branch URL> npm run db:studio -w packages/db`.
 - **Roll back the code:** **Workers & Pages › chukta-web-<env> › Deployments**, then promote an earlier version, or revert the commit and let the pipeline redeploy.
 - **Roll back data:** Neon keeps history for the free plan's restore window. Use **Branches › Restore** to a point in time.

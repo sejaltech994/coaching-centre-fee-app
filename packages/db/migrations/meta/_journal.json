@@ -29,6 +29,34 @@
       "when": 1793083140452,
       "tag": "0003_profile",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793114414875,
+      "tag": "0004_auth_identities",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793188351280,
+      "tag": "0005_google_only_signin",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793192058041,
+      "tag": "0006_otp_owner",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793248325471,
+      "tag": "0007_students",
+      "breakpoints": true
     }
   ]
 }

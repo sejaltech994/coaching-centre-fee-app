@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createConsoleSmsProvider } from "./console";
 
 describe("console SMS provider", () => {
-  it("prints the login code with the phone number masked", async () => {
+  it("prints the code that confirms a mobile number, with the number masked", async () => {
     const log = vi.fn();
     const sms = createConsoleSmsProvider(log);
 
@@ -10,7 +10,7 @@ describe("console SMS provider", () => {
 
     expect(log).toHaveBeenCalledTimes(1);
     const line = log.mock.calls[0]?.[0] as string;
-    expect(line).toContain("482913");
+    expect(line).toBe("[sms:console] Chukta code for +91******3210: 482913 (confirms your mobile number; valid 5 minutes)");
     expect(line).toContain("+91******3210");
     expect(line).not.toContain("9876543210");
   });

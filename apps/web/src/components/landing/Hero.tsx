@@ -31,7 +31,7 @@ export function Hero() {
           </a>
         </div>
         <p className={`${styles.caption} ${styles.rise}`} style={delay(700)}>
-          Phone OTP login · no card · live in 15 minutes
+          Sign in with Google · no card · live in 15 minutes
         </p>
       </div>
       <PhonePreview />

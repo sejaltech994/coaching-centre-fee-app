@@ -2,13 +2,13 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
-import { CodeInput } from "./CodeInput";
+import { OtpInput } from "./OtpInput";
 
 function Harness({ initial = "" }: { initial?: string }) {
   const [code, setCode] = useState(initial);
   return (
     <>
-      <CodeInput value={code} onChange={setCode} />
+      <OtpInput value={code} onChange={setCode} />
       <output data-testid="code">{code}</output>
     </>
   );
@@ -17,7 +17,7 @@ function Harness({ initial = "" }: { initial?: string }) {
 const digit = (n: number) => screen.getByLabelText(`Digit ${n}`);
 const code = () => screen.getByTestId("code").textContent;
 
-describe("CodeInput", () => {
+describe("OtpInput", () => {
   it("shows six labelled boxes in a group named for the code", () => {
     render(<Harness />);
     expect(screen.getByRole("group", { name: "6-digit code" })).toBeInTheDocument();
@@ -57,6 +57,17 @@ describe("CodeInput", () => {
     expect(digit(3)).toHaveFocus();
   });
 
+  it("moves between boxes with the arrow keys", async () => {
+    const user = userEvent.setup();
+    render(<Harness initial="482913" />);
+
+    await user.click(digit(3));
+    await user.keyboard("{ArrowLeft}");
+    expect(digit(2)).toHaveFocus();
+    await user.keyboard("{ArrowRight}{ArrowRight}");
+    expect(digit(4)).toHaveFocus();
+  });
+
   it("fills every box from a pasted code, ignoring spaces", () => {
     render(<Harness />);
 
@@ -75,7 +86,7 @@ describe("CodeInput", () => {
   });
 
   it("marks every box invalid when told the code was wrong", () => {
-    render(<CodeInput value="" onChange={() => {}} invalid />);
+    render(<OtpInput value="" onChange={() => {}} invalid />);
     for (let n = 1; n <= 6; n++) expect(digit(n)).toHaveAttribute("aria-invalid", "true");
   });
 });

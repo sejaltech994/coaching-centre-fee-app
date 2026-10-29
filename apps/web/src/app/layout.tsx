@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Fraunces, Manrope, Martian_Mono, Mukta, Rozha_One } from "next/font/google";
+import InitColorSchemeScript from "@mui/material/InitColorSchemeScript";
+import { ThemeRegistry } from "@/theme/ThemeRegistry";
 import "./globals.css";
 
 const rozhaOne = Rozha_One({ weight: "400", subsets: ["latin", "devanagari"], variable: "--font-rozha" });
@@ -17,8 +19,16 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${rozhaOne.variable} ${mukta.variable} ${martianMono.variable} ${fraunces.variable} ${manrope.variable}`}>
-      <body>{children}</body>
+    // suppressHydrationWarning: InitColorSchemeScript sets the colour-scheme class before React loads.
+    <html
+      lang="en"
+      className={`${rozhaOne.variable} ${mukta.variable} ${martianMono.variable} ${fraunces.variable} ${manrope.variable}`}
+      suppressHydrationWarning
+    >
+      <body>
+        <InitColorSchemeScript attribute="class" defaultMode="light" />
+        <ThemeRegistry>{children}</ThemeRegistry>
+      </body>
     </html>
   );
 }

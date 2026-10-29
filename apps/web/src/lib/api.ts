@@ -2,7 +2,15 @@
 import type { BatchInput, CentreType, Weekday } from "@chukta/shared";
 
 export type Me = {
-  user: { id: string; phone: string; fullName: string | null; email: string | null; role: "owner" };
+  user: {
+    id: string;
+    phone: string;
+    /** False until the owner confirms the number with a code. */
+    phoneVerified: boolean;
+    fullName: string | null;
+    email: string | null;
+    role: "owner";
+  };
   centre: {
     id: string;
     name: string | null;
@@ -20,18 +28,24 @@ export type LoginSession = Me & {
   isNewAccount: boolean;
 };
 
-/** A verified number with no account yet: the ticket lets it register within `expiresIn` seconds. */
-export type SignupRequired = { status: "signup_required"; signupTicket: string; phone: string; expiresIn: number };
+/** The Google account that just signed in and has no Chukta account yet. */
+export type GooglePending = { email: string; name: string | null };
 
+/** What sign-up sends; the API checks it with the shared validateProfile. */
 export type RegisterInput = {
-  signupTicket: string;
   fullName: string;
+  phone: string;
   centreName: string;
   city: string;
   centreType: string;
-  email?: string;
   acceptedTerms: boolean;
 };
+
+/** A way the owner signs in; Google is the only one. */
+export type Identity = { provider: "google"; email: string; lastUsedAt: string | null };
+
+/** A device the owner is signed in on (one sign-in). */
+export type DeviceSession = { id: string; device: string; signedInAt: string; lastActiveAt: string; current: boolean };
 
 export type CentreResponse = {
   centre: { id: string; name: string | null; plan: "free" | "pro"; timezone: string };
@@ -48,7 +62,30 @@ export type Batch = {
   createdAt: string;
 };
 
+/** A batch a student is in now. */
+export type StudentBatch = { id: string; name: string; enrolmentId: string; since: string };
+
+export type StudentSummary = {
+  id: string;
+  name: string;
+  parentName: string;
+  parentPhone: string;
+  whatsappOptIn: boolean;
+  status: "active" | "left";
+  batches: StudentBatch[];
+};
+
+export type Enrolment = { id: string; batch: { id: string; name: string }; startDate: string; endDate: string | null };
+
+/** A student with every batch they've been in. */
+export type StudentDetail = StudentSummary & { enrolments: Enrolment[] };
+
+export type StudentInput = { name: string; parentName: string; parentPhone: string; whatsappOptIn: boolean };
+
+export type StudentFilters = { status: "active" | "left" | "all"; batchId?: string; q?: string; cursor?: string };
+
 export class ApiRequestError extends Error {
+  /** After a wrong code: how many tries it has left. */
   readonly attemptsLeft?: number;
   readonly retryAfterSeconds?: number;
   /** Message per field at fault, for forms. */
@@ -113,19 +150,36 @@ async function call<T>(path: string, init: { method?: string; body?: unknown; to
   return payload as T;
 }
 
-export const requestOtp = (phone: string) =>
-  call<{ expiresInSeconds: number; resendAfterSeconds: number }>("/auth/otp/request", {
-    method: "POST",
-    body: { phone },
-  });
-
-export const verifyOtp = (phone: string, code: string) =>
-  call<LoginSession | SignupRequired>("/auth/otp/verify", { method: "POST", body: { phone, code } });
-
+/** Signs up the Google account waiting in the API's cookie. */
 export const registerOwner = (input: RegisterInput) =>
   call<LoginSession>("/auth/register", { method: "POST", body: input });
 
 export const getMe = (token: string) => call<Me>("/me", { token });
+
+export const updateMe = (token: string, changes: { fullName: string }) =>
+  call<{ user: Me["user"] }>("/me", { method: "PATCH", body: changes, token });
+
+/** Texts a code to confirm `phone`: the owner's number or one they're switching to. */
+export const sendPhoneCode = (token: string, phone: string) =>
+  call<{ expiresInSeconds: number; resendAfterSeconds: number }>("/me/phone/verify", { method: "POST", body: { phone }, token });
+
+export const confirmPhone = (token: string, phone: string, code: string) =>
+  call<{ user: Me["user"] }>("/me/phone/confirm", { method: "POST", body: { phone, code }, token });
+
+export const listSessions = (token: string) => call<{ sessions: DeviceSession[] }>("/me/sessions", { token });
+
+export const signOutSession = (token: string, id: string) =>
+  call<void>(`/me/sessions/${encodeURIComponent(id)}`, { method: "DELETE", token });
+
+export const signOutOtherSessions = (token: string) =>
+  call<{ signedOut: number }>("/me/sessions/sign-out-others", { method: "POST", token });
+
+export const getIdentities = (token: string) => call<{ identities: Identity[] }>("/me/identities", { token });
+
+/** Where "Continue with Google" goes: the API runs the OAuth flow and redirects back. */
+export const googleStartUrl = () => `${apiBaseUrl()}/auth/google/start`;
+
+export const getGooglePending = () => call<GooglePending>("/auth/google/pending");
 
 export const refreshSession = () =>
   call<{ accessToken: string; expiresIn: number }>("/auth/refresh", { method: "POST" });
@@ -133,6 +187,9 @@ export const refreshSession = () =>
 export const logout = () => call<void>("/auth/logout", { method: "POST" });
 
 export const getCentre = (token: string) => call<CentreResponse>("/centre", { token });
+
+export const updateCentre = (token: string, changes: { centreName: string; city: string; centreType: string }) =>
+  call<{ centre: Me["centre"] }>("/centre", { method: "PATCH", body: changes, token });
 
 // --- Batches ---
 
@@ -152,3 +209,25 @@ export const updateBatch = async (token: string, id: string, changes: Partial<Ba
 /** The API archives rather than deletes. */
 export const archiveBatch = async (token: string, id: string) =>
   (await call<{ batch: Batch }>(`/batches/${id}`, { method: "DELETE", token })).batch;
+
+export const listStudents = (token: string, filters: StudentFilters) => {
+  const query = new URLSearchParams(Object.entries(filters).filter((entry): entry is [string, string] => Boolean(entry[1])));
+  return call<{ students: StudentSummary[]; nextCursor: string | null }>(`/students?${query}`, { token });
+};
+
+export const createStudent = (token: string, input: StudentInput & { batchIds: string[] }) =>
+  call<{ student: StudentSummary }>("/students", { method: "POST", body: input, token });
+
+export const getStudent = (token: string, id: string) =>
+  call<{ student: StudentDetail }>(`/students/${encodeURIComponent(id)}`, { token }).then(({ student }) => student);
+
+export const updateStudent = (token: string, id: string, changes: Partial<StudentInput> & { status?: "active" | "left" }) =>
+  call<{ student: StudentSummary }>(`/students/${encodeURIComponent(id)}`, { method: "PATCH", body: changes, token });
+
+/** Puts a student in a batch from today. */
+export const enrol = (token: string, studentId: string, batchId: string) =>
+  call<{ enrolment: Enrolment }>("/enrolments", { method: "POST", body: { studentId, batchId }, token });
+
+/** Takes a student out of a batch on `endDate` (YYYY-MM-DD). */
+export const endEnrolment = (token: string, id: string, endDate: string) =>
+  call<{ enrolment: Enrolment }>(`/enrolments/${encodeURIComponent(id)}`, { method: "PATCH", body: { endDate }, token });

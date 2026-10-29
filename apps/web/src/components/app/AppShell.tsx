@@ -3,14 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { logout, type CentreResponse } from "@/lib/api";
-import { clearSession } from "@/lib/session";
+import type { CentreResponse } from "@/lib/api";
+import { signOut } from "@/lib/signOut";
 import styles from "./app.module.css";
 
-type Section = "dashboard" | "batches";
+type Section = "dashboard" | "batches" | "students" | "settings";
 
-// Only sections that exist are listed; Students, Fees, Reminders and Settings
-// join as they are built (see the Batches design canvas).
+// Only sections that exist are listed; Fees and Reminders join as they are
+// built (see the Batches design canvas).
 const SECTIONS: { id: Section; label: string; href: string; icon: ReactNode }[] = [
   {
     id: "dashboard",
@@ -26,6 +26,29 @@ const SECTIONS: { id: Section; label: string; href: string; icon: ReactNode }[] 
       <>
         <rect x="3" y="4" width="18" height="5" rx="1.5" />
         <rect x="3" y="11" width="18" height="9" rx="1.5" />
+      </>
+    ),
+  },
+  {
+    id: "students",
+    label: "Students",
+    href: "/students",
+    icon: (
+      <>
+        <circle cx="9" cy="8" r="3.5" />
+        <path d="M3 20c.8-3.4 3.2-5 6-5s5.2 1.6 6 5" />
+        <path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 15c1.6.6 2.6 2 3 5" />
+      </>
+    ),
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    href: "/settings",
+    icon: (
+      <>
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
       </>
     ),
   },
@@ -51,8 +74,7 @@ export function AppShell({
   const router = useRouter();
 
   async function logOut() {
-    await logout().catch(() => undefined);
-    clearSession();
+    await signOut();
     router.replace("/login");
   }
 

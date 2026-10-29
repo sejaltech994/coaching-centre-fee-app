@@ -64,7 +64,7 @@ jobs:
         run: |
           node -e '
             const fs = require("fs");
-            const rows = ["apps/web", "apps/api", "packages/shared", "packages/db", "packages/integrations"]
+            const rows = ["apps/web", "apps/api", "packages/shared", "packages/content", "packages/db", "packages/integrations"]
               .filter((dir) => fs.existsSync(`${dir}/coverage/coverage-summary.json`))
               .map((dir) => {
                 const t = require(`./${dir}/coverage/coverage-summary.json`).total;
@@ -110,25 +110,17 @@ jobs:
           fail-on-severity: high
           deny-licenses: AGPL-3.0, GPL-3.0, SSPL-1.0
 
-  e2e:
-    name: E2E
+  e2e-suite:
+    name: E2E suite
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    # Playwright's image ships the matching browser, so no slow system-package install.
-    # Keep the tag equal to @playwright/test in the e2e repo.
-    container:
-      image: mcr.microsoft.com/playwright:v1.64.0-noble
-      options: --ipc=host
-    env:
-      WEB_URL: http://localhost:3000
-      API_URL: http://localhost:8787/api/v1
-      OTP_LOG_FILE: /tmp/chukta-api.log
+    outputs:
+      ref: ${{ steps.pick.outputs.ref }}
+      playwright: ${{ steps.version.outputs.playwright }}
     steps:
-      - uses: actions/checkout@v7
       # A same-named branch in the e2e repo (e.g. feature/batches) carries this
       # change's new scenarios; otherwise the suite on main is used.
       - name: Pick the e2e branch
-        id: e2e-ref
+        id: pick
         env:
           BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
@@ -140,7 +132,35 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: sejaltech994/coaching-centre-fee-app-e2e
-          ref: ${{ steps.e2e-ref.outputs.ref }}
+          ref: ${{ steps.pick.outputs.ref }}
+          sparse-checkout: package.json
+          sparse-checkout-cone-mode: false
+      # The container image must match the suite's @playwright/test exactly, and
+      # the e2e repo updates it on its own (Dependabot), so it's read, not typed here.
+      - name: Read its Playwright version
+        id: version
+        run: echo "playwright=$(node -p 'require("./package.json").devDependencies["@playwright/test"]')" >> "$GITHUB_OUTPUT"
+
+  e2e:
+    name: E2E
+    needs: e2e-suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Playwright's image ships the matching browser, so no slow system-package install.
+    container:
+      image: mcr.microsoft.com/playwright:v${{ needs.e2e-suite.outputs.playwright }}-noble
+      options: --ipc=host
+    env:
+      WEB_URL: http://localhost:3000
+      API_URL: http://localhost:8787/api/v1
+      # The API's console SMS provider writes codes here; @sms scenarios read them.
+      OTP_LOG_FILE: /tmp/chukta-api.log
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          repository: sejaltech994/coaching-centre-fee-app-e2e
+          ref: ${{ needs.e2e-suite.outputs.ref }}
           path: e2e
       - uses: actions/setup-node@v7
         with:
@@ -153,11 +173,12 @@ jobs:
       - name: Install and build the app
         env:
           NEXT_PUBLIC_API_URL: ${{ env.API_URL }}
+          NEXT_PUBLIC_GOOGLE_SIGN_IN: "on"
         run: |
           npm ci
           npm run build -w apps/web
 
-      - name: Start the API (embedded database, console SMS)
+      - name: Start the API (embedded database, fake Google)
         working-directory: apps/api
         env:
           NODE_ENV: development
@@ -166,8 +187,8 @@ jobs:
           JWT_SECRET: e2e-only-secret-not-used-anywhere-else-0123456789
           SMS_PROVIDER: console
           WEB_ORIGINS: ${{ env.WEB_URL }}
-          # Every scenario logs in from the same IP; the TSD's 20/hour would cap the suite.
-          OTP_PER_IP_PER_HOUR: "1000"
+          # The API's own account chooser in place of Google (refused in production).
+          GOOGLE_PROVIDER: fake
         run: nohup npx tsx src/server.ts > "$OTP_LOG_FILE" 2>&1 &
 
       - name: Serve the web build
