@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { getCentre, type CentreResponse } from "./api";
+import { loginUrl, takeReturn } from "./returnTo";
 import { checkLogin, clearSession, ensureAccessToken, getCachedCentre, setCachedCentre } from "./session";
 
 export type Session = { token: string | null; centre: CentreResponse["centre"] | null };
@@ -24,7 +25,10 @@ export function useSession(): Session {
     let cancelled = false;
     (async () => {
       const token = await ensureAccessToken();
-      if (!token) return routerRef.current.replace("/login/?session=required");
+      if (!token) return routerRef.current.replace(loginUrl("required"));
+      // Just signed in after being sent away from a page: back to it.
+      const back = takeReturn();
+      if (back) routerRef.current.replace(back);
       if (cancelled) return;
       const cached = getCachedCentre();
       setSession({ token, centre: cached });
@@ -35,7 +39,7 @@ export function useSession(): Session {
         if (!cancelled) setSession({ token, centre });
       } catch {
         clearSession();
-        routerRef.current.replace("/login/?session=expired");
+        routerRef.current.replace(loginUrl("expired"));
       }
     })();
     return () => {

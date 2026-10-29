@@ -1,12 +1,16 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { SignIn } from "@/components/auth/SignIn";
+import { rememberReturn } from "@/lib/returnTo";
 
 function SignInScreen() {
   const params = useSearchParams();
+  const next = params.get("next");
+  // Kept through the Google round trip, so the owner lands back where they were.
+  useEffect(() => rememberReturn(next), [next]);
   return (
     <SignIn
       // Inlined at build time: on where the environment has a Google OAuth client.
