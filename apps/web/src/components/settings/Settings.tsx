@@ -16,8 +16,21 @@ import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
 import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
 import { GoogleMark } from "@/components/auth/GoogleMark";
-import { ApiRequestError, getIdentities, getMe, updateCentre, updateMe, type Identity, type Me } from "@/lib/api";
+import {
+  ApiRequestError,
+  getIdentities,
+  getMe,
+  listSessions,
+  updateCentre,
+  updateMe,
+  type DeviceSession,
+  type Identity,
+  type Me,
+} from "@/lib/api";
 import { copy, errorMessage, fill } from "@/lib/copy";
+import { Devices } from "./Devices";
+import { PhoneBanner } from "./PhoneBanner";
+import { PhoneConfirm } from "./PhoneConfirm";
 
 type Props = {
   token: string;
@@ -52,14 +65,18 @@ export function Settings({ token, onCentreChanged, onSignOut }: Props) {
   const t = copy.settings;
   const [me, setMe] = useState<Me | null>(null);
   const [identities, setIdentities] = useState<Identity[]>([]);
+  const [sessions, setSessions] = useState<DeviceSession[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+  const [confirmingPhone, setConfirmingPhone] = useState(false);
+  // A short note after a save, e.g. "Saved."
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([getMe(token), getIdentities(token)]).then(
-      ([loaded, { identities: methods }]) => {
+    Promise.all([getMe(token), getIdentities(token), listSessions(token)]).then(
+      ([loaded, { identities: methods }, { sessions: devices }]) => {
         setMe(loaded);
         setIdentities(methods);
+        setSessions(devices);
       },
       (err: unknown) => setLoadError(errorMessage(err)),
     );
@@ -78,6 +95,8 @@ export function Settings({ token, onCentreChanged, onSignOut }: Props) {
         <Typography color="text.secondary">{t.lead}</Typography>
       </Stack>
 
+      {!user.phoneVerified && !confirmingPhone && <PhoneBanner onConfirm={() => setConfirmingPhone(true)} />}
+
       <Section title={t.profile}>
         <ProfileEditor
           token={token}
@@ -85,7 +104,7 @@ export function Settings({ token, onCentreChanged, onSignOut }: Props) {
           centreName={centre.name}
           onSaved={(changed) => {
             setMe({ user: changed, centre });
-            setSaved(true);
+            setNotice(t.saved);
           }}
         />
         <Divider />
@@ -93,9 +112,30 @@ export function Settings({ token, onCentreChanged, onSignOut }: Props) {
           <Chip label={t.confirmed} color="paid" />
         </Row>
         <Divider />
-        <Row label={t.mobile} value={formatIndianMobile(user.phone)} hint={user.phoneVerified ? undefined : t.mobileHint}>
-          {user.phoneVerified ? <Chip label={t.confirmed} color="paid" /> : <Chip label={t.notConfirmed} color="pending" />}
-        </Row>
+        {confirmingPhone ? (
+          <PhoneConfirm
+            token={token}
+            phone={user.phone}
+            onCancel={() => setConfirmingPhone(false)}
+            onConfirmed={(changed) => {
+              setMe({ user: changed, centre });
+              setConfirmingPhone(false);
+              setNotice(t.phoneConfirmed);
+            }}
+          />
+        ) : (
+          <Row label={t.mobile} value={formatIndianMobile(user.phone)} hint={user.phoneVerified ? undefined : t.mobileHint}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+              {user.phoneVerified ? <Chip label={t.confirmed} color="paid" /> : <Chip label={t.notConfirmed} color="pending" />}
+              <Button
+                aria-label={user.phoneVerified ? t.changeNumberName : t.confirmNumberName}
+                onClick={() => setConfirmingPhone(true)}
+              >
+                {user.phoneVerified ? t.changeNumber : t.confirmNumber}
+              </Button>
+            </Stack>
+          </Row>
+        )}
       </Section>
 
       <Section title={t.centre}>
@@ -105,7 +145,7 @@ export function Settings({ token, onCentreChanged, onSignOut }: Props) {
           onSaved={(changed) => {
             setMe({ user, centre: changed });
             onCentreChanged(changed);
-            setSaved(true);
+            setNotice(t.saved);
           }}
         />
       </Section>
@@ -124,6 +164,10 @@ export function Settings({ token, onCentreChanged, onSignOut }: Props) {
         </Section>
       )}
 
+      <Section title={t.devices}>
+        <Devices token={token} sessions={sessions} onNotice={setNotice} />
+      </Section>
+
       <Box>
         <Button variant="outlined" onClick={onSignOut}>
           {t.signOut}
@@ -131,10 +175,10 @@ export function Settings({ token, onCentreChanged, onSignOut }: Props) {
       </Box>
 
       <Snackbar
-        open={saved}
+        open={notice !== null}
         autoHideDuration={4000}
-        onClose={() => setSaved(false)}
-        message={t.saved}
+        onClose={() => setNotice(null)}
+        message={notice}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       />
     </Stack>

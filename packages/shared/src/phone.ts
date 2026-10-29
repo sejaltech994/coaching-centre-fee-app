@@ -1,6 +1,9 @@
 /** E.164 form of an Indian mobile number, e.g. "+919876543210". */
 export type IndianMobile = `+91${string}`;
 
+/** What the forms and the API say about a number normalizeIndianMobile() rejects. */
+export const INVALID_PHONE_MESSAGE = "Enter a 10-digit Indian mobile number.";
+
 const SEPARATORS = /[\s\-().]/g;
 const MOBILE = /^[6-9]\d{9}$/;
 

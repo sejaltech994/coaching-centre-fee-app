@@ -43,6 +43,13 @@
       "when": 1793188351280,
       "tag": "0005_google_only_signin",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793192058041,
+      "tag": "0006_otp_owner",
+      "breakpoints": true
     }
   ]
 }

@@ -12,6 +12,11 @@ import {
   refreshSession,
   registerOwner,
   updateBatch,
+  confirmPhone,
+  listSessions,
+  signOutOtherSessions,
+  signOutSession,
+  sendPhoneCode,
   updateCentre,
   updateMe,
 } from "./api";
@@ -182,6 +187,41 @@ describe("API client", () => {
       ["http://localhost:8787/api/v1/me", "PATCH", { fullName: "Asha S. Sharma" }],
       ["http://localhost:8787/api/v1/centre", "PATCH", { centreName: "Sunrise Academy", city: "Patna", centreType: "tuition" }],
       ["http://localhost:8787/api/v1/me/identities", "GET", undefined],
+    ]);
+  });
+
+  it("sends and checks the code that confirms a mobile number", async () => {
+    reply(202, { expiresInSeconds: 300, resendAfterSeconds: 30 });
+    reply(200, { user: { phoneVerified: true } });
+
+    await expect(sendPhoneCode("t", "91234 56789")).resolves.toEqual({ expiresInSeconds: 300, resendAfterSeconds: 30 });
+    await expect(confirmPhone("t", "91234 56789", "482913")).resolves.toEqual({ user: { phoneVerified: true } });
+
+    const sent = fetchMock.mock.calls.map(([url, init]) => [url, init!.method, JSON.parse(init!.body as string)]);
+    expect(sent).toEqual([
+      ["http://localhost:8787/api/v1/me/phone/verify", "POST", { phone: "91234 56789" }],
+      ["http://localhost:8787/api/v1/me/phone/confirm", "POST", { phone: "91234 56789", code: "482913" }],
+    ]);
+  });
+
+  it("passes on how many tries a wrong code leaves", async () => {
+    reply(400, { error: { code: "invalid_otp", message: "That code didn’t match. 4 tries left.", attemptsLeft: 4 } });
+    await expect(confirmPhone("t", "9876543210", "000000")).rejects.toMatchObject({ code: "invalid_otp", attemptsLeft: 4 });
+  });
+
+  it("lists devices and signs them out", async () => {
+    reply(200, { sessions: [] });
+    reply(204);
+    reply(200, { signedOut: 2 });
+
+    await listSessions("t");
+    await signOutSession("t", "s1");
+    await expect(signOutOtherSessions("t")).resolves.toEqual({ signedOut: 2 });
+
+    expect(fetchMock.mock.calls.map(([url, init]) => [url, init!.method])).toEqual([
+      ["http://localhost:8787/api/v1/me/sessions", "GET"],
+      ["http://localhost:8787/api/v1/me/sessions/s1", "DELETE"],
+      ["http://localhost:8787/api/v1/me/sessions/sign-out-others", "POST"],
     ]);
   });
 

@@ -17,7 +17,7 @@ const seconds = (date: Date) => Math.floor(date.getTime() / 1000);
 
 export async function signAccessToken({ config, now }: Deps, auth: AuthContext): Promise<string> {
   const issuedAt = seconds(now());
-  return new SignJWT({ cid: auth.centreId, role: auth.role })
+  return new SignJWT({ cid: auth.centreId, role: auth.role, ...(auth.sessionId && { sid: auth.sessionId }) })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(auth.userId)
     .setIssuer(ISSUER)
@@ -37,7 +37,8 @@ export async function verifyAccessToken({ config, now }: Deps, token: string): P
       currentDate: now(),
     });
     if (typeof payload.sub !== "string" || typeof payload.cid !== "string" || payload.role !== "owner") return null;
-    return { userId: payload.sub, centreId: payload.cid, role: payload.role };
+    const sessionId = typeof payload.sid === "string" ? payload.sid : undefined;
+    return { userId: payload.sub, centreId: payload.cid, role: payload.role, sessionId };
   } catch {
     return null;
   }
@@ -49,21 +50,22 @@ const hashToken = (secret: string, token: string) => keyedHash(secret, "refresh"
 export async function issueRefreshToken(
   { db, config, now }: Deps,
   input: { userId: string; familyId?: string; userAgent?: string },
-): Promise<{ id: string; token: string }> {
+): Promise<{ id: string; token: string; sessionId: string }> {
   const token = randomToken();
   const createdAt = now();
+  const familyId = input.familyId ?? randomUUID();
   const [row] = await db
     .insert(refreshTokens)
     .values({
       userId: input.userId,
-      familyId: input.familyId ?? randomUUID(),
+      familyId,
       tokenHash: hashToken(config.jwtSecret, token),
       expiresAt: new Date(createdAt.getTime() + REFRESH_TOKEN_TTL_SECONDS * 1000),
       userAgent: input.userAgent ?? null,
       createdAt,
     })
     .returning({ id: refreshTokens.id });
-  return { id: row!.id, token };
+  return { id: row!.id, token, sessionId: familyId };
 }
 
 /**
@@ -108,7 +110,10 @@ export async function rotateRefreshToken(
     throw new ApiError(401, "refresh_token_reused", "This session was signed out for safety. Log in again.");
   }
 
-  return { auth: { userId: user.id, centreId: user.centreId, role: user.role }, token: next.token };
+  return {
+    auth: { userId: user.id, centreId: user.centreId, role: user.role, sessionId: current.familyId },
+    token: next.token,
+  };
 }
 
 export async function revokeRefreshToken({ db, config, now }: Deps, token: string): Promise<void> {

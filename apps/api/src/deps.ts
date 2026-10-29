@@ -13,6 +13,12 @@ export type Deps = {
 };
 
 /** Who is calling, taken from a verified access token. centreId scopes every query. */
-export type AuthContext = { userId: string; centreId: string; role: "owner" };
+export type AuthContext = {
+  userId: string;
+  centreId: string;
+  role: "owner";
+  /** The sign-in (refresh token family) this token belongs to: which device is calling. */
+  sessionId?: string;
+};
 
 export type AppEnv = { Variables: { auth: AuthContext } };

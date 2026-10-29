@@ -59,7 +59,12 @@ export function authRoutes(deps: Deps) {
     setRefreshCookie(c, refresh.token);
     return {
       status: "signed_in" as const,
-      accessToken: await signAccessToken(deps, { userId: user.id, centreId: centre.id, role: user.role }),
+      accessToken: await signAccessToken(deps, {
+        userId: user.id,
+        centreId: centre.id,
+        role: user.role,
+        sessionId: refresh.sessionId,
+      }),
       expiresIn: ACCESS_TOKEN_TTL_SECONDS,
       isNewAccount,
       user: userDto(user),

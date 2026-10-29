@@ -9,7 +9,7 @@ export {
   type BatchValidation,
   type Weekday,
 } from "./batch";
-export { formatIndianMobile, maskPhone, normalizeIndianMobile, type IndianMobile } from "./phone";
+export { formatIndianMobile, INVALID_PHONE_MESSAGE, maskPhone, normalizeIndianMobile, type IndianMobile } from "./phone";
 export {
   CENTRE_TYPE_LABELS,
   CENTRE_TYPES,
