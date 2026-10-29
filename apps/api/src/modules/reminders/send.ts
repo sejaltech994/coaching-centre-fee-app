@@ -3,12 +3,14 @@ import {
   addDays,
   formatRupees,
   MESSAGE_TEMPLATES,
+  PLANS,
   messageFor,
   periodLabel,
   reminderKindOn,
   renderMessage,
   type MessageKey,
   type MessageValues,
+  type Plan,
   type Tone,
 } from "@chukta/shared";
 import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
@@ -28,14 +30,14 @@ export type Outcome = { status: "sent" | "skipped" | "failed"; error: string | n
 export const NOT_SET_UP = "WhatsApp isn’t set up yet.";
 export const NO_CONSENT = "The parent hasn’t agreed to WhatsApp messages.";
 
-type Centre = { id: string; name: string | null; timezone: string; reminderTone: Tone };
+type Centre = { id: string; name: string | null; timezone: string; reminderTone: Tone; plan: Plan };
 export type Target = { invoice: Invoice; student: Student; batchName: string };
 
 const dayFormat = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 
 export async function loadCentre(deps: Deps, centreId: string): Promise<Centre | null> {
   const [row] = await deps.db
-    .select({ id: centres.id, name: centres.name, timezone: centres.timezone, reminderTone: centres.reminderTone })
+    .select({ id: centres.id, name: centres.name, timezone: centres.timezone, reminderTone: centres.reminderTone, plan: centres.plan })
     .from(centres)
     .where(eq(centres.id, centreId));
   return row ?? null;
@@ -134,7 +136,8 @@ const hourIn = (timezone: string, now: Date) =>
  */
 export async function sendScheduledReminders(deps: Deps, centreId: string): Promise<void> {
   const centre = await loadCentre(deps, centreId);
-  if (!centre) return;
+  // Automatic reminders are Pro; Free centres send them by hand.
+  if (!centre || !PLANS[centre.plan].automaticReminders) return;
   const now = deps.now();
   const hour = hourIn(centre.timezone, now);
   if (hour < 9 || hour >= 20) return;

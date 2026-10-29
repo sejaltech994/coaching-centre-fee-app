@@ -4,6 +4,7 @@ import { localDate } from "./lib/dates";
 import { billEnrolments, markOverdue } from "./modules/invoices/billing";
 import { razorpayCentres, reconcileRazorpay } from "./modules/payments/razorpay";
 import { sendScheduledReminders } from "./modules/reminders/send";
+import { endLapsedPro } from "./modules/subscription/routes";
 
 /**
  * The scheduled work (TSD: background jobs), run every hour by a Cron Trigger on
@@ -12,6 +13,8 @@ import { sendScheduledReminders } from "./modules/reminders/send";
  */
 export async function runScheduledJobs(deps: Deps): Promise<{ centres: number; failed: number }> {
   const now = deps.now();
+  // First, so a centre whose Pro has lapsed gets Free's behaviour today.
+  await endLapsedPro(deps);
   const all = await deps.db.select({ id: centres.id, timezone: centres.timezone }).from(centres);
   let failed = 0;
   for (const centre of all) {

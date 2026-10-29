@@ -14,6 +14,7 @@ import { fakeCheckoutRoutes, razorpaySettingsRoutes, razorpayWebhookRoutes } fro
 import { paymentSettingsRoutes } from "./modules/payments/routes";
 import { publicRoutes } from "./modules/public/routes";
 import { receiptRoutes } from "./modules/receipts/routes";
+import { fakeSubscriptionCheckout, subscriptionRoutes, subscriptionWebhookRoutes } from "./modules/subscription/routes";
 import { reminderRoutes, reminderToneRoutes, whatsappWebhookRoutes } from "./modules/reminders/routes";
 import { meRoutes } from "./modules/me/routes";
 import { enrolmentRoutes, studentRoutes } from "./modules/students/routes";
@@ -60,6 +61,7 @@ export function createApp(deps: Deps) {
   app.route("/reminders", reminderRoutes(deps));
   app.route("/dashboard", dashboardRoutes(deps));
   app.route("/attendance", attendanceRoutes(deps));
+  app.route("/subscription", subscriptionRoutes(deps));
   // No sign-in: a parent's pay link and receipt, keyed by the bill's secret token.
   app.route("/public", publicRoutes(deps));
   // Signed by each centre's own Razorpay webhook secret.
@@ -67,6 +69,8 @@ export function createApp(deps: Deps) {
   // Signed by Meta with the WhatsApp app secret.
   app.route("/webhooks/whatsapp", whatsappWebhookRoutes(deps));
   // Only with RAZORPAY_PROVIDER=fake (never production): the test checkout.
+  app.route("/webhooks/chukta-razorpay", subscriptionWebhookRoutes(deps));
+  app.route("/dev/fake-razorpay/subscriptions", fakeSubscriptionCheckout(deps));
   app.route("/dev/fake-razorpay", fakeCheckoutRoutes(deps));
 
   app.notFound(notFound);

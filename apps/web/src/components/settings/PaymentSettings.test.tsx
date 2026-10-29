@@ -22,12 +22,12 @@ beforeEach(() => {
 
 const RAZORPAY = { keyId: "rzp_test_abc123", webhookUrl: "https://chukta.example/api/v1/webhooks/razorpay/c1" };
 
-function setup() {
+function setup(plan: "free" | "pro" = "pro") {
   const onSaved = vi.fn();
   const user = userEvent.setup();
   render(
     <ThemeRegistry>
-      <PaymentSettings token="token" onSaved={onSaved} />
+      <PaymentSettings token="token" plan={plan} onSaved={onSaved} />
     </ThemeRegistry>,
   );
   return { user, onSaved };
@@ -118,5 +118,11 @@ describe("PaymentSettings", () => {
 
     expect(disconnectRazorpay).toHaveBeenCalledWith("token");
     expect(await screen.findByRole("button", { name: "Connect Razorpay" })).toBeInTheDocument();
+  });
+
+  it("offers the centre's own Razorpay only with Pro", async () => {
+    setup("free");
+    expect(await screen.findByText("Card payments through your own Razorpay account come with Pro.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Connect Razorpay" })).not.toBeInTheDocument();
   });
 });

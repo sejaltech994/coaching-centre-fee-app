@@ -45,6 +45,11 @@ jobs:
       WHATSAPP_TOKEN: ${{ secrets.WHATSAPP_TOKEN }}
       WHATSAPP_APP_SECRET: ${{ secrets.WHATSAPP_APP_SECRET }}
       WHATSAPP_VERIFY_TOKEN: ${{ secrets.WHATSAPP_VERIFY_TOKEN }}
+      # Chukta's own Razorpay account, for the Pro plan; unset = upgrading isn't offered.
+      CHUKTA_RAZORPAY_KEY_ID: ${{ vars.CHUKTA_RAZORPAY_KEY_ID }}
+      CHUKTA_RAZORPAY_PRO_PLAN_ID: ${{ vars.CHUKTA_RAZORPAY_PRO_PLAN_ID }}
+      CHUKTA_RAZORPAY_KEY_SECRET: ${{ secrets.CHUKTA_RAZORPAY_KEY_SECRET }}
+      CHUKTA_RAZORPAY_WEBHOOK_SECRET: ${{ secrets.CHUKTA_RAZORPAY_WEBHOOK_SECRET }}
     defaults:
       run:
         working-directory: apps/web
@@ -115,13 +120,15 @@ jobs:
           fi
           umask 077
           # Google's client ID isn't secret, but travels with its secret so the two always match.
-          # WhatsApp travels only when all four of its settings are there.
+          # WhatsApp and Chukta's own Razorpay each travel only when all four of their settings are there.
           node -e '
             const { DATABASE_URL, JWT_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } = process.env;
             const google = GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET ? { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } : {};
             const names = ["WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_TOKEN", "WHATSAPP_APP_SECRET", "WHATSAPP_VERIFY_TOKEN"];
             const whatsapp = names.every((n) => process.env[n]) ? Object.fromEntries(names.map((n) => [n, process.env[n]])) : {};
-            process.stdout.write(JSON.stringify({ DATABASE_URL, JWT_SECRET, ...google, ...whatsapp }));
+            const proNames = ["CHUKTA_RAZORPAY_KEY_ID", "CHUKTA_RAZORPAY_PRO_PLAN_ID", "CHUKTA_RAZORPAY_KEY_SECRET", "CHUKTA_RAZORPAY_WEBHOOK_SECRET"];
+            const pro = proNames.every((n) => process.env[n]) ? Object.fromEntries(proNames.map((n) => [n, process.env[n]])) : {};
+            process.stdout.write(JSON.stringify({ DATABASE_URL, JWT_SECRET, ...google, ...whatsapp, ...pro }));
           ' > "$RUNNER_TEMP/secrets.json"
           npx wrangler secret bulk "$RUNNER_TEMP/secrets.json" --env "$DEPLOY_ENV"
           rm -f "$RUNNER_TEMP/secrets.json"

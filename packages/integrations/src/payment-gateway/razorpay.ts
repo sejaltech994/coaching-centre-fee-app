@@ -28,6 +28,10 @@ export interface PaymentGateway {
   verifyCredentials(keys: GatewayKeys): Promise<boolean>;
   createPaymentLink(keys: GatewayKeys, link: NewPaymentLink): Promise<{ id: string; shortUrl: string }>;
   fetchPaymentLink(keys: GatewayKeys, id: string): Promise<PaymentLinkState>;
+  /** Chukta's own Pro plan: a monthly subscription on Chukta's account. */
+  createSubscription(keys: GatewayKeys, subscription: { planId: string; notes: Record<string, string> }): Promise<{ id: string; shortUrl: string }>;
+  /** Stops renewing at the end of the period already paid for. */
+  cancelSubscription(keys: GatewayKeys, id: string): Promise<void>;
 }
 
 const API = "https://api.razorpay.com/v1";
@@ -90,6 +94,22 @@ export function createRazorpayGateway(options: { fetch?: typeof fetch } = {}): P
       const captured = payments.find((p) => p.status === "captured");
       return { status: String(link.status), payment: captured ? { id: captured.payment_id, method: captured.method } : null };
     },
+
+    async createSubscription(keys, subscription) {
+      // Monthly for up to 10 years; the owner cancels whenever they like.
+      const created = await expectOk(keys, "POST", "/subscriptions", {
+        plan_id: subscription.planId,
+        total_count: 120,
+        quantity: 1,
+        customer_notify: 1,
+        notes: subscription.notes,
+      });
+      return { id: String(created.id), shortUrl: String(created.short_url) };
+    },
+
+    async cancelSubscription(keys, id) {
+      await expectOk(keys, "POST", `/subscriptions/${encodeURIComponent(id)}/cancel`, { cancel_at_cycle_end: 1 });
+    },
   };
 }
 
@@ -99,6 +119,7 @@ export async function verifyRazorpaySignature(body: string, signature: string, s
 }
 
 type FakeLink = NewPaymentLink & { status: "created" | "paid"; payment: GatewayPayment | null };
+type FakeSubscription = { planId: string; notes: Record<string, string>; status: "created" | "active" | "cancelled" };
 
 /**
  * A stand-in for Razorpay outside production (RAZORPAY_PROVIDER=fake): test keys
@@ -107,6 +128,7 @@ type FakeLink = NewPaymentLink & { status: "created" | "paid"; payment: GatewayP
  */
 export function createFakeGateway(checkoutBase: string) {
   const links = new Map<string, FakeLink>();
+  const subscriptions = new Map<string, FakeSubscription>();
   const random = () => crypto.randomUUID().replace(/-/g, "").slice(0, 14);
   return {
     async verifyCredentials(keys: GatewayKeys) {
@@ -123,6 +145,27 @@ export function createFakeGateway(checkoutBase: string) {
     },
     link(id: string) {
       return links.get(id) ?? null;
+    },
+    async createSubscription(_keys: GatewayKeys, subscription: { planId: string; notes: Record<string, string> }) {
+      const id = `sub_fake_${random()}`;
+      subscriptions.set(id, { ...subscription, status: "created" });
+      return { id, shortUrl: `${checkoutBase}/subscriptions/${id}` };
+    },
+    async cancelSubscription(_keys: GatewayKeys, id: string) {
+      const subscription = subscriptions.get(id);
+      if (subscription) subscription.status = "cancelled";
+    },
+    subscription(id: string) {
+      return subscriptions.get(id) ?? null;
+    },
+    /** The owner pays on the fake checkout: active for a month from `now`. */
+    paySubscription(id: string, now: Date) {
+      const subscription = subscriptions.get(id);
+      if (!subscription) throw new Error(`No fake subscription ${id}`);
+      subscription.status = "active";
+      const currentEnd = new Date(now);
+      currentEnd.setUTCMonth(currentEnd.getUTCMonth() + 1);
+      return { status: "active" as const, currentEnd };
     },
     /** The parent pays on the fake checkout. */
     pay(id: string): GatewayPayment {

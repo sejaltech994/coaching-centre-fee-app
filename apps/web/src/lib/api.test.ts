@@ -30,6 +30,9 @@ import {
   getAttendance,
   saveAttendance,
   setAbsenceAlerts,
+  cancelPro,
+  getSubscription,
+  startPro,
   recordPayment,
   receiptPdf,
   savePaymentSettings,
@@ -402,6 +405,21 @@ describe("API client", () => {
       ["http://localhost:8787/api/v1/attendance", "PUT", { batchId: "b1", date: "2026-11-02", marks: [{ studentId: "s1", present: false }] }],
       ["http://localhost:8787/api/v1/centre/absence-alerts", "GET", undefined],
       ["http://localhost:8787/api/v1/centre/absence-alerts", "PUT", { on: true }],
+    ]);
+  });
+
+  it("reads the plan, goes Pro and cancels it", async () => {
+    reply(200, { plan: "free" });
+    reply(200, { url: "https://rzp.io/i/sub" });
+    reply(200, { plan: "pro", status: "cancelled" });
+    await getSubscription("t");
+    await startPro("t");
+    await cancelPro("t");
+    const sent = fetchMock.mock.calls.map(([url, init]) => [url, init!.method]);
+    expect(sent).toEqual([
+      ["http://localhost:8787/api/v1/subscription", "GET"],
+      ["http://localhost:8787/api/v1/subscription", "POST"],
+      ["http://localhost:8787/api/v1/subscription/cancel", "POST"],
     ]);
   });
 

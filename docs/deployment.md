@@ -95,6 +95,16 @@ Reminders go from **one Chukta WhatsApp number** for every centre, through Meta'
 
 The webhook updates each reminder's delivery status, and a parent replying **STOP** is opted out of WhatsApp.
 
+## Pro plan billing (Chukta's own Razorpay account)
+
+Pro (₹499 a month) is a Razorpay Subscription on **Chukta's own** account: the only money Chukta takes is its own fee. Parents' fees never touch it; they go to each centre's own UPI ID or Razorpay account. Until an environment has these settings, Settings › Plan says Pro isn't available there.
+
+1. In Chukta's Razorpay dashboard (test mode for dev, sit and uat): **Subscriptions › Plans › Create plan**, monthly, ₹499. Note its plan ID.
+2. **Webhooks › Add**: `https://<environment's domain>/api/v1/webhooks/chukta-razorpay`, events `subscription.activated`, `subscription.charged`, `subscription.cancelled` and `subscription.halted`, with a long random secret.
+3. For each GitHub environment, set the variables `CHUKTA_RAZORPAY_KEY_ID` and `CHUKTA_RAZORPAY_PRO_PLAN_ID`, and the secrets `CHUKTA_RAZORPAY_KEY_SECRET` and `CHUKTA_RAZORPAY_WEBHOOK_SECRET`. Re-run the deploy.
+
+Free covers up to 25 active students with reminders sent by hand; Pro adds any number of students, automatic reminders and each centre's own Razorpay. A cancelled or failed Pro lasts until the end of the period paid for, then the hourly job moves the centre back to Free.
+
 ## Day to day
 
 - **Sign in on hosted dev, sit or uat:** with Google, once that environment has its own OAuth client ([google-sign-in.md](google-sign-in.md)). While the Google app is in *Testing*, only the test users listed in Google Cloud can sign in.

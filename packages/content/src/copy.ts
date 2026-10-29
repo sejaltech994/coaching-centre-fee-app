@@ -306,6 +306,31 @@ export const CATALOG = {
       remindersSent: { label: "Message after several ({sent} sent, {skipped} not)", text: "Sent {sent}, skipped {skipped}." },
     },
   },
+  plan: {
+    title: "Settings: plan",
+    entries: {
+      title: { label: "Section heading", text: "Plan" },
+      free: { label: "Plan name: Free", text: "Free" },
+      pro: { label: "Plan name: Pro", text: "Pro" },
+      usage: { label: "Students used on Free ({active}, {max})", text: "{active} of {max} students" },
+      count: { label: "Students on Pro ({active})", text: "{active} students" },
+      freeIncludes: {
+        label: "What Free includes",
+        text: "Batches, fee plans, bills, UPI pay links, receipts and attendance. Reminders sent by hand.",
+        multiline: true,
+      },
+      proIncludes: {
+        label: "What Pro adds",
+        text: "Pro adds any number of students, automatic WhatsApp reminders and card payments through your own Razorpay account.",
+        multiline: true,
+      },
+      goPro: { label: "Button: upgrade ({price})", text: "Go Pro: {price} a month" },
+      unavailable: { label: "When Pro can't be bought here", text: "Pro isn't available here yet." },
+      renews: { label: "Pro renewal date ({date})", text: "Renews on {date}" },
+      ends: { label: "Cancelled Pro's end ({date})", text: "Pro until {date}, then Free." },
+      cancel: { label: "Button: cancel Pro", text: "Cancel Pro" },
+    },
+  },
   payments: {
     title: "Settings: payments",
     entries: {
@@ -328,6 +353,7 @@ export const CATALOG = {
         multiline: true,
       },
       connect: { label: "Button: connect Razorpay", text: "Connect Razorpay" },
+      razorpayIsPro: { label: "On Free: Razorpay needs Pro", text: "Card payments through your own Razorpay account come with Pro." },
       keyId: { label: "Field: Razorpay key ID", text: "Key ID" },
       keySecret: { label: "Field: Razorpay key secret", text: "Key secret" },
       keysHint: { label: "Hint: where the keys are", text: "In Razorpay: Account & Settings › API keys." },

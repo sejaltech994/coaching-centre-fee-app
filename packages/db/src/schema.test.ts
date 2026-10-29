@@ -53,6 +53,12 @@ describe("migrations", () => {
     expect([tables.rows, columns.rows]).toEqual([[], []]);
   });
 
+  it("start a centre on Free with no subscription, and only allow known subscription states", async () => {
+    const { centre } = await insertOwner();
+    expect(centre).toMatchObject({ plan: "free", planRenewsAt: null, subscriptionId: null, subscriptionStatus: null });
+    await expect(db.insert(centres).values({ subscriptionStatus: "paused" as never })).rejects.toThrow();
+  });
+
   it("only allow known plans", async () => {
     await expect(db.insert(centres).values({ ownerPhone: "+919876543210", plan: "gold" as never })).rejects.toThrow();
   });

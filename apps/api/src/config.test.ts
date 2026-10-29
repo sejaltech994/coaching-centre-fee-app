@@ -19,6 +19,7 @@ describe("loadConfig", () => {
       google: null,
       razorpay: "razorpay",
       whatsapp: null,
+      proPlan: null,
     });
   });
 
@@ -139,6 +140,33 @@ describe("loadConfig", () => {
       expect(loadConfig({ ...valid, WHATSAPP_PROVIDER: "fake" }).whatsapp).toEqual({ provider: "fake" });
       expect(() => loadConfig({ ...valid, NODE_ENV: "production", WHATSAPP_PROVIDER: "fake" })).toThrow("WHATSAPP_PROVIDER=fake");
       expect(() => loadConfig({ ...valid, WHATSAPP_PROVIDER: "pigeon" })).toThrow("WHATSAPP_PROVIDER");
+    });
+  });
+
+  describe("Chukta's own Razorpay account, for Pro", () => {
+    const CHUKTA = {
+      CHUKTA_RAZORPAY_KEY_ID: "rzp_live_chukta",
+      CHUKTA_RAZORPAY_KEY_SECRET: "secret",
+      CHUKTA_RAZORPAY_WEBHOOK_SECRET: "webhook",
+      CHUKTA_RAZORPAY_PRO_PLAN_ID: "plan_pro",
+    };
+
+    it("is off until configured, so upgrading isn't offered", () => {
+      expect(loadConfig(valid).proPlan).toBeNull();
+    });
+
+    it("reads the account and the Pro plan", () => {
+      expect(loadConfig({ ...valid, ...CHUKTA }).proPlan).toEqual({ keyId: "rzp_live_chukta", keySecret: "secret", webhookSecret: "webhook", planId: "plan_pro" });
+      expect(() => loadConfig({ ...valid, ...CHUKTA, CHUKTA_RAZORPAY_PRO_PLAN_ID: undefined })).toThrow("CHUKTA_RAZORPAY_PRO_PLAN_ID");
+    });
+
+    it("uses test values with the fake gateway", () => {
+      expect(loadConfig({ ...valid, RAZORPAY_PROVIDER: "fake" }).proPlan).toEqual({
+        keyId: "rzp_test_chukta",
+        keySecret: "fake",
+        webhookSecret: "fake-webhook-secret",
+        planId: "plan_fake_pro",
+      });
     });
   });
 });

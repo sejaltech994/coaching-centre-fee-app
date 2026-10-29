@@ -17,7 +17,7 @@ import { RazorpayConnect } from "./RazorpayConnect";
  * Settings › Payments: the centre's own UPI ID. Each bill's pay link then opens
  * the parent's UPI app with the centre as payee; Chukta never holds the money.
  */
-export function PaymentSettings({ token, onSaved }: { token: string; onSaved: () => void }) {
+export function PaymentSettings({ token, plan, onSaved }: { token: string; plan: "free" | "pro"; onSaved: () => void }) {
   const t = copy.payments;
   const titleId = useId();
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -117,7 +117,7 @@ export function PaymentSettings({ token, onSaved }: { token: string; onSaved: ()
           {error}
         </Alert>
       )}
-      {settings && <RazorpayConnect token={token} account={razorpay} onChange={setRazorpay} />}
+      {settings && <RazorpayConnect token={token} plan={plan} account={razorpay} onChange={setRazorpay} />}
     </Card>
   );
 }

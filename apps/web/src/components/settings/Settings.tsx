@@ -20,16 +20,19 @@ import {
   ApiRequestError,
   getIdentities,
   getMe,
+  getSubscription,
   listSessions,
   updateCentre,
   updateMe,
   type DeviceSession,
   type Identity,
   type Me,
+  type Subscription,
 } from "@/lib/api";
 import { copy, errorMessage, fill } from "@/lib/copy";
 import { Devices } from "./Devices";
 import { PaymentSettings } from "./PaymentSettings";
+import { PlanCard } from "./PlanCard";
 
 type Props = {
   token: string;
@@ -66,6 +69,7 @@ export function Settings({ token, onCentreChanged, onSignOut }: Props) {
   const [me, setMe] = useState<Me | null>(null);
   const [identities, setIdentities] = useState<Identity[]>([]);
   const [sessions, setSessions] = useState<DeviceSession[]>([]);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   // A short note after a save, e.g. "Saved."
   const [notice, setNotice] = useState<string | null>(null);
@@ -79,6 +83,7 @@ export function Settings({ token, onCentreChanged, onSignOut }: Props) {
       },
       (err: unknown) => setLoadError(errorMessage(err)),
     );
+    getSubscription(token).then(setSubscription, () => undefined);
   }, [token]);
 
   if (!me) return loadError ? <Alert severity="error">{loadError}</Alert> : null;
@@ -124,7 +129,9 @@ export function Settings({ token, onCentreChanged, onSignOut }: Props) {
         />
       </Section>
 
-      <PaymentSettings token={token} onSaved={() => setNotice(t.saved)} />
+      {subscription && <PlanCard token={token} subscription={subscription} onChange={setSubscription} />}
+
+      <PaymentSettings token={token} plan={subscription?.plan ?? "free"} onSaved={() => setNotice(t.saved)} />
 
       {google && (
         <Section title={t.signInMethods}>

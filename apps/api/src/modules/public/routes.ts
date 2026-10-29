@@ -1,5 +1,5 @@
 import { batches, centres, invoices, paymentLinks, paymentSettings, students, withCentre } from "@chukta/db";
-import { periodLabel, upiPayLink } from "@chukta/shared";
+import { periodLabel, PLANS, upiPayLink } from "@chukta/shared";
 import { and, desc, eq, gt, isNull, or } from "drizzle-orm";
 import { Hono } from "hono";
 import type { AppEnv, Deps } from "../../deps";
@@ -25,7 +25,7 @@ export function publicRoutes(deps: Deps) {
     const token = c.req.param("token");
     if (!TOKEN.test(token)) throw notFound();
     const [row] = await deps.db
-      .select({ invoice: invoices, studentName: students.name, batchName: batches.name, centreName: centres.name, upi: paymentSettings })
+      .select({ invoice: invoices, studentName: students.name, batchName: batches.name, centreName: centres.name, plan: centres.plan, upi: paymentSettings })
       .from(invoices)
       .innerJoin(students, eq(students.id, invoices.studentId))
       .innerJoin(batches, eq(batches.id, invoices.batchId))
@@ -57,7 +57,7 @@ export function publicRoutes(deps: Deps) {
       },
       receiptUrl: invoice.status === "paid" ? `/api/v1/public/receipts/${token}` : null,
       // Cards, net banking and UPI through the centre's own Razorpay account.
-      card: payable && Boolean(row.upi?.razorpayKeyId),
+      card: payable && Boolean(row.upi?.razorpayKeyId) && PLANS[row.plan].ownGateway,
     });
   });
 
@@ -74,7 +74,8 @@ export function publicRoutes(deps: Deps) {
     if (!row) throw notFound();
     const { invoice } = row;
     if (invoice.status !== "pending" && invoice.status !== "overdue") throw invoiceClosed();
-    const keys = await centreRazorpay(deps, invoice.centreId);
+    const [centre] = await deps.db.select({ plan: centres.plan }).from(centres).where(eq(centres.id, invoice.centreId));
+    const keys = centre && PLANS[centre.plan].ownGateway ? await centreRazorpay(deps, invoice.centreId) : null;
     if (!keys) throw new ApiError(409, "gateway_not_connected", "This centre doesn't take card payments here. Pay by UPI instead.");
 
     const now = deps.now();

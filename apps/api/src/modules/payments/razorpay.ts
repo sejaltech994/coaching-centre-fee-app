@@ -1,6 +1,6 @@
 import { paymentLinks, paymentSettings, webhookEvents, withCentre } from "@chukta/db";
 import { verifyRazorpaySignature, type FakeGateway, type GatewayKeys, type GatewayPayment } from "@chukta/integrations";
-import { formatRupees } from "@chukta/shared";
+import { formatRupees, PLANS } from "@chukta/shared";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -10,6 +10,7 @@ import { readJson } from "../../lib/request";
 import { openSecret, sealSecret } from "../../lib/secrets";
 import { requireAuth } from "../../middleware/auth";
 import { thankForPayment } from "../reminders/send";
+import { centrePlan, planRequired } from "../subscription/routes";
 import { recordPayment, type PaymentMethod } from "./record";
 
 /**
@@ -115,6 +116,9 @@ export function razorpaySettingsRoutes(deps: Deps) {
     if (!keys.keySecret) fields.keySecret = "Enter the key secret.";
     if (!keys.webhookSecret) fields.webhookSecret = "Enter the webhook secret you set in Razorpay.";
     if (Object.keys(fields).length > 0) throw invalidFields(fields);
+    if (!PLANS[await centrePlan(deps, c.var.auth.centreId)].ownGateway) {
+      throw planRequired("Connecting your own Razorpay account comes with Pro.");
+    }
     if (!(await deps.gateway.verifyCredentials(keys))) {
       throw invalidFields({ keySecret: "Razorpay didn’t accept these keys. Check the key ID and secret." });
     }

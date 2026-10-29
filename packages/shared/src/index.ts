@@ -56,3 +56,4 @@ export {
   type ReminderKind,
   type Tone,
 } from "./messages";
+export { PLANS, PRO_PRICE_PAISE, studentLimitReached, type Plan } from "./plans";

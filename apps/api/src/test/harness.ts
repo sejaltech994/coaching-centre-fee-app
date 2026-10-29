@@ -19,6 +19,7 @@ export const testConfig: Config = {
   google: { provider: "fake" },
   razorpay: "fake",
   whatsapp: { provider: "fake" },
+  proPlan: { keyId: "rzp_test_chukta", keySecret: "fake", webhookSecret: "fake-webhook-secret", planId: "plan_fake_pro" },
 };
 
 /** The API wired to an in-memory Postgres, the fake Google and a clock the test controls. */

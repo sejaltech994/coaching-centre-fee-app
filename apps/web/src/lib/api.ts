@@ -146,6 +146,17 @@ export type Reminder = {
 
 export type ReminderTone = "gentle" | "firm";
 
+/** The centre's plan with Chukta (Free or Pro) and how much of it is used. */
+export type Subscription = {
+  plan: "free" | "pro";
+  status: "created" | "active" | "cancelled" | "halted" | null;
+  /** When Pro renews (or, once cancelled, ends). */
+  renewsAt: string | null;
+  proPricePaise: number;
+  canUpgrade: boolean;
+  students: { active: number; max: number | null };
+};
+
 /** A batch's students on a day, each present, absent or not yet marked (null). */
 export type AttendanceDay = {
   batch: { id: string; name: string };
@@ -477,3 +488,13 @@ export const getAbsenceAlerts = (token: string) => call<{ on: boolean }>("/centr
 
 export const setAbsenceAlerts = (token: string, on: boolean) =>
   call<{ on: boolean }>("/centre/absence-alerts", { method: "PUT", body: { on }, token });
+
+// --- Chukta's own plans ---
+
+export const getSubscription = (token: string) => call<Subscription>("/subscription", { token });
+
+/** Starts Pro: returns Razorpay's checkout for Chukta's own subscription. */
+export const startPro = (token: string) => call<{ url: string }>("/subscription", { method: "POST", token });
+
+export const cancelPro = (token: string) =>
+  call<Pick<Subscription, "plan" | "status" | "renewsAt">>("/subscription/cancel", { method: "POST", token });

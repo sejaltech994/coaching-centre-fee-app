@@ -6,9 +6,9 @@ import { owner } from "../../test/owner";
 
 const KEYS = { keyId: "rzp_test_abc123", keySecret: "key-secret", webhookSecret: "webhook-secret" };
 
-/** An owner with a bill for Aarav, their Razorpay account connected (on the fake gateway). */
+/** A Pro owner with a bill for Aarav, their Razorpay account connected (on the fake gateway). */
 async function connected() {
-  const o = await owner();
+  const o = await owner("asha@example.com", undefined, { plan: "pro" });
   const res = await o.call("PUT", "/centre/razorpay", KEYS);
   const [bill] = (await o.list()).invoices;
   const token = new URL(bill.payLink).searchParams.get("t")!;
@@ -51,7 +51,7 @@ describe("connecting the centre's own Razorpay account", () => {
   });
 
   it("refuses keys Razorpay doesn't accept, or that don't look like keys", async () => {
-    const { call } = await owner();
+    const { call } = await owner("asha@example.com", undefined, { plan: "pro" });
 
     const refused = await call("PUT", "/centre/razorpay", { ...KEYS, keyId: "rzp_live_unknown" });
     expect(refused.status).toBe(400);

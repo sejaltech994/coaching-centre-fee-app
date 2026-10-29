@@ -19,6 +19,8 @@ export type Config = {
     | { provider: "meta"; token: string; phoneNumberId: string; appSecret: string; verifyToken: string }
     | { provider: "fake" }
     | null;
+  /** Chukta's own Razorpay account and its ₹499/month Pro plan, or null: upgrading isn't offered. */
+  proPlan: { keyId: string; keySecret: string; webhookSecret: string; planId: string } | null;
 };
 
 const ENVS = ["development", "test", "staging", "production"] as const;
@@ -56,6 +58,23 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     google,
     razorpay,
     whatsapp: loadWhatsApp(env, nodeEnv),
+    proPlan: loadProPlan(env, razorpay),
+  };
+}
+
+function loadProPlan(env: Record<string, string | undefined>, razorpay: Config["razorpay"]): Config["proPlan"] {
+  if (razorpay === "fake") {
+    return { keyId: "rzp_test_chukta", keySecret: "fake", webhookSecret: "fake-webhook-secret", planId: "plan_fake_pro" };
+  }
+  const names = ["CHUKTA_RAZORPAY_KEY_ID", "CHUKTA_RAZORPAY_KEY_SECRET", "CHUKTA_RAZORPAY_WEBHOOK_SECRET", "CHUKTA_RAZORPAY_PRO_PLAN_ID"];
+  if (names.every((name) => !env[name])) return null;
+  const missing = names.find((name) => !env[name]);
+  if (missing) throw new Error(`${missing} is not set`);
+  return {
+    keyId: env.CHUKTA_RAZORPAY_KEY_ID!,
+    keySecret: env.CHUKTA_RAZORPAY_KEY_SECRET!,
+    webhookSecret: env.CHUKTA_RAZORPAY_WEBHOOK_SECRET!,
+    planId: env.CHUKTA_RAZORPAY_PRO_PLAN_ID!,
   };
 }
 

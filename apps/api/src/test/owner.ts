@@ -1,3 +1,5 @@
+import { centres } from "@chukta/db";
+import { eq } from "drizzle-orm";
 import { createTestApp, refreshCookie } from "./harness";
 
 export const DAY = 24 * 60 * 60 * 1000;
@@ -9,9 +11,15 @@ export const AARAV = { name: "Aarav Sharma", parentName: "Neha Sharma", parentPh
  * days) and Aarav in it. `call` sends the owner's current token; `advance` moves
  * the clock and renews the session, as the web app would.
  */
-export async function owner(email = "asha@example.com", shared?: Awaited<ReturnType<typeof createTestApp>>) {
+export async function owner(
+  email = "asha@example.com",
+  shared?: Awaited<ReturnType<typeof createTestApp>>,
+  options: { plan?: "free" | "pro" } = {},
+) {
   const app = shared ?? (await createTestApp());
   const login = await app.login(email);
+  // Pro features (automatic reminders, the centre's own Razorpay) need the plan.
+  if (options.plan === "pro") await app.db.update(centres).set({ plan: "pro" }).where(eq(centres.id, login.body.centre.id));
   let token = login.body.accessToken as string;
   let cookie = login.cookie;
   const call = (method: string, path: string, body?: unknown) => app.call(method, path, { token, body });

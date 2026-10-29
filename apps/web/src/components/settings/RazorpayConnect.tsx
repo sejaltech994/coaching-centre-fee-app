@@ -10,14 +10,14 @@ import { useState, type FormEvent } from "react";
 import { ApiRequestError, connectRazorpay, disconnectRazorpay, type RazorpayAccount } from "@/lib/api";
 import { copy, errorMessage, fill } from "@/lib/copy";
 
-type Props = { token: string; account: RazorpayAccount | null; onChange: (account: RazorpayAccount | null) => void };
+type Props = { token: string; plan: "free" | "pro"; account: RazorpayAccount | null; onChange: (account: RazorpayAccount | null) => void };
 
 /**
  * The optional Razorpay part of Settings › Payments: the centre's OWN account,
  * so card and net-banking money settles to the centre. The API checks the keys
  * with Razorpay before keeping them (encrypted).
  */
-export function RazorpayConnect({ token, account, onChange }: Props) {
+export function RazorpayConnect({ token, plan, account, onChange }: Props) {
   const t = copy.payments;
   const [editing, setEditing] = useState(false);
   const [keys, setKeys] = useState({ keyId: "", keySecret: "", webhookSecret: "" });
@@ -89,6 +89,10 @@ export function RazorpayConnect({ token, account, onChange }: Props) {
             <Button onClick={() => setEditing(false)}>{t.cancel}</Button>
           </Stack>
         </Stack>
+      ) : plan === "free" ? (
+        <Typography variant="body2" color="text.secondary">
+          {t.razorpayIsPro}
+        </Typography>
       ) : (
         <Stack spacing={1} sx={{ alignItems: "flex-start" }}>
           <Typography variant="body2" color="text.secondary">

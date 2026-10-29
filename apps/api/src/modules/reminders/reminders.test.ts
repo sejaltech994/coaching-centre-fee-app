@@ -7,9 +7,9 @@ import { DAY, owner } from "../../test/owner";
 
 const HOUR = 60 * 60 * 1000;
 
-/** Aarav's parent has agreed to WhatsApp; the clock is 10:00 in India on 2 Nov, 3 days before the 5 Nov due date. */
+/** A Pro centre; Aarav's parent has agreed to WhatsApp; 10:00 in India on 2 Nov, 3 days before the 5 Nov due date. */
 async function optedIn(config?: Parameters<typeof createTestApp>[0]) {
-  const o = await owner("asha@example.com", config ? await createTestApp(config) : undefined);
+  const o = await owner("asha@example.com", config ? await createTestApp(config) : undefined, { plan: "pro" });
   await o.call("PATCH", `/students/${o.studentId}`, { whatsappOptIn: true });
   const [bill] = (await o.list()).invoices;
   return { ...o, bill, whatsapp: o.app.messaging as FakeWhatsApp };
@@ -46,6 +46,14 @@ describe("scheduled reminders", () => {
     ]);
   });
 
+  it("leaves Free centres to remind by hand: no automatic reminders", async () => {
+    const o = await owner();
+    await o.call("PATCH", `/students/${o.studentId}`, { whatsappOptIn: true });
+    await o.app.runJobs();
+    expect((o.app.messaging as FakeWhatsApp).sent).toEqual([]);
+    expect((await o.json("GET", "/reminders")).reminders).toEqual([]);
+  });
+
   it("waits for daytime in India: nothing between 20:00 and 9:00", async () => {
     const { app, advance, whatsapp } = await optedIn();
     await advance(11 * HOUR); // 21:00 in India
@@ -65,7 +73,10 @@ describe("scheduled reminders", () => {
   });
 
   it("records a reminder as skipped when the parent hasn't agreed to WhatsApp", async () => {
-    const { app, json, whatsapp } = await owner().then(async (o) => ({ ...o, whatsapp: o.app.messaging as FakeWhatsApp }));
+    const { app, json, whatsapp } = await owner("asha@example.com", undefined, { plan: "pro" }).then(async (o) => ({
+      ...o,
+      whatsapp: o.app.messaging as FakeWhatsApp,
+    }));
 
     await app.runJobs();
 

@@ -109,3 +109,36 @@ describe("createFakeGateway (never in production)", () => {
     await expect(fake.fetchPaymentLink(keys, link.id)).resolves.toEqual({ status: "paid", payment });
   });
 });
+
+describe("Razorpay subscriptions (Chukta's own Pro plan)", () => {
+  it("starts a monthly subscription on a plan, for the centre, with Razorpay's checkout link", async () => {
+    reply(200, { id: "sub_1", short_url: "https://rzp.io/i/sub", status: "created" });
+
+    await expect(gateway.createSubscription(keys, { planId: "plan_pro", notes: { centre_id: "c1" } })).resolves.toEqual({
+      id: "sub_1",
+      shortUrl: "https://rzp.io/i/sub",
+    });
+    expect(sent()).toMatchObject({ url: "https://api.razorpay.com/v1/subscriptions", method: "POST" });
+    expect(sent().body).toEqual({ plan_id: "plan_pro", total_count: 120, quantity: 1, customer_notify: 1, notes: { centre_id: "c1" } });
+  });
+
+  it("cancels at the end of the paid period", async () => {
+    reply(200, { id: "sub_1", status: "active" });
+    await gateway.cancelSubscription(keys, "sub_1");
+    expect(sent()).toMatchObject({ url: "https://api.razorpay.com/v1/subscriptions/sub_1/cancel", method: "POST", body: { cancel_at_cycle_end: 1 } });
+  });
+});
+
+describe("the fake gateway's subscriptions", () => {
+  it("makes a checkout link, and on payment gives the paid period's end", async () => {
+    const fake = createFakeGateway("http://localhost:8787/api/v1/dev/fake-razorpay");
+    const sub = await fake.createSubscription(keys, { planId: "plan_pro", notes: { centre_id: "c1" } });
+
+    expect(sub.shortUrl).toBe(`http://localhost:8787/api/v1/dev/fake-razorpay/subscriptions/${sub.id}`);
+    expect(fake.subscription(sub.id)).toMatchObject({ notes: { centre_id: "c1" }, status: "created" });
+    const paid = fake.paySubscription(sub.id, new Date("2026-11-02T04:30:00Z"));
+    expect(paid).toEqual({ status: "active", currentEnd: new Date("2026-12-02T04:30:00Z") });
+    await fake.cancelSubscription(keys, sub.id);
+    expect(fake.subscription(sub.id)!.status).toBe("cancelled");
+  });
+});

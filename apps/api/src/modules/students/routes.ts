@@ -10,6 +10,7 @@ import { readJson } from "../../lib/request";
 import { requireAuth } from "../../middleware/auth";
 import { feePlanDto } from "../fee-plans/routes";
 import { billEnrolments, dropBillsAfter } from "../invoices/billing";
+import { centrePlan, ensureStudentPlace } from "../subscription/routes";
 
 /**
  * Students (TSD: students) and their enrolments in batches. Every query runs in
@@ -187,8 +188,10 @@ export function studentRoutes(deps: Deps) {
     const { centreId } = c.var.auth;
     const now = deps.now();
     const startDate = batchIds.length > 0 ? await centreToday(deps, centreId) : "";
+    const plan = await centrePlan(deps, centreId);
 
     const student = await withCentre(deps.db, centreId, async (tx) => {
+      await ensureStudentPlace(tx, centreId, plan);
       // Each batch's students are billed on its fee plan.
       let found: { id: string; feePlanId: string | null }[] = [];
       if (batchIds.length > 0) {
@@ -245,6 +248,7 @@ export function studentRoutes(deps: Deps) {
     const { status, ...changes } = await readJson(c, patchBody);
     const now = deps.now();
     const endDate = status === "left" ? await centreToday(deps, centreId) : "";
+    const plan = await centrePlan(deps, centreId);
 
     const student = await withCentre(deps.db, centreId, async (tx) => {
       const [current] = await tx.select().from(students).where(byId(centreId, id)).for("update");
@@ -254,6 +258,8 @@ export function studentRoutes(deps: Deps) {
       if (!checked.ok) throw invalidFields(checked.fields);
       const consentChanged = checked.value.whatsappOptIn !== current.whatsappOptIn;
       const leaving = status === "left" && current.status !== "left";
+      // Coming back takes a place on the plan again.
+      if (status === "active" && current.status === "left") await ensureStudentPlace(tx, centreId, plan);
 
       const [row] = await tx
         .update(students)

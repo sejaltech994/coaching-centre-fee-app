@@ -53,11 +53,15 @@ export const centres = pgTable(
     // Message parents on WhatsApp when their child is marked absent (TSD: absence-alert).
     absenceAlerts: boolean("absence_alerts").notNull().default(false),
     planRenewsAt: timestamp("plan_renews_at", { withTimezone: true }),
+    // The Pro subscription on Chukta's own Razorpay account, and where it stands.
+    subscriptionId: text("subscription_id").unique(),
+    subscriptionStatus: text("subscription_status", { enum: ["created", "active", "cancelled", "halted"] }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     check("centres_plan_check", sql`${t.plan} in ('free', 'pro')`),
+    check("centres_subscription_status_check", sql`${t.subscriptionStatus} in ('created', 'active', 'cancelled', 'halted')`),
     check("centres_reminder_tone_check", sql`${t.reminderTone} in ('gentle', 'firm')`),
     check(
       "centres_centre_type_check",
