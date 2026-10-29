@@ -30,4 +30,10 @@ describe("/login", () => {
     render(<LoginPage />);
     expect(screen.getByRole("alert")).toHaveTextContent("Google sign-in was cancelled.");
   });
+
+  it("says why the owner has to log in", () => {
+    search = new URLSearchParams({ session: "expired" });
+    render(<LoginPage />);
+    expect(screen.getByRole("status")).toHaveTextContent("Your login has expired. Log in to continue.");
+  });
 });

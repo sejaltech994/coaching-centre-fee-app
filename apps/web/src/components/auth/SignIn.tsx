@@ -16,14 +16,19 @@ type Props = {
   googleEnabled: boolean;
   /** Why the owner is back here (?google_error=…). */
   googleError?: string;
+  /** Why a signed-in page sent the owner here (?session=…). */
+  session?: string;
 };
+
+const SESSION_NOTICES = { required: "loginRequired", expired: "loginExpired" } as const;
 
 /**
  * Sign in (W1). Google is the only way in, for new and returning owners alike:
  * the API sends a new Google account on to sign-up.
  */
-export function SignIn({ googleEnabled, googleError }: Props) {
+export function SignIn({ googleEnabled, googleError, session }: Props) {
   const t = copy.auth;
+  const notice = session && session in SESSION_NOTICES ? t[SESSION_NOTICES[session as keyof typeof SESSION_NOTICES]] : null;
   return (
     <Stack spacing={2.5}>
       <Stack spacing={0.75}>
@@ -32,6 +37,12 @@ export function SignIn({ googleEnabled, googleError }: Props) {
         </Typography>
         <Typography color="text.secondary">{t.signInLead}</Typography>
       </Stack>
+
+      {notice && (
+        <Alert severity="info" role="status">
+          {notice}
+        </Alert>
+      )}
 
       {!googleEnabled ? (
         <Alert severity="info">{copy.errors.googleUnavailable}</Alert>

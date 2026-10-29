@@ -27,6 +27,7 @@ import {
   signOutOtherSessions,
   signOutSession,
   sendPhoneCode,
+  setSessionHooks,
   updateCentre,
   updateMe,
 } from "./api";
@@ -48,6 +49,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  setSessionHooks(null);
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
 });
@@ -290,5 +292,60 @@ describe("API client", () => {
     expect(result.centre.id).toBe("c1");
     const headers = new Headers(fetchMock.mock.calls[0]![1]!.headers);
     expect(headers.get("authorization")).toBe("Bearer token-123");
+  });
+});
+
+describe("API client when the access token runs out", () => {
+  const unauthenticated = { error: { code: "unauthenticated", message: "Log in to continue." } };
+  const centre = { centre: { id: "c1", name: null, plan: "free", timezone: "Asia/Kolkata" } };
+  const sentToken = (call: number) => new Headers(fetchMock.mock.calls[call]![1]!.headers).get("authorization");
+
+  function hooks(renewed: string | null, current: string | null = null) {
+    const session = { current: vi.fn(() => current), renew: vi.fn(async () => renewed), ended: vi.fn() };
+    setSessionHooks(session);
+    return session;
+  }
+
+  it("gets a new access token and tries once more", async () => {
+    const session = hooks("fresh");
+    reply(401, unauthenticated);
+    reply(200, centre);
+
+    await expect(getCentre("stale")).resolves.toEqual(centre);
+
+    expect(session.renew).toHaveBeenCalledWith("stale");
+    expect([sentToken(0), sentToken(1)]).toEqual(["Bearer stale", "Bearer fresh"]);
+    expect(session.ended).not.toHaveBeenCalled();
+  });
+
+  it("sends the session's newest token, not the one the page started with", async () => {
+    hooks(null, "newest");
+    reply(200, centre);
+
+    await getCentre("old");
+
+    expect(sentToken(0)).toBe("Bearer newest");
+  });
+
+  it("ends the login when it can't be renewed", async () => {
+    const session = hooks(null);
+    reply(401, unauthenticated);
+
+    await expect(getCentre("stale")).rejects.toMatchObject({ status: 401, code: "unauthenticated" });
+
+    expect(session.ended).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves requests made without a token, and other errors, alone", async () => {
+    const session = hooks("fresh");
+    reply(401, unauthenticated);
+    reply(403, { error: { code: "forbidden", message: "No." } });
+
+    await expect(refreshSession()).rejects.toMatchObject({ status: 401 });
+    await expect(getCentre("token")).rejects.toMatchObject({ status: 403 });
+
+    expect(session.renew).not.toHaveBeenCalled();
+    expect(session.ended).not.toHaveBeenCalled();
   });
 });

@@ -126,7 +126,45 @@ export function apiBaseUrl(): string {
   return (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787/api/v1").replace(/\/+$/, "");
 }
 
-async function call<T>(path: string, init: { method?: string; body?: unknown; token?: string } = {}): Promise<T> {
+/** How requests carry on when the access token runs out; session.ts plugs itself in. */
+export type SessionHooks = {
+  /** The newest access token, which may be fresher than the one a page was handed. */
+  current: () => string | null;
+  /** A new access token in place of `stale`, or null when the login has ended. */
+  renew: (stale: string) => Promise<string | null>;
+  /** The login has ended: log out of the app. */
+  ended: () => void;
+};
+
+let session: SessionHooks | null = null;
+
+export function setSessionHooks(hooks: SessionHooks | null): void {
+  session = hooks;
+}
+
+type CallInit = { method?: string; body?: unknown; token?: string };
+
+/**
+ * A request to the API. With a token, a 401 means the access token ran out:
+ * it is renewed and the request tried once more, or the login has ended.
+ */
+async function call<T>(path: string, init: CallInit = {}): Promise<T> {
+  if (!init.token || !session) return send<T>(path, init);
+  const token = session.current() ?? init.token;
+  try {
+    return await send<T>(path, { ...init, token });
+  } catch (err) {
+    if (!(err instanceof ApiRequestError && err.status === 401)) throw err;
+    const renewed = await session.renew(token);
+    if (!renewed) {
+      session.ended();
+      throw err;
+    }
+    return send<T>(path, { ...init, token: renewed });
+  }
+}
+
+async function send<T>(path: string, init: CallInit): Promise<T> {
   const headers = new Headers();
   if (init.body !== undefined) headers.set("content-type", "application/json");
   if (init.token) headers.set("authorization", `Bearer ${init.token}`);
