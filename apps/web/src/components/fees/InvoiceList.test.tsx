@@ -61,7 +61,7 @@ const paidBill = bill(1, {
   payment: { method: "upi", amountPaise: 250000, reference: "412345678901", receivedAt: "2026-11-02T04:30:00.000Z", receipt: { id: "r1", number: 1 } },
 });
 
-function setup(props: { studentId?: string } = {}) {
+function setup(props: { studentId?: string; batchId?: string } = {}) {
   const user = userEvent.setup();
   render(
     <ThemeRegistry>
@@ -272,5 +272,13 @@ describe("InvoiceList", () => {
 
     expect(await screen.findByText("The parent hasn’t agreed to WhatsApp messages.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Send" })).not.toBeInTheDocument();
+  });
+
+  it("shows one batch's bills, filtered, without the batch column", async () => {
+    setup({ batchId: "b1" });
+    await screen.findByRole("table");
+    expect(listInvoices).toHaveBeenCalledWith("token", { status: "unpaid", batchId: "b1" });
+    expect(screen.getByRole("button", { name: "Paid" })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Batch" })).not.toBeInTheDocument();
   });
 });

@@ -12,7 +12,7 @@ import { useSession } from "@/lib/useSession";
 
 /**
  * Edit, archive or restore one batch: /batches/edit?id=… (a query parameter, as the
- * site is a static export). The design's batch detail page arrives with students.
+ * site is a static export). /batches/view shows the batch with its students.
  */
 function EditBatch() {
   const router = useRouter();

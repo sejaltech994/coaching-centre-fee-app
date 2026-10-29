@@ -47,7 +47,7 @@ export function StatusChip({ status }: { status: InvoiceStatus }) {
  * The centre's bills, newest due first: filtered by status and due month on
  * the Fees page, or one student's bills (all statuses, no filters) on their page.
  */
-export function InvoiceList({ token, studentId }: { token: string; studentId?: string }) {
+export function InvoiceList({ token, studentId, batchId }: { token: string; studentId?: string; batchId?: string }) {
   const t = copy.fees;
   const filtersId = useId();
   const [status, setStatus] = useState<Status>(studentId ? "all" : "unpaid");
@@ -61,11 +61,11 @@ export function InvoiceList({ token, studentId }: { token: string; studentId?: s
   const [reminding, setReminding] = useState<string[] | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const filters: InvoiceFilters = { status, ...(month && { month }), ...(studentId && { studentId }) };
+  const filters: InvoiceFilters = { status, ...(month && { month }), ...(studentId && { studentId }), ...(batchId && { batchId }) };
 
   useEffect(() => {
     let cancelled = false;
-    listInvoices(token, { status, ...(month && { month }), ...(studentId && { studentId }) }).then(
+    listInvoices(token, { status, ...(month && { month }), ...(studentId && { studentId }), ...(batchId && { batchId }) }).then(
       (page) => {
         if (cancelled) return;
         setInvoices(page.invoices);
@@ -77,7 +77,7 @@ export function InvoiceList({ token, studentId }: { token: string; studentId?: s
     return () => {
       cancelled = true;
     };
-  }, [token, status, month, studentId]);
+  }, [token, status, month, studentId, batchId]);
 
   async function showMore() {
     if (!cursor) return;
@@ -170,7 +170,7 @@ export function InvoiceList({ token, studentId }: { token: string; studentId?: s
               <TableRow>
                 <TableCell>{t.colBill}</TableCell>
                 {!studentId && <TableCell>{t.colStudent}</TableCell>}
-                <TableCell>{t.colBatch}</TableCell>
+                {!batchId && <TableCell>{t.colBatch}</TableCell>}
                 <TableCell>{t.colPeriod}</TableCell>
                 <TableCell>{t.colDue}</TableCell>
                 <TableCell align="right">{t.colAmount}</TableCell>
@@ -192,7 +192,7 @@ export function InvoiceList({ token, studentId }: { token: string; studentId?: s
                         </Link>
                       </TableCell>
                     )}
-                    <TableCell>{invoice.batch.name}</TableCell>
+                    {!batchId && <TableCell>{invoice.batch.name}</TableCell>}
                     <TableCell sx={{ whiteSpace: "nowrap" }}>{periodLabel(invoice.cycle, invoice.periodStart)}</TableCell>
                     <TableCell sx={{ whiteSpace: "nowrap" }}>{showDate(invoice.dueDate)}</TableCell>
                     <TableCell align="right">

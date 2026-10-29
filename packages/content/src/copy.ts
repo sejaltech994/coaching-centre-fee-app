@@ -231,6 +231,22 @@ export const CATALOG = {
       discountInvalid: { label: "Discount not an amount", text: "Enter a discount of ₹0 or more." },
     },
   },
+  batch: {
+    title: "One batch",
+    entries: {
+      edit: { label: "Button: edit the batch", text: "Edit batch" },
+      noPlan: { label: "When the batch has no fee plan", text: "No fee plan: its students aren't billed." },
+      students: { label: "Section: students", text: "Students" },
+      colStudent: { label: "Column: student", text: "Student" },
+      colParent: { label: "Column: parent", text: "Parent" },
+      colSince: { label: "Column: in the batch since", text: "Since" },
+      noStudents: { label: "When the batch has no students", text: "No students in this batch yet." },
+      addStudent: { label: "Button: add a student", text: "Add a student" },
+      fees: { label: "Section: fees", text: "Fees" },
+      notFound: { label: "When the batch doesn't exist", text: "We couldn't find that batch." },
+      back: { label: "Link: back to batches", text: "Back to batches" },
+    },
+  },
   fees: {
     title: "Fees",
     entries: {
