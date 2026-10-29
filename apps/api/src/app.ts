@@ -6,6 +6,7 @@ import { handleError, notFound } from "./lib/errors";
 import { authRoutes } from "./modules/auth/routes";
 import { batchRoutes } from "./modules/batches/routes";
 import { centreRoutes } from "./modules/centre/routes";
+import { dashboardRoutes } from "./modules/dashboard/routes";
 import { feePlanRoutes } from "./modules/fee-plans/routes";
 import { invoiceRoutes } from "./modules/invoices/routes";
 import { fakeCheckoutRoutes, razorpaySettingsRoutes, razorpayWebhookRoutes } from "./modules/payments/razorpay";
@@ -55,6 +56,7 @@ export function createApp(deps: Deps) {
   app.route("/invoices", invoiceRoutes(deps));
   app.route("/receipts", receiptRoutes(deps));
   app.route("/reminders", reminderRoutes(deps));
+  app.route("/dashboard", dashboardRoutes(deps));
   // No sign-in: a parent's pay link and receipt, keyed by the bill's secret token.
   app.route("/public", publicRoutes(deps));
   // Signed by each centre's own Razorpay webhook secret.

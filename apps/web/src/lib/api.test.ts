@@ -25,6 +25,7 @@ import {
   previewReminder,
   sendReminders,
   setReminderTone,
+  getDashboardSummary,
   recordPayment,
   receiptPdf,
   savePaymentSettings,
@@ -366,6 +367,17 @@ describe("API client", () => {
       ["http://localhost:8787/api/v1/reminders/send", "POST", { invoiceIds: ["i1", "i2"] }],
       ["http://localhost:8787/api/v1/centre/reminder-tone", "GET", undefined],
       ["http://localhost:8787/api/v1/centre/reminder-tone", "PUT", { tone: "firm" }],
+    ]);
+  });
+
+  it("reads the dashboard for this month or a chosen one", async () => {
+    reply(200, { month: "2026-11" });
+    reply(200, { month: "2026-10" });
+    await getDashboardSummary("t");
+    await getDashboardSummary("t", "2026-10");
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "http://localhost:8787/api/v1/dashboard/summary",
+      "http://localhost:8787/api/v1/dashboard/summary?month=2026-10",
     ]);
   });
 

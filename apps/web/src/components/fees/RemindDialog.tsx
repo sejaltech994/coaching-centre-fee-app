@@ -10,12 +10,12 @@ import DialogTitle from "@mui/material/DialogTitle";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { useEffect, useId, useState } from "react";
-import { previewReminder, sendReminders, type Invoice } from "@/lib/api";
+import { previewReminder, sendReminders } from "@/lib/api";
 import { copy, errorMessage, fill } from "@/lib/copy";
 
 type Props = {
   token: string;
-  invoices: Invoice[];
+  invoiceIds: string[];
   onClose: () => void;
   onSent: (summary: { sent: number; skipped: number }) => void;
 };
@@ -24,23 +24,23 @@ type Props = {
  * Sending WhatsApp reminders by hand: first the exact message (the first bill's,
  * with its real names and amount), then Send. Each parent gets their own bill.
  */
-export function RemindDialog({ token, invoices, onClose, onSent }: Props) {
+export function RemindDialog({ token, invoiceIds, onClose, onSent }: Props) {
   const t = copy.fees;
   const titleId = useId();
-  const many = invoices.length > 1;
+  const many = invoiceIds.length > 1;
   const [preview, setPreview] = useState<{ text: string; canSend: boolean; reason: string | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    previewReminder(token, invoices[0]!.id).then(setPreview, (err: unknown) => setError(errorMessage(err)));
-  }, [token, invoices]);
+    previewReminder(token, invoiceIds[0]!).then(setPreview, (err: unknown) => setError(errorMessage(err)));
+  }, [token, invoiceIds]);
 
   async function send() {
     setBusy(true);
     setError(null);
     try {
-      const { results } = await sendReminders(token, invoices.map((invoice) => invoice.id));
+      const { results } = await sendReminders(token, invoiceIds);
       const sent = results.filter((r) => r.status === "sent").length;
       onSent({ sent, skipped: results.length - sent });
     } catch (err) {
@@ -54,7 +54,7 @@ export function RemindDialog({ token, invoices, onClose, onSent }: Props) {
   const canSend = preview && (many || preview.canSend);
   return (
     <Dialog open onClose={onClose} aria-labelledby={titleId} fullWidth maxWidth="sm">
-      <DialogTitle id={titleId}>{many ? fill(t.remindAllTitle, { count: invoices.length }) : t.remindTitle}</DialogTitle>
+      <DialogTitle id={titleId}>{many ? fill(t.remindAllTitle, { count: invoiceIds.length }) : t.remindTitle}</DialogTitle>
       <DialogContent>
         <Stack spacing={2}>
           {many && <Typography color="text.secondary">{t.remindAllLead}</Typography>}

@@ -58,7 +58,7 @@ export function InvoiceList({ token, studentId }: { token: string; studentId?: s
   const [loadingMore, setLoadingMore] = useState(false);
   const [waiving, setWaiving] = useState<Invoice | null>(null);
   const [paying, setPaying] = useState<Invoice | null>(null);
-  const [reminding, setReminding] = useState<Invoice[] | null>(null);
+  const [reminding, setReminding] = useState<string[] | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const filters: InvoiceFilters = { status, ...(month && { month }), ...(studentId && { studentId }) };
@@ -153,7 +153,7 @@ export function InvoiceList({ token, studentId }: { token: string; studentId?: s
 
       {!studentId && unpaidShown.length > 1 && (
         <Box>
-          <Button variant="outlined" onClick={() => setReminding(unpaidShown)}>
+          <Button variant="outlined" onClick={() => setReminding(unpaidShown.map((invoice) => invoice.id))}>
             {fill(t.remindAll, { count: unpaidShown.length })}
           </Button>
         </Box>
@@ -216,7 +216,7 @@ export function InvoiceList({ token, studentId }: { token: string; studentId?: s
                             >
                               {t.recordPayment}
                             </Button>
-                            <Button aria-label={fill(t.remindName, { number: invoice.number })} onClick={() => setReminding([invoice])}>
+                            <Button aria-label={fill(t.remindName, { number: invoice.number })} onClick={() => setReminding([invoice.id])}>
                               {t.remind}
                             </Button>
                             <Button aria-label={fill(t.copyLinkName, { number: invoice.number })} onClick={() => copyPayLink(invoice)}>
@@ -279,7 +279,7 @@ export function InvoiceList({ token, studentId }: { token: string; studentId?: s
       {reminding && (
         <RemindDialog
           token={token}
-          invoices={reminding}
+          invoiceIds={reminding}
           onClose={() => setReminding(null)}
           onSent={({ sent, skipped }) => {
             setNotice(reminding.length === 1 && sent === 1 ? t.reminderSent : fill(t.remindersSent, { sent, skipped }));

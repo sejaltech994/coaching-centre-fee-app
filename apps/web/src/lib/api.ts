@@ -146,6 +146,23 @@ export type Reminder = {
 
 export type ReminderTone = "gentle" | "firm";
 
+/** A month's money and who owes (GET /dashboard/summary); money in paise. */
+export type DashboardSummary = {
+  month: string;
+  collectedPaise: number;
+  billedPaise: number;
+  outstandingPaise: number;
+  /** Every overdue bill, from any month. */
+  overduePaise: number;
+  defaulters: {
+    student: { id: string; name: string; parentName: string };
+    overduePaise: number;
+    bills: number;
+    oldestDueDate: string;
+    invoiceIds: string[];
+  }[];
+};
+
 export type PaymentMethod = "upi" | "cash" | "bank_transfer" | "card" | "netbanking" | "wallet";
 
 /** What the owner records: UPI, cash or a bank transfer; the day it came (YYYY-MM-DD). */
@@ -437,3 +454,6 @@ export const getReminderTone = (token: string) => call<{ tone: ReminderTone }>("
 
 export const setReminderTone = (token: string, tone: ReminderTone) =>
   call<{ tone: ReminderTone }>("/centre/reminder-tone", { method: "PUT", body: { tone }, token });
+
+export const getDashboardSummary = (token: string, month?: string) =>
+  call<DashboardSummary>(`/dashboard/summary${month ? `?month=${encodeURIComponent(month)}` : ""}`, { token });

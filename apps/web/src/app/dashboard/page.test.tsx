@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getMe } from "@/lib/api";
+import { getDashboardSummary, getMe } from "@/lib/api";
 import { useSession } from "@/lib/useSession";
 import DashboardPage from "./page";
 
@@ -9,6 +9,7 @@ vi.mock("@/lib/useSession", () => ({ useSession: vi.fn() }));
 vi.mock("@/lib/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api")>()),
   getMe: vi.fn(),
+  getDashboardSummary: vi.fn(),
 }));
 
 const owner = () => ({
@@ -21,6 +22,9 @@ const centre = (name: string | null) => ({ id: "c1", name, plan: "free" as const
 beforeEach(() => {
   vi.mocked(useSession).mockReturnValue({ token: "token", centre: centre("Sunrise Classes") });
   vi.mocked(getMe).mockReset().mockResolvedValue(owner());
+  vi.mocked(getDashboardSummary)
+    .mockReset()
+    .mockResolvedValue({ month: "2026-11", collectedPaise: 0, billedPaise: 0, outstandingPaise: 0, overduePaise: 0, defaulters: [] });
 });
 
 describe("/dashboard", () => {
@@ -49,9 +53,9 @@ describe("/dashboard", () => {
     expect(getMe).not.toHaveBeenCalled();
   });
 
-  it("points to setting up batches first", () => {
+  it("points to setting up batches first", async () => {
     render(<DashboardPage />);
-    expect(screen.getByRole("link", { name: "Set up batches" })).toHaveAttribute("href", "/batches");
+    expect(await screen.findByRole("link", { name: "Set up batches" })).toHaveAttribute("href", "/batches");
   });
 
   it("sits in the app shell with Dashboard marked as the current page", () => {

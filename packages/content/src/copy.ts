@@ -345,6 +345,38 @@ export const CATALOG = {
       cancel: { label: "Button: cancel", text: "Cancel" },
     },
   },
+  dashboard: {
+    title: "Dashboard",
+    entries: {
+      lead: { label: "Text under the centre's name", text: "This month's fees at a glance." },
+      welcome: { label: "Heading before the centre is named", text: "Welcome to Chukta" },
+      nameCentre: {
+        label: "Text before the centre is named",
+        text: "You're in. Start with your batches; you'll be able to name your centre in Settings.",
+        multiline: true,
+      },
+      month: { label: "Field: which month", text: "Month" },
+      collected: { label: "Tile: money received", text: "Collected" },
+      collectedNote: { label: "Under Collected ({month})", text: "Received in {month}" },
+      outstanding: { label: "Tile: still owed this month", text: "Still to collect" },
+      outstandingNote: { label: "Under Still to collect ({billed}, {month})", text: "Of {billed} billed for {month}" },
+      overdue: { label: "Tile: overdue", text: "Overdue" },
+      overdueNote: { label: "Under Overdue", text: "From every month" },
+      owing: { label: "Section: who owes", text: "Who owes" },
+      colStudent: { label: "Column: student", text: "Student" },
+      colParent: { label: "Column: parent", text: "Parent" },
+      colOverdue: { label: "Column: overdue amount", text: "Overdue" },
+      colBills: { label: "Column: number of bills", text: "Bills" },
+      colOldest: { label: "Column: oldest due date", text: "Oldest due" },
+      nobodyOwes: { label: "When nothing is overdue", text: "Nobody owes anything overdue." },
+      firstSteps: {
+        label: "Before anything is billed",
+        text: "Nothing billed yet. Set up your batches with a fee plan, then add students: their bills are made for you.",
+        multiline: true,
+      },
+      setUpBatches: { label: "Button: set up batches", text: "Set up batches" },
+    },
+  },
   reminders: {
     title: "Reminders",
     entries: {
