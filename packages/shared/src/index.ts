@@ -41,3 +41,4 @@ export {
   type BillingTerms,
   type InvoiceStatus,
 } from "./billing";
+export { upiPayLink, validatePaymentSettings, type PaymentSettingsInput } from "./payments";

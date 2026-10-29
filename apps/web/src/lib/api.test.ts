@@ -15,6 +15,11 @@ import {
   createFeePlan,
   listFeePlans,
   listInvoices,
+  getPaymentSettings,
+  getPublicInvoice,
+  recordPayment,
+  receiptPdf,
+  savePaymentSettings,
   waiveInvoice,
   setDiscount,
   updateFeePlan,
@@ -280,6 +285,40 @@ describe("API client", () => {
       ["http://localhost:8787/api/v1/invoices?status=all&month=2026-11&studentId=s1&cursor=c", "GET", undefined],
       ["http://localhost:8787/api/v1/invoices/i1/waive", "POST", { reason: "Scholarship" }],
     ]);
+  });
+
+  it("reads and saves the centre's UPI ID, and records a payment for a bill", async () => {
+    reply(200, { paymentSettings: { upiId: null, payeeName: null } });
+    reply(200, { paymentSettings: { upiId: "sunrise@okicici", payeeName: "Sunrise" } });
+    reply(201, { invoice: { id: "i1", status: "paid" } });
+
+    await getPaymentSettings("t");
+    await savePaymentSettings("t", { upiId: "sunrise@okicici", payeeName: "Sunrise" });
+    await recordPayment("t", "i1", { method: "cash", reference: "", receivedOn: "2026-11-01" });
+
+    const sent = fetchMock.mock.calls.map(([url, init]) => [url, init!.method, init!.body && JSON.parse(init!.body as string)]);
+    expect(sent).toEqual([
+      ["http://localhost:8787/api/v1/centre/payment-settings", "GET", undefined],
+      ["http://localhost:8787/api/v1/centre/payment-settings", "PUT", { upiId: "sunrise@okicici", payeeName: "Sunrise" }],
+      ["http://localhost:8787/api/v1/invoices/i1/payments", "POST", { method: "cash", reference: "", receivedOn: "2026-11-01" }],
+    ]);
+  });
+
+  it("downloads a receipt as a PDF, with the access token", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("%PDF-1.7", { status: 200, headers: { "content-type": "application/pdf" } }));
+
+    const pdf = await receiptPdf("t", "r1");
+
+    expect(pdf.type).toBe("application/pdf");
+    expect(await pdf.text()).toBe("%PDF-1.7");
+    expect(fetchMock.mock.calls[0]![0]).toBe("http://localhost:8787/api/v1/receipts/r1/pdf");
+  });
+
+  it("reads a parent's bill from its pay link, without signing in", async () => {
+    reply(200, { centre: { name: "Sunrise" } });
+    await getPublicInvoice("abc");
+    expect(fetchMock.mock.calls[0]![0]).toBe("http://localhost:8787/api/v1/public/invoices/abc");
+    expect(new Headers(fetchMock.mock.calls[0]![1]!.headers).get("authorization")).toBeNull();
   });
 
   it("reads the centre with the access token", async () => {

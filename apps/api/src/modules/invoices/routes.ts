@@ -1,11 +1,13 @@
-import { batches, invoices, students, withCentre, type Invoice, type Tx } from "@chukta/db";
+import { batches, invoices, payments, receipts, students, withCentre, type Invoice, type Payment, type Tx } from "@chukta/db";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv, Deps } from "../../deps";
 import { ApiError, invalidFields, invalidRequest } from "../../lib/errors";
+import { centreToday } from "../../lib/dates";
 import { readJson } from "../../lib/request";
 import { requireAuth } from "../../middleware/auth";
+import { recordPayment } from "../payments/record";
 
 /** Bills (TSD: invoices). They're made by billing.ts; here the owner lists, reads and waives them. */
 
@@ -13,9 +15,18 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const notFound = () => new ApiError(404, "not_found", "No such bill.");
 const closed = () => new ApiError(409, "invoice_closed", "This bill is already paid or waived.");
 
-type Row = { invoice: Invoice; student: { id: string; name: string; parentName: string }; batch: { id: string; name: string } };
+type Row = {
+  invoice: Invoice;
+  student: { id: string; name: string; parentName: string };
+  batch: { id: string; name: string };
+  payment: Payment | null;
+  receipt: { id: string; number: number } | null;
+};
 
-export function invoiceDto({ invoice, student, batch }: Row) {
+/** Where the parent opens a bill and pays it: the web app's /pay page. */
+export const payLink = (deps: Deps, token: string) => `${deps.config.webOrigins[0]}/pay/?t=${token}`;
+
+export function invoiceDto({ invoice, student, batch, payment, receipt }: Row, deps: Deps) {
   return {
     id: invoice.id,
     number: invoice.number,
@@ -33,6 +44,14 @@ export function invoiceDto({ invoice, student, batch }: Row) {
     paidAt: invoice.paidAt?.toISOString() ?? null,
     waivedAt: invoice.waivedAt?.toISOString() ?? null,
     waiveReason: invoice.waiveReason,
+    payment: payment && {
+      method: payment.method,
+      amountPaise: payment.amountPaise,
+      reference: payment.reference,
+      receivedAt: payment.receivedAt.toISOString(),
+      receipt,
+    },
+    payLink: payLink(deps, invoice.publicToken),
     createdAt: invoice.createdAt.toISOString(),
   };
 }
@@ -44,10 +63,14 @@ export const withNames = (tx: Tx) =>
       invoice: invoices,
       student: { id: students.id, name: students.name, parentName: students.parentName },
       batch: { id: batches.id, name: batches.name },
+      payment: payments,
+      receipt: { id: receipts.id, number: receipts.number },
     })
     .from(invoices)
     .innerJoin(students, eq(students.id, invoices.studentId))
-    .innerJoin(batches, eq(batches.id, invoices.batchId));
+    .innerJoin(batches, eq(batches.id, invoices.batchId))
+    .leftJoin(payments, eq(payments.invoiceId, invoices.id))
+    .leftJoin(receipts, eq(receipts.paymentId, payments.id));
 
 const STATUSES = { unpaid: ["pending", "overdue"], all: null, pending: ["pending"], overdue: ["overdue"], paid: ["paid"], waived: ["waived"] } as const;
 
@@ -72,6 +95,17 @@ function decodeCursor(cursor: string) {
 }
 
 const waiveBody = z.object({ reason: z.unknown() });
+// The owner records UPI, cash or a bank transfer; cards and the rest come through the centre's gateway.
+const paymentBody = z
+  .object({
+    method: z.enum(["upi", "cash", "bank_transfer"]),
+    reference: z.string().max(100).optional(),
+    receivedOn: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional(),
+  })
+  .strict();
 
 export function invoiceRoutes(deps: Deps) {
   const routes = new Hono<AppEnv>();
@@ -103,7 +137,7 @@ export function invoiceRoutes(deps: Deps) {
 
     const page = rows.slice(0, limit);
     return c.json({
-      invoices: page.map(invoiceDto),
+      invoices: page.map((row) => invoiceDto(row, deps)),
       nextCursor: rows.length > limit ? encodeCursor(page.at(-1)!.invoice) : null,
     });
   });
@@ -116,7 +150,7 @@ export function invoiceRoutes(deps: Deps) {
       withNames(tx).where(and(eq(invoices.id, id), eq(invoices.centreId, centreId))),
     );
     if (!row) throw notFound();
-    return c.json({ invoice: invoiceDto(row) });
+    return c.json({ invoice: invoiceDto(row, deps) });
   });
 
   /** TSD: waive an invoice with a reason; who and when are kept (money-changing actions are audited). */
@@ -142,7 +176,27 @@ export function invoiceRoutes(deps: Deps) {
       const [shown] = await withNames(tx).where(byId);
       return shown!;
     });
-    return c.json({ invoice: invoiceDto(row) });
+    return c.json({ invoice: invoiceDto(row, deps) });
+  });
+
+  /** TSD: record a cash (or UPI, or bank) payment. The bill is paid in full and gets a receipt. */
+  routes.post("/:id/payments", async (c) => {
+    const { centreId, userId } = c.var.auth;
+    const id = c.req.param("id");
+    if (!UUID.test(id)) throw notFound();
+    const { method, reference, receivedOn } = await readJson(c, paymentBody);
+    const now = deps.now();
+    const today = await centreToday(deps, centreId);
+    if (receivedOn && receivedOn > today) throw invalidFields({ receivedOn: "The payment can’t be received in the future." });
+    // A day in the past is recorded at noon in India, so it reads as that day everywhere.
+    const receivedAt = !receivedOn || receivedOn === today ? now : new Date(`${receivedOn}T12:00:00+05:30`);
+
+    const row = await withCentre(deps.db, centreId, async (tx) => {
+      await recordPayment(tx, { centreId, invoiceId: id, method, reference: reference?.trim() || null, receivedAt, recordedBy: userId, now });
+      const [shown] = await withNames(tx).where(and(eq(invoices.id, id), eq(invoices.centreId, centreId)));
+      return shown!;
+    });
+    return c.json({ invoice: invoiceDto(row, deps) }, 201);
   });
 
   return routes;

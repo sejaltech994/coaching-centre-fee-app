@@ -328,6 +328,11 @@ export const invoices = pgTable(
       .references(() => batches.id),
     // 1, 2, 3… within the centre: what parents and the owner quote.
     number: integer("number").notNull(),
+    // The secret in the parent's pay link (/pay?t=…): 128 random bits, no centre id.
+    publicToken: text("public_token")
+      .notNull()
+      .unique()
+      .default(sql`replace(gen_random_uuid()::text, '-', '')`),
     cycle: text("cycle", { enum: ["monthly", "quarterly", "one_time"] }).notNull(),
     periodStart: date("period_start").notNull(),
     periodEnd: date("period_end").notNull(),
@@ -365,6 +370,76 @@ export const invoices = pgTable(
   ],
 ).enableRLS();
 
+/** How parents pay a centre: its own UPI ID (TSD: Integrations › Payments). Chukta never holds the money. */
+export const paymentSettings = pgTable(
+  "payment_settings",
+  {
+    id: id(),
+    centreId: uuid("centre_id")
+      .notNull()
+      .unique()
+      .references(() => centres.id),
+    upiId: text("upi_id"),
+    payeeName: text("payee_name"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [centreIsolation("payment_settings_centre_isolation", t.centreId)],
+).enableRLS();
+
+export const PAYMENT_METHODS = ["upi", "cash", "bank_transfer", "card", "netbanking", "wallet"] as const;
+
+/** Money received for a bill: recorded by the owner, or by the centre's gateway. One per bill (bills are paid in full). */
+export const payments = pgTable(
+  "payments",
+  {
+    id: id(),
+    centreId: uuid("centre_id")
+      .notNull()
+      .references(() => centres.id),
+    invoiceId: uuid("invoice_id")
+      .notNull()
+      .unique()
+      .references(() => invoices.id),
+    amountPaise: integer("amount_paise").notNull(),
+    method: text("method", { enum: PAYMENT_METHODS }).notNull(),
+    // UPI reference (UTR), bank reference or a note.
+    reference: text("reference"),
+    // Set for gateway payments; unique, so a repeated webhook records nothing new.
+    gatewayPaymentId: text("gateway_payment_id").unique(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull(),
+    recordedBy: uuid("recorded_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("payments_centre_received_idx").on(t.centreId, t.receivedAt),
+    check("payments_amount_check", sql`${t.amountPaise} > 0`),
+    check("payments_method_check", sql.raw(`method in (${PAYMENT_METHODS.map((m) => `'${m}'`).join(", ")})`)),
+    centreIsolation("payments_centre_isolation", t.centreId),
+  ],
+).enableRLS();
+
+/** One receipt per payment, numbered 1, 2, 3… per centre. Its PDF is drawn from these rows on request. */
+export const receipts = pgTable(
+  "receipts",
+  {
+    id: id(),
+    centreId: uuid("centre_id")
+      .notNull()
+      .references(() => centres.id),
+    paymentId: uuid("payment_id")
+      .notNull()
+      .unique()
+      .references(() => payments.id),
+    number: integer("number").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("receipts_centre_number_unique").on(t.centreId, t.number),
+    centreIsolation("receipts_centre_isolation", t.centreId),
+  ],
+).enableRLS();
+
 export type Centre = typeof centres.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Consent = typeof consents.$inferSelect;
@@ -375,3 +450,6 @@ export type Student = typeof students.$inferSelect;
 export type Enrolment = typeof enrolments.$inferSelect;
 export type FeePlan = typeof feePlans.$inferSelect;
 export type Invoice = typeof invoices.$inferSelect;
+export type Payment = typeof payments.$inferSelect;
+export type Receipt = typeof receipts.$inferSelect;
+export type PaymentSettings = typeof paymentSettings.$inferSelect;

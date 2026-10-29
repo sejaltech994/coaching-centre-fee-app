@@ -119,7 +119,42 @@ export type Invoice = {
   paidAt: string | null;
   waivedAt: string | null;
   waiveReason: string | null;
+  payment: {
+    method: PaymentMethod;
+    amountPaise: number;
+    reference: string | null;
+    receivedAt: string;
+    receipt: { id: string; number: number } | null;
+  } | null;
+  /** The parent's page for this bill, to send them: no sign-in needed. */
+  payLink: string;
   createdAt: string;
+};
+
+export type PaymentMethod = "upi" | "cash" | "bank_transfer" | "card" | "netbanking" | "wallet";
+
+/** What the owner records: UPI, cash or a bank transfer; the day it came (YYYY-MM-DD). */
+export type PaymentInput = { method: "upi" | "cash" | "bank_transfer"; reference: string; receivedOn: string };
+
+export type PaymentSettings = { upiId: string | null; payeeName: string | null };
+
+/** A bill as its parent sees it from the pay link. */
+export type PublicInvoice = {
+  centre: { name: string | null };
+  invoice: {
+    number: number;
+    studentName: string;
+    batchName: string;
+    cycle: FeeCycle;
+    periodStart: string;
+    dueDate: string;
+    totalPaise: number;
+    lateFeePaise: number;
+    status: InvoiceStatus;
+  };
+  /** The centre's own UPI, while the bill is unpaid and the centre has set it up. */
+  upi: { upiId: string; payeeName: string; link: string } | null;
+  receiptUrl: string | null;
 };
 
 export type InvoiceFilters = {
@@ -169,7 +204,7 @@ export function setSessionHooks(hooks: SessionHooks | null): void {
   session = hooks;
 }
 
-type CallInit = { method?: string; body?: unknown; token?: string };
+type CallInit = { method?: string; body?: unknown; token?: string; as?: "json" | "blob" };
 
 /**
  * A request to the API. With a token, a 401 means the access token ran out:
@@ -212,6 +247,7 @@ async function send<T>(path: string, init: CallInit): Promise<T> {
   }
 
   if (res.status === 204) return undefined as T;
+  if (res.ok && init.as === "blob") return (await res.blob()) as T;
   const payload = (await res.json().catch(() => null)) as
     | (T & { error?: { code: string; message: string; fields?: Record<string, string> } })
     | null;
@@ -335,3 +371,18 @@ export const listInvoices = (token: string, filters: InvoiceFilters) => {
 
 export const waiveInvoice = (token: string, id: string, reason: string) =>
   call<{ invoice: Invoice }>(`/invoices/${encodeURIComponent(id)}/waive`, { method: "POST", body: { reason }, token });
+
+export const recordPayment = (token: string, id: string, input: PaymentInput) =>
+  call<{ invoice: Invoice }>(`/invoices/${encodeURIComponent(id)}/payments`, { method: "POST", body: input, token });
+
+/** The receipt as a PDF file, to open or save. */
+export const receiptPdf = (token: string, id: string) =>
+  call<Blob>(`/receipts/${encodeURIComponent(id)}/pdf`, { token, as: "blob" });
+
+export const getPaymentSettings = (token: string) => call<{ paymentSettings: PaymentSettings }>("/centre/payment-settings", { token });
+
+export const savePaymentSettings = (token: string, settings: PaymentSettings) =>
+  call<{ paymentSettings: PaymentSettings }>("/centre/payment-settings", { method: "PUT", body: settings, token });
+
+/** A parent's bill from its pay link's token. */
+export const getPublicInvoice = (token: string) => call<PublicInvoice>(`/public/invoices/${encodeURIComponent(token)}`);

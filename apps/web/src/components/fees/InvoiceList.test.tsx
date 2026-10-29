@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiRequestError, listInvoices, waiveInvoice, type Invoice } from "@/lib/api";
+import { ApiRequestError, listInvoices, receiptPdf, recordPayment, waiveInvoice, type Invoice } from "@/lib/api";
 import { ThemeRegistry } from "@/theme/ThemeRegistry";
 import { InvoiceList } from "./InvoiceList";
 
@@ -9,6 +9,8 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api")>()),
   listInvoices: vi.fn(),
   waiveInvoice: vi.fn(),
+  recordPayment: vi.fn(),
+  receiptPdf: vi.fn(),
 }));
 
 const bill = (number: number, extra: Partial<Invoice> = {}): Invoice => ({
@@ -28,6 +30,8 @@ const bill = (number: number, extra: Partial<Invoice> = {}): Invoice => ({
   paidAt: null,
   waivedAt: null,
   waiveReason: null,
+  payment: null,
+  payLink: `http://localhost:3000/pay/?t=${"a".repeat(31)}${number}`,
   createdAt: "2026-11-02T04:30:00.000Z",
   ...extra,
 });
@@ -43,6 +47,14 @@ beforeEach(() => {
       nextCursor: null,
     });
   vi.mocked(waiveInvoice).mockReset();
+  vi.mocked(recordPayment).mockReset();
+  vi.mocked(receiptPdf).mockReset();
+});
+
+const paidBill = bill(1, {
+  status: "paid",
+  paidAt: "2026-11-02T04:30:00.000Z",
+  payment: { method: "upi", amountPaise: 250000, reference: "412345678901", receivedAt: "2026-11-02T04:30:00.000Z", receipt: { id: "r1", number: 1 } },
 });
 
 function setup(props: { studentId?: string } = {}) {
@@ -153,5 +165,63 @@ describe("InvoiceList", () => {
     vi.mocked(listInvoices).mockRejectedValue(new ApiRequestError(0, "network_error", "x"));
     setup();
     expect(await screen.findByRole("alert")).toHaveTextContent("Can't reach Chukta.");
+  });
+
+  it("records a payment, by UPI with its reference, and says which receipt it got", async () => {
+    vi.mocked(recordPayment).mockResolvedValue({ invoice: paidBill });
+    const { user } = setup();
+    await screen.findByRole("table");
+
+    await user.click(screen.getByRole("button", { name: "Record payment for bill #1" }));
+    const dialog = screen.getByRole("dialog", { name: "Record payment for bill #1" });
+    expect(dialog).toHaveTextContent("Aarav Sharma paid ₹2,500 for Nov 2026.");
+    await user.click(within(dialog).getByRole("button", { name: "UPI" }));
+    await user.type(within(dialog).getByLabelText("Reference (optional)"), "412345678901");
+    await user.click(within(dialog).getByRole("button", { name: "Record payment" }));
+
+    expect(recordPayment).toHaveBeenCalledWith("token", "i1", expect.objectContaining({ method: "upi", reference: "412345678901" }));
+    expect(await screen.findByText("Payment recorded. Receipt #1.")).toBeInTheDocument();
+    expect(rows()[1]).toHaveTextContent("Paid");
+    expect(screen.queryByRole("button", { name: "Record payment for bill #1" })).not.toBeInTheDocument();
+  });
+
+  it("explains a payment that can't be recorded", async () => {
+    vi.mocked(recordPayment).mockRejectedValue(
+      new ApiRequestError(400, "invalid_request", "x", { fields: { receivedOn: "The payment can’t be received in the future." } }),
+    );
+    const { user } = setup();
+    await screen.findByRole("table");
+
+    await user.click(screen.getByRole("button", { name: "Record payment for bill #1" }));
+    await user.click(screen.getByRole("button", { name: "Record payment" }));
+
+    expect(await screen.findByLabelText("Received on")).toHaveAccessibleDescription("The payment can’t be received in the future.");
+  });
+
+  it("opens a paid bill's receipt", async () => {
+    vi.mocked(listInvoices).mockResolvedValue({ invoices: [paidBill], nextCursor: null });
+    vi.mocked(receiptPdf).mockResolvedValue(new Blob(["%PDF"], { type: "application/pdf" }));
+    const createObjectURL = vi.fn(() => "blob:receipt");
+    vi.stubGlobal("URL", Object.assign(URL, { createObjectURL }));
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    const { user } = setup();
+    await screen.findByRole("table");
+
+    await user.click(screen.getByRole("button", { name: "Receipt #1" }));
+
+    expect(receiptPdf).toHaveBeenCalledWith("token", "r1");
+    expect(open).toHaveBeenCalledWith("blob:receipt", "_blank", "noopener");
+    vi.unstubAllGlobals();
+  });
+
+  it("copies an unpaid bill's pay link, to send to the parent", async () => {
+    const { user } = setup();
+    const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+    await screen.findByRole("table");
+
+    await user.click(screen.getByRole("button", { name: "Copy pay link for bill #1" }));
+
+    expect(writeText).toHaveBeenCalledWith(bill(1).payLink);
+    expect(await screen.findByText("Pay link copied. Send it to the parent on WhatsApp.")).toBeInTheDocument();
   });
 });

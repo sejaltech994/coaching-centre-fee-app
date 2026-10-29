@@ -93,6 +93,12 @@ describe("migrations", () => {
     ["invoices.enrolment_id", "enrolments", "no action"],
     ["invoices.batch_id", "batches", "no action"],
     ["invoices.waived_by", "users", "set null"],
+    ["payment_settings.centre_id", "centres", "no action"],
+    ["payments.centre_id", "centres", "no action"],
+    ["payments.invoice_id", "invoices", "no action"],
+    ["payments.recorded_by", "users", "set null"],
+    ["receipts.centre_id", "centres", "no action"],
+    ["receipts.payment_id", "payments", "no action"],
   ])("link %s to %s (on delete: %s)", (column, target, onDelete) => {
     const tables = Object.values(schema).filter((value) => value instanceof PgTable);
     const links = tables.flatMap((table) => {
@@ -105,7 +111,7 @@ describe("migrations", () => {
 
     expect(links).toContainEqual({ from: column, to: target, onDelete });
     // Every link in the schema is listed here, so a new one needs a row above.
-    expect(links).toHaveLength(17);
+    expect(links).toHaveLength(23);
   });
 
   it("keep refresh token hashes unique and delete them with their user", async () => {

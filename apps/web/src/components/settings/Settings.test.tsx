@@ -5,6 +5,7 @@ import {
   ApiRequestError,
   getIdentities,
   getMe,
+  getPaymentSettings,
   listSessions,
   signOutOtherSessions,
   signOutSession,
@@ -23,6 +24,7 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   updateMe: vi.fn(),
   updateCentre: vi.fn(),
   listSessions: vi.fn(),
+  getPaymentSettings: vi.fn(),
   signOutSession: vi.fn(),
   signOutOtherSessions: vi.fn(),
 }));
@@ -54,6 +56,7 @@ beforeEach(() => {
     identities: [{ provider: "google", email: "asha@example.com", lastUsedAt: "2026-10-28T10:00:00.000Z" }],
   });
   vi.mocked(updateMe).mockReset().mockResolvedValue({ user: { ...me.user, fullName: "Asha S. Sharma" } });
+  vi.mocked(getPaymentSettings).mockReset().mockResolvedValue({ paymentSettings: { upiId: "sunrise@okicici", payeeName: "Sunrise Classes" } });
   vi.mocked(listSessions).mockReset().mockResolvedValue({ sessions: [thisPhone, laptop, tablet] });
   vi.mocked(signOutSession).mockReset().mockResolvedValue(undefined);
   vi.mocked(signOutOtherSessions).mockReset().mockResolvedValue({ signedOut: 2 });
@@ -91,6 +94,7 @@ describe("Settings", () => {
     expect(profile).not.toHaveTextContent("Not confirmed");
     expect(section("Centre")).toHaveTextContent("Sunrise Classes · Coaching · Pune");
     expect(section("Sign-in methods")).toHaveTextContent("Connected as asha@example.com");
+    expect(await within(section("Payments")).findByText("sunrise@okicici")).toBeInTheDocument();
   });
 
   it("never asks for the mobile number to be confirmed", async () => {

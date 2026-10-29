@@ -8,6 +8,9 @@ import { batchRoutes } from "./modules/batches/routes";
 import { centreRoutes } from "./modules/centre/routes";
 import { feePlanRoutes } from "./modules/fee-plans/routes";
 import { invoiceRoutes } from "./modules/invoices/routes";
+import { paymentSettingsRoutes } from "./modules/payments/routes";
+import { publicRoutes } from "./modules/public/routes";
+import { receiptRoutes } from "./modules/receipts/routes";
 import { meRoutes } from "./modules/me/routes";
 import { enrolmentRoutes, studentRoutes } from "./modules/students/routes";
 
@@ -39,12 +42,16 @@ export function createApp(deps: Deps) {
   });
   app.route("/auth", authRoutes(deps));
   app.route("/me", meRoutes(deps));
+  app.route("/centre/payment-settings", paymentSettingsRoutes(deps));
   app.route("/centre", centreRoutes(deps));
   app.route("/batches", batchRoutes(deps));
   app.route("/fee-plans", feePlanRoutes(deps));
   app.route("/students", studentRoutes(deps));
   app.route("/enrolments", enrolmentRoutes(deps));
   app.route("/invoices", invoiceRoutes(deps));
+  app.route("/receipts", receiptRoutes(deps));
+  // No sign-in: a parent's pay link and receipt, keyed by the bill's secret token.
+  app.route("/public", publicRoutes(deps));
 
   app.notFound(notFound);
   app.onError(handleError);

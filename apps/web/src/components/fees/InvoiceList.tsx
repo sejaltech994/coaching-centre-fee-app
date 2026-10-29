@@ -20,8 +20,9 @@ import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
 import NextLink from "next/link";
 import { useEffect, useId, useState } from "react";
-import { listInvoices, type Invoice, type InvoiceFilters } from "@/lib/api";
+import { listInvoices, receiptPdf, type Invoice, type InvoiceFilters } from "@/lib/api";
 import { copy, errorMessage, fill } from "@/lib/copy";
+import { RecordPaymentDialog } from "./RecordPaymentDialog";
 import { WaiveDialog } from "./WaiveDialog";
 
 type Status = InvoiceFilters["status"];
@@ -55,6 +56,7 @@ export function InvoiceList({ token, studentId }: { token: string; studentId?: s
   const [error, setError] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [waiving, setWaiving] = useState<Invoice | null>(null);
+  const [paying, setPaying] = useState<Invoice | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const filters: InvoiceFilters = { status, ...(month && { month }), ...(studentId && { studentId }) };
@@ -86,6 +88,25 @@ export function InvoiceList({ token, studentId }: { token: string; studentId?: s
       setError(errorMessage(err));
     } finally {
       setLoadingMore(false);
+    }
+  }
+
+  async function openReceipt(receiptId: string) {
+    try {
+      const url = URL.createObjectURL(await receiptPdf(token, receiptId));
+      window.open(url, "_blank", "noopener");
+    } catch (err) {
+      setNotice(errorMessage(err));
+    }
+  }
+
+  async function copyPayLink(invoice: Invoice) {
+    try {
+      await navigator.clipboard.writeText(invoice.payLink);
+      setNotice(t.linkCopied);
+    } catch {
+      // Clipboard blocked (e.g. an insecure page): show the link to copy by hand.
+      setNotice(invoice.payLink);
     }
   }
 
@@ -174,11 +195,29 @@ export function InvoiceList({ token, studentId }: { token: string; studentId?: s
                       <StatusChip status={invoice.status} />
                     </TableCell>
                     <TableCell align="right">
-                      {unpaid && (
-                        <Button aria-label={fill(t.waiveName, { number: invoice.number })} onClick={() => setWaiving(invoice)}>
-                          {t.waive}
-                        </Button>
-                      )}
+                      <Stack direction="row" spacing={0.5} sx={{ justifyContent: "flex-end" }}>
+                        {unpaid && (
+                          <>
+                            <Button
+                              aria-label={fill(t.recordPaymentName, { number: invoice.number })}
+                              onClick={() => setPaying(invoice)}
+                            >
+                              {t.recordPayment}
+                            </Button>
+                            <Button aria-label={fill(t.copyLinkName, { number: invoice.number })} onClick={() => copyPayLink(invoice)}>
+                              {t.copyLink}
+                            </Button>
+                            <Button aria-label={fill(t.waiveName, { number: invoice.number })} onClick={() => setWaiving(invoice)}>
+                              {t.waive}
+                            </Button>
+                          </>
+                        )}
+                        {invoice.payment?.receipt && (
+                          <Button onClick={() => openReceipt(invoice.payment!.receipt!.id)}>
+                            {fill(t.receipt, { number: invoice.payment.receipt.number })}
+                          </Button>
+                        )}
+                      </Stack>
                     </TableCell>
                   </TableRow>
                 );
@@ -205,6 +244,19 @@ export function InvoiceList({ token, studentId }: { token: string; studentId?: s
             replace(changed);
             setWaiving(null);
             setNotice(t.waivedNotice);
+          }}
+        />
+      )}
+
+      {paying && (
+        <RecordPaymentDialog
+          token={token}
+          invoice={paying}
+          onClose={() => setPaying(null)}
+          onRecorded={(changed) => {
+            replace(changed);
+            setPaying(null);
+            setNotice(fill(t.paymentRecorded, { number: changed.payment?.receipt?.number ?? "" }));
           }}
         />
       )}

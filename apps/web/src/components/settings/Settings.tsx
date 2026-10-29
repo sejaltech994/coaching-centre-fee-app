@@ -29,6 +29,7 @@ import {
 } from "@/lib/api";
 import { copy, errorMessage, fill } from "@/lib/copy";
 import { Devices } from "./Devices";
+import { PaymentSettings } from "./PaymentSettings";
 
 type Props = {
   token: string;
@@ -122,6 +123,8 @@ export function Settings({ token, onCentreChanged, onSignOut }: Props) {
           }}
         />
       </Section>
+
+      <PaymentSettings token={token} onSaved={() => setNotice(t.saved)} />
 
       {google && (
         <Section title={t.signInMethods}>
