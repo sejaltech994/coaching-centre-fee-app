@@ -49,7 +49,7 @@ const hashToken = (secret: string, token: string) => keyedHash(secret, "refresh"
 /** Stores a new refresh token (hashed) and returns the raw value for the cookie. */
 export async function issueRefreshToken(
   { db, config, now }: Deps,
-  input: { userId: string; familyId?: string; userAgent?: string },
+  input: { userId: string; familyId?: string; userAgent?: string; city?: string | null },
 ): Promise<{ id: string; token: string; sessionId: string }> {
   const token = randomToken();
   const createdAt = now();
@@ -62,6 +62,7 @@ export async function issueRefreshToken(
       tokenHash: hashToken(config.jwtSecret, token),
       expiresAt: new Date(createdAt.getTime() + REFRESH_TOKEN_TTL_SECONDS * 1000),
       userAgent: input.userAgent ?? null,
+      city: input.city ?? null,
       createdAt,
     })
     .returning({ id: refreshTokens.id });
@@ -76,6 +77,7 @@ export async function rotateRefreshToken(
   deps: Deps,
   token: string,
   userAgent?: string,
+  city?: string | null,
 ): Promise<{ auth: AuthContext; token: string }> {
   const { db, config, now } = deps;
   const current = await db.query.refreshTokens.findFirst({
@@ -98,7 +100,7 @@ export async function rotateRefreshToken(
   const user = await db.query.users.findFirst({ where: eq(users.id, current.userId) });
   if (!user) throw unauthenticated();
 
-  const next = await issueRefreshToken(deps, { userId: user.id, familyId: current.familyId, userAgent });
+  const next = await issueRefreshToken(deps, { userId: user.id, familyId: current.familyId, userAgent, city });
   // Conditional on revoked_at still being null, so two concurrent refreshes can't both win.
   const revoked = await db
     .update(refreshTokens)

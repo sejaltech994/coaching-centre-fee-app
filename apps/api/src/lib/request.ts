@@ -15,6 +15,16 @@ export async function readJson<T extends z.ZodType>(c: Context, schema: T): Prom
   return parsed.data;
 }
 
+/**
+ * The caller's city as Cloudflare places it: the Worker's request.cf, or the
+ * cf-ipcity header behind a trusted proxy. Null when unknown (e.g. locally).
+ */
+export function clientCity(c: Context, trustProxyHeaders: boolean): string | null {
+  const cf = (c.req.raw as Request & { cf?: { city?: unknown } }).cf;
+  const city = typeof cf?.city === "string" ? cf.city : trustProxyHeaders ? c.req.header("cf-ipcity") : undefined;
+  return city?.trim().slice(0, 80) || null;
+}
+
 /** The caller's IP for rate limiting. Proxy headers are trusted only when configured. */
 export function clientIp(c: Context, trustProxyHeaders: boolean): string {
   if (trustProxyHeaders) {

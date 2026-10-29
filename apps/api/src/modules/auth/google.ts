@@ -6,6 +6,7 @@ import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import type { AppEnv, Deps } from "../../deps";
 import { pkceChallenge, randomToken, seal, unseal } from "../../lib/crypto";
 import { ApiError } from "../../lib/errors";
+import { clientCity } from "../../lib/request";
 import { issueRefreshToken } from "./tokens";
 
 /**
@@ -99,7 +100,11 @@ export function googleRoutes(deps: Deps, setRefreshCookie: (c: Context, token: s
     });
 
     if (signedIn) {
-      const refresh = await issueRefreshToken(deps, { userId: signedIn, userAgent: c.req.header("user-agent") });
+      const refresh = await issueRefreshToken(deps, {
+        userId: signedIn,
+        userAgent: c.req.header("user-agent"),
+        city: clientCity(c, deps.config.trustProxyHeaders),
+      });
       setRefreshCookie(c, refresh.token);
       return c.redirect(web("/dashboard/"), 302);
     }

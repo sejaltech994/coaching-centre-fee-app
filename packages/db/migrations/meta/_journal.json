@@ -113,6 +113,13 @@
       "when": 1793292373028,
       "tag": "0015_subscription",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1793295878105,
+      "tag": "0016_device_city",
+      "breakpoints": true
     }
   ]
 }

@@ -158,6 +158,8 @@ export const refreshTokens = pgTable(
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
     replacedById: uuid("replaced_by_id"),
     userAgent: text("user_agent"),
+    // Where the device was when this token was issued (Cloudflare's guess from its IP), if known.
+    city: text("city"),
     createdAt: createdAt(),
   },
   (t) => [index("refresh_tokens_family_id_idx").on(t.familyId), index("refresh_tokens_user_id_idx").on(t.userId)],

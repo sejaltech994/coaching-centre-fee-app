@@ -34,6 +34,7 @@ vi.mock("@/lib/api", async (importOriginal) => ({
 const thisPhone: DeviceSession = {
   id: "s-phone",
   device: "Chrome on Android",
+  city: null,
   signedInAt: "2026-10-28T04:30:00.000Z",
   lastActiveAt: "2026-10-28T04:30:00.000Z",
   current: true,
@@ -41,6 +42,7 @@ const thisPhone: DeviceSession = {
 const laptop: DeviceSession = {
   id: "s-laptop",
   device: "Chrome on Windows",
+  city: "Pune",
   signedInAt: "2026-10-20T04:30:00.000Z",
   lastActiveAt: "2026-10-25T10:00:00.000Z",
   current: false,
@@ -227,7 +229,7 @@ describe("Settings", () => {
     const rows = within(devices).getAllByRole("listitem");
     expect(rows.map((row) => row.textContent)).toEqual([
       expect.stringMatching(/^Chrome on Android.*This device/),
-      expect.stringMatching(/^Chrome on Windows.*Last active 25 Oct 2026/),
+      expect.stringMatching(/^Chrome on Windows · Pune.*Last active 25 Oct 2026/),
       expect.stringMatching(/^Safari on iPad.*Last active 25 Oct 2026/),
     ]);
     expect(within(rows[0]!).queryByRole("button")).not.toBeInTheDocument();

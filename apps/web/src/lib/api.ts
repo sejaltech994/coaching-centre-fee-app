@@ -43,8 +43,8 @@ export type RegisterInput = {
 /** A way the owner signs in; Google is the only one. */
 export type Identity = { provider: "google"; email: string; lastUsedAt: string | null };
 
-/** A device the owner is signed in on (one sign-in). */
-export type DeviceSession = { id: string; device: string; signedInAt: string; lastActiveAt: string; current: boolean };
+/** A device the owner is signed in on (one sign-in), and the city it was last seen in, if known. */
+export type DeviceSession = { id: string; device: string; city: string | null; signedInAt: string; lastActiveAt: string; current: boolean };
 
 export type CentreResponse = {
   centre: { id: string; name: string | null; plan: "free" | "pro"; timezone: string };

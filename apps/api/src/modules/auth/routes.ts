@@ -5,7 +5,7 @@ import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { z } from "zod";
 import type { AppEnv, Deps } from "../../deps";
 import { invalidFields, unauthenticated } from "../../lib/errors";
-import { clientIp, readJson } from "../../lib/request";
+import { clientCity, clientIp, readJson } from "../../lib/request";
 import { clearPendingGoogle, googlePendingMissing, googleRoutes, readPendingGoogle } from "./google";
 import { register } from "./signup";
 import {
@@ -54,7 +54,11 @@ export function authRoutes(deps: Deps) {
 
   /** Starts a session: refresh cookie plus the access token and who signed in. */
   async function signIn(c: Context, user: User, centre: Centre, isNewAccount: boolean) {
-    const refresh = await issueRefreshToken(deps, { userId: user.id, userAgent: c.req.header("user-agent") });
+    const refresh = await issueRefreshToken(deps, {
+      userId: user.id,
+      userAgent: c.req.header("user-agent"),
+      city: clientCity(c, deps.config.trustProxyHeaders),
+    });
     setRefreshCookie(c, refresh.token);
     return {
       status: "signed_in" as const,
@@ -91,7 +95,7 @@ export function authRoutes(deps: Deps) {
   routes.post("/refresh", async (c) => {
     const token = getCookie(c, REFRESH_COOKIE);
     if (!token) throw unauthenticated();
-    const rotated = await rotateRefreshToken(deps, token, c.req.header("user-agent"));
+    const rotated = await rotateRefreshToken(deps, token, c.req.header("user-agent"), clientCity(c, deps.config.trustProxyHeaders));
     setRefreshCookie(c, rotated.token);
     return c.json({ accessToken: await signAccessToken(deps, rotated.auth), expiresIn: ACCESS_TOKEN_TTL_SECONDS });
   });
