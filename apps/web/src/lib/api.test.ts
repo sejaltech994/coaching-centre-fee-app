@@ -33,6 +33,7 @@ import {
   cancelPro,
   getSubscription,
   startPro,
+  downloadMonthlyReport,
   recordPayment,
   receiptPdf,
   savePaymentSettings,
@@ -421,6 +422,12 @@ describe("API client", () => {
       ["http://localhost:8787/api/v1/subscription", "POST"],
       ["http://localhost:8787/api/v1/subscription/cancel", "POST"],
     ]);
+  });
+
+  it("downloads a month's report as a file", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("Bill", { status: 200, headers: { "content-type": "text/csv" } }));
+    expect(await (await downloadMonthlyReport("t", "2026-11")).text()).toBe("Bill");
+    expect(fetchMock.mock.calls[0]![0]).toBe("http://localhost:8787/api/v1/reports/monthly?month=2026-11");
   });
 
   it("reads the centre with the access token", async () => {

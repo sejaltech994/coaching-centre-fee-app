@@ -535,3 +535,7 @@ export const deleteAccount = (token: string, confirm: string) =>
   call<{ deletesAt: string }>("/me", { method: "DELETE", body: { confirm }, token });
 
 export const keepAccount = (token: string) => call<{ deletesAt: null }>("/me/restore", { method: "POST", token });
+
+/** Pro's monthly report: the month's bills and how each was paid, as a CSV file. */
+export const downloadMonthlyReport = (token: string, month: string) =>
+  call<Blob>(`/reports/monthly?month=${encodeURIComponent(month)}`, { token, as: "blob" });

@@ -464,6 +464,8 @@ export const CATALOG = {
         multiline: true,
       },
       setUpBatches: { label: "Button: set up batches", text: "Set up batches" },
+      report: { label: "Button: download the month's report ({month})", text: "Download {month} report" },
+      reportIsPro: { label: "On Free: reports need Pro", text: "Monthly reports come with Pro." },
     },
   },
   attendance: {

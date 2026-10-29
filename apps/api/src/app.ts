@@ -14,6 +14,7 @@ import { fakeCheckoutRoutes, razorpaySettingsRoutes, razorpayWebhookRoutes } fro
 import { paymentSettingsRoutes } from "./modules/payments/routes";
 import { publicRoutes } from "./modules/public/routes";
 import { receiptRoutes } from "./modules/receipts/routes";
+import { reportRoutes } from "./modules/reports/routes";
 import { fakeSubscriptionCheckout, subscriptionRoutes, subscriptionWebhookRoutes } from "./modules/subscription/routes";
 import { reminderRoutes, reminderToneRoutes, whatsappWebhookRoutes } from "./modules/reminders/routes";
 import { meRoutes } from "./modules/me/routes";
@@ -62,6 +63,7 @@ export function createApp(deps: Deps) {
   app.route("/dashboard", dashboardRoutes(deps));
   app.route("/attendance", attendanceRoutes(deps));
   app.route("/subscription", subscriptionRoutes(deps));
+  app.route("/reports", reportRoutes(deps));
   // No sign-in: a parent's pay link and receipt, keyed by the bill's secret token.
   app.route("/public", publicRoutes(deps));
   // Signed by each centre's own Razorpay webhook secret.

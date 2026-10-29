@@ -20,20 +20,61 @@ import NextLink from "next/link";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { showDate } from "@/components/fees/InvoiceList";
 import { RemindDialog } from "@/components/fees/RemindDialog";
-import { getDashboardSummary, type DashboardSummary } from "@/lib/api";
+import {
+  downloadMonthlyReport,
+  getDashboardSummary,
+  type DashboardSummary,
+} from "@/lib/api";
 import { copy, errorMessage, fill } from "@/lib/copy";
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
 /** "Nov 2026" from "2026-11". */
-const monthLabel = (month: string) => `${MONTHS[Number(month.slice(5, 7)) - 1]} ${month.slice(0, 4)}`;
+const monthLabel = (month: string) =>
+  `${MONTHS[Number(month.slice(5, 7)) - 1]} ${month.slice(0, 4)}`;
 
 /** A headline number: the figure in text ink, its meaning underneath. Named for screen readers by its label. */
-function Tile({ label, value, note, badge }: { label: string; value: string; note: string; badge?: ReactNode }) {
+function Tile({
+  label,
+  value,
+  note,
+  badge,
+}: {
+  label: string;
+  value: string;
+  note: string;
+  badge?: ReactNode;
+}) {
   const id = useId();
   return (
-    <Card component="section" aria-labelledby={id} sx={{ p: { xs: 2, md: 2.5 }, flex: 1, minWidth: 180 }}>
-      <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
-        <Typography id={id} variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+    <Card
+      component="section"
+      aria-labelledby={id}
+      sx={{ p: { xs: 2, md: 2.5 }, flex: 1, minWidth: 180 }}
+    >
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{ alignItems: "center", justifyContent: "space-between" }}
+      >
+        <Typography
+          id={id}
+          variant="body2"
+          color="text.secondary"
+          sx={{ fontWeight: 600 }}
+        >
           {label}
         </Typography>
         {badge}
@@ -49,7 +90,13 @@ function Tile({ label, value, note, badge }: { label: string; value: string; not
 }
 
 /** The centre's month at a glance (TSD: dashboard): collected vs still to collect, overdue, and who owes. */
-export function Dashboard({ token }: { token: string }) {
+export function Dashboard({
+  token,
+  plan,
+}: {
+  token: string;
+  plan: "free" | "pro";
+}) {
   const t = copy.dashboard;
   const owingId = useId();
   const [month, setMonth] = useState("");
@@ -73,37 +120,84 @@ export function Dashboard({ token }: { token: string }) {
     };
   }, [token, month]);
 
+  async function downloadReport(month: string) {
+    try {
+      const url = URL.createObjectURL(
+        await downloadMonthlyReport(token, month),
+      );
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `chukta-fees-${month}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setNotice(errorMessage(err));
+    }
+  }
+
   if (error) return <Alert severity="error">{error}</Alert>;
   if (!summary) return null;
 
   const shown = monthLabel(summary.month);
-  const nothingYet = summary.billedPaise === 0 && summary.collectedPaise === 0 && summary.overduePaise === 0;
+  const nothingYet =
+    summary.billedPaise === 0 &&
+    summary.collectedPaise === 0 &&
+    summary.overduePaise === 0;
   const allOverdue = summary.defaulters.flatMap((d) => d.invoiceIds);
 
   return (
     <Stack spacing={3}>
-      <TextField
-        type="month"
-        label={t.month}
-        value={month || summary.month}
-        onChange={(event) => setMonth(event.target.value)}
-        fullWidth={false}
-        sx={{ width: 190 }}
-        slotProps={{ inputLabel: { shrink: true } }}
-      />
+      <Stack
+        direction="row"
+        spacing={2}
+        sx={{ alignItems: "center", flexWrap: "wrap" }}
+      >
+        <TextField
+          type="month"
+          label={t.month}
+          value={month || summary.month}
+          onChange={(event) => setMonth(event.target.value)}
+          fullWidth={false}
+          sx={{ width: 190 }}
+          slotProps={{ inputLabel: { shrink: true } }}
+        />
+        {plan === "pro" ? (
+          <Button
+            variant="outlined"
+            onClick={() => downloadReport(summary.month)}
+          >
+            {fill(t.report, { month: shown })}
+          </Button>
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            {t.reportIsPro}
+          </Typography>
+        )}
+      </Stack>
 
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-        <Tile label={t.collected} value={formatRupees(summary.collectedPaise)} note={fill(t.collectedNote, { month: shown })} />
+        <Tile
+          label={t.collected}
+          value={formatRupees(summary.collectedPaise)}
+          note={fill(t.collectedNote, { month: shown })}
+        />
         <Tile
           label={t.outstanding}
           value={formatRupees(summary.outstandingPaise)}
-          note={fill(t.outstandingNote, { billed: formatRupees(summary.billedPaise), month: shown })}
+          note={fill(t.outstandingNote, {
+            billed: formatRupees(summary.billedPaise),
+            month: shown,
+          })}
         />
         <Tile
           label={t.overdue}
           value={formatRupees(summary.overduePaise)}
           note={t.overdueNote}
-          badge={summary.overduePaise > 0 ? <Chip label={copy.fees.overdue} color="overdue" /> : undefined}
+          badge={
+            summary.overduePaise > 0 ? (
+              <Chip label={copy.fees.overdue} color="overdue" />
+            ) : undefined
+          }
         />
       </Stack>
 
@@ -115,19 +209,39 @@ export function Dashboard({ token }: { token: string }) {
           </Button>
         </Stack>
       ) : (
-        <Card component="section" aria-labelledby={owingId} sx={{ overflowX: "auto" }}>
-          <Stack direction="row" spacing={2} sx={{ alignItems: "center", justifyContent: "space-between", px: { xs: 2, md: 3 }, pt: 2, pb: 1 }}>
+        <Card
+          component="section"
+          aria-labelledby={owingId}
+          sx={{ overflowX: "auto" }}
+        >
+          <Stack
+            direction="row"
+            spacing={2}
+            sx={{
+              alignItems: "center",
+              justifyContent: "space-between",
+              px: { xs: 2, md: 3 },
+              pt: 2,
+              pb: 1,
+            }}
+          >
             <Typography id={owingId} variant="h4" component="h2">
               {t.owing}
             </Typography>
             {allOverdue.length > 0 && (
-              <Button variant="outlined" onClick={() => setReminding(allOverdue)}>
+              <Button
+                variant="outlined"
+                onClick={() => setReminding(allOverdue)}
+              >
                 {fill(copy.fees.remindAll, { count: allOverdue.length })}
               </Button>
             )}
           </Stack>
           {summary.defaulters.length === 0 ? (
-            <Typography color="text.secondary" sx={{ px: { xs: 2, md: 3 }, pb: 2 }}>
+            <Typography
+              color="text.secondary"
+              sx={{ px: { xs: 2, md: 3 }, pb: 2 }}
+            >
               {t.nobodyOwes}
             </Typography>
           ) : (
@@ -145,16 +259,24 @@ export function Dashboard({ token }: { token: string }) {
                 {summary.defaulters.map((d) => (
                   <TableRow key={d.student.id}>
                     <TableCell>
-                      <Link component={NextLink} href={`/students/edit?id=${d.student.id}`}>
+                      <Link
+                        component={NextLink}
+                        href={`/students/edit?id=${d.student.id}`}
+                      >
                         {d.student.name}
                       </Link>
                     </TableCell>
                     <TableCell>{d.student.parentName}</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+                    <TableCell
+                      align="right"
+                      sx={{ fontWeight: 600, whiteSpace: "nowrap" }}
+                    >
                       {formatRupees(d.overduePaise)}
                     </TableCell>
                     <TableCell align="right">{d.bills}</TableCell>
-                    <TableCell sx={{ whiteSpace: "nowrap" }}>{showDate(d.oldestDueDate)}</TableCell>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>
+                      {showDate(d.oldestDueDate)}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

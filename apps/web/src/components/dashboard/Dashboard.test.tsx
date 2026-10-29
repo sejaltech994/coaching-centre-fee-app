@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiRequestError, getDashboardSummary, previewReminder, sendReminders, type DashboardSummary } from "@/lib/api";
+import { ApiRequestError, downloadMonthlyReport, getDashboardSummary, previewReminder, sendReminders, type DashboardSummary } from "@/lib/api";
 import { ThemeRegistry } from "@/theme/ThemeRegistry";
 import { Dashboard } from "./Dashboard";
 
@@ -10,6 +10,7 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   getDashboardSummary: vi.fn(),
   previewReminder: vi.fn(),
   sendReminders: vi.fn(),
+  downloadMonthlyReport: vi.fn(),
 }));
 
 const summary: DashboardSummary = {
@@ -29,11 +30,11 @@ beforeEach(() => {
   vi.mocked(sendReminders).mockReset().mockResolvedValue({ results: [{ invoiceId: "i3", status: "sent", error: null }, { invoiceId: "i4", status: "sent", error: null }] });
 });
 
-function setup() {
+function setup(plan: "free" | "pro" = "free") {
   const user = userEvent.setup();
   render(
     <ThemeRegistry>
-      <Dashboard token="token" />
+      <Dashboard token="token" plan={plan} />
     </ThemeRegistry>,
   );
   return { user };
@@ -98,5 +99,24 @@ describe("Dashboard", () => {
     vi.mocked(getDashboardSummary).mockRejectedValue(new ApiRequestError(0, "network_error", "x"));
     setup();
     expect(await screen.findByRole("alert")).toHaveTextContent("Can't reach Chukta.");
+  });
+
+  it("downloads the month's report on Pro", async () => {
+    vi.mocked(downloadMonthlyReport).mockResolvedValue(new Blob(["Bill"], { type: "text/csv" }));
+    vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: vi.fn(() => "blob:report"), revokeObjectURL: vi.fn() }));
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    const { user } = setup("pro");
+
+    await user.click(await screen.findByRole("button", { name: "Download Nov 2026 report" }));
+
+    expect(downloadMonthlyReport).toHaveBeenCalledWith("token", "2026-11");
+    expect(click).toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it("says monthly reports come with Pro", async () => {
+    setup("free");
+    expect(await screen.findByText("Monthly reports come with Pro.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /report/ })).not.toBeInTheDocument();
   });
 });

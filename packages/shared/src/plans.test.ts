@@ -4,8 +4,8 @@ import { PLANS, PRO_PRICE_PAISE, studentLimitReached } from "./plans";
 describe("plans", () => {
   it("match the pricing page: Free for up to 25 students, Pro at ₹499 a month for any number", () => {
     expect(PRO_PRICE_PAISE).toBe(49900);
-    expect(PLANS.free).toEqual({ maxStudents: 25, automaticReminders: false, ownGateway: false });
-    expect(PLANS.pro).toEqual({ maxStudents: null, automaticReminders: true, ownGateway: true });
+    expect(PLANS.free).toEqual({ maxStudents: 25, automaticReminders: false, ownGateway: false, monthlyReports: false });
+    expect(PLANS.pro).toEqual({ maxStudents: null, automaticReminders: true, ownGateway: true, monthlyReports: true });
   });
 
   it("stops a Free centre at 25 active students, never a Pro one", () => {

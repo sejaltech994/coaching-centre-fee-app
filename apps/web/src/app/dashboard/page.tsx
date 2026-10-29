@@ -23,7 +23,7 @@ export default function DashboardPage() {
             </Typography>
             <Typography color="text.secondary">{centre.name ? t.lead : t.nameCentre}</Typography>
           </Stack>
-          {token && <Dashboard token={token} />}
+          {token && <Dashboard token={token} plan={centre.plan} />}
         </Stack>
       ) : (
         <p className={app.muted} aria-live="polite">
