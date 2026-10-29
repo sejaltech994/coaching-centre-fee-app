@@ -3,6 +3,7 @@ import type { Deps } from "./deps";
 import { localDate } from "./lib/dates";
 import { billEnrolments, markOverdue } from "./modules/invoices/billing";
 import { razorpayCentres, reconcileRazorpay } from "./modules/payments/razorpay";
+import { sendScheduledReminders } from "./modules/reminders/send";
 
 /**
  * The scheduled work (TSD: background jobs), run every hour by a Cron Trigger on
@@ -20,6 +21,8 @@ export async function runScheduledJobs(deps: Deps): Promise<{ centres: number; f
         await billEnrolments(tx, { centreId: centre.id, today, now });
         await markOverdue(tx, { today, now });
       });
+      // After billing and overdue marks, so today's reminders see them.
+      await sendScheduledReminders(deps, centre.id);
     } catch (err) {
       failed += 1;
       console.error(`Scheduled jobs failed for centre ${centre.id}:`, err);

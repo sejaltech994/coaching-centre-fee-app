@@ -7,6 +7,7 @@ import { createApp } from "./app";
 import { loadConfig, type Config } from "./config";
 import { gatewayFromConfig } from "./gateway";
 import { googleFromConfig } from "./google";
+import { messagingFromConfig } from "./messaging";
 import { runScheduledJobs } from "./jobs";
 
 /** The Worker's bindings: vars and secrets from wrangler.jsonc, plus the static assets. */
@@ -59,6 +60,7 @@ export function createWorker(makeDb: (url: string) => DbHandle = (url) => create
           db: handle.db,
           google: googleFromConfig(config.google),
           gateway: gatewayFromConfig(config, `${new URL(request.url).origin}/api/v1`),
+          messaging: messagingFromConfig(config.whatsapp),
           now: () => new Date(),
           config,
         });
@@ -74,7 +76,7 @@ export function createWorker(makeDb: (url: string) => DbHandle = (url) => create
       if (!config) return;
       const handle = makeDb(config.databaseUrl);
       try {
-        await runScheduledJobs({ db: handle.db, google: null, gateway: gatewayFromConfig(config, ""), now: () => new Date(), config });
+        await runScheduledJobs({ db: handle.db, google: null, gateway: gatewayFromConfig(config, ""), messaging: messagingFromConfig(config.whatsapp), now: () => new Date(), config });
       } finally {
         ctx.waitUntil(handle.close());
       }

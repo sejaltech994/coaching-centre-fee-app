@@ -1,5 +1,5 @@
 import type { Database } from "@chukta/db";
-import type { FakeGateway, GoogleSignIn, PaymentGateway } from "@chukta/integrations";
+import type { FakeGateway, FakeWhatsApp, GoogleSignIn, MessagingProvider, PaymentGateway } from "@chukta/integrations";
 import type { Config } from "./config";
 
 /** Everything the API needs from the outside world, injected so tests can control it. */
@@ -9,6 +9,8 @@ export type Deps = {
   google: GoogleSignIn | null;
   /** Payments on each centre's own Razorpay account; the fake one has a checkout of its own. */
   gateway: PaymentGateway | FakeGateway;
+  /** WhatsApp, or null when it isn't set up here (reminders are then recorded as skipped). */
+  messaging: MessagingProvider | FakeWhatsApp | null;
   now: () => Date;
   config: Config;
 };

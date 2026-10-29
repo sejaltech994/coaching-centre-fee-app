@@ -1,3 +1,5 @@
+import { hmacHex, sameText } from "../hmac";
+
 /**
  * Razorpay, on each centre's OWN account (TSD: Payments): Chukta calls it with the
  * centre's keys, so money settles to the centre and never passes through Chukta.
@@ -91,17 +93,9 @@ export function createRazorpayGateway(options: { fetch?: typeof fetch } = {}): P
   };
 }
 
-const hex = (bytes: ArrayBuffer) => [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, "0")).join("");
-
 /** Razorpay signs each webhook's raw body with the webhook secret (HMAC-SHA256, hex). Compared in constant time. */
 export async function verifyRazorpaySignature(body: string, signature: string, secret: string): Promise<boolean> {
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const expected = hex(await crypto.subtle.sign("HMAC", key, encoder.encode(body)));
-  if (signature.length !== expected.length) return false;
-  let diff = 0;
-  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ signature.charCodeAt(i);
-  return diff === 0;
+  return sameText(await hmacHex(secret, body), signature);
 }
 
 type FakeLink = NewPaymentLink & { status: "created" | "paid"; payment: GatewayPayment | null };

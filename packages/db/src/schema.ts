@@ -48,12 +48,15 @@ export const centres = pgTable(
     timezone: text("timezone").notNull().default("Asia/Kolkata"),
     gstNumber: text("gst_number"),
     plan: text("plan", { enum: ["free", "pro"] }).notNull().default("free"),
+    // How fee reminders read: gentle or firm (TSD: default_reminder_tone).
+    reminderTone: text("reminder_tone", { enum: ["gentle", "firm"] }).notNull().default("gentle"),
     planRenewsAt: timestamp("plan_renews_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     check("centres_plan_check", sql`${t.plan} in ('free', 'pro')`),
+    check("centres_reminder_tone_check", sql`${t.reminderTone} in ('gentle', 'firm')`),
     check(
       "centres_centre_type_check",
       sql.raw(`centre_type in (${CENTRE_TYPES.map((type) => `'${type}'`).join(", ")})`),
@@ -489,6 +492,48 @@ export const webhookEvents = pgTable(
   (t) => [uniqueIndex("webhook_events_source_event_unique").on(t.source, t.eventId)],
 );
 
+export const REMINDER_KINDS = ["pre_due", "due", "overdue_3", "overdue_7", "manual", "payment_received"] as const;
+export const REMINDER_STATUSES = ["sent", "delivered", "read", "failed", "skipped"] as const;
+
+/**
+ * A WhatsApp message about a bill: a scheduled or hand-sent reminder, or the
+ * thank-you with its receipt. Keeps the template and version used, so every
+ * message traces to its exact wording; Meta's delivery reports update status.
+ */
+export const reminders = pgTable(
+  "reminders",
+  {
+    id: id(),
+    centreId: uuid("centre_id")
+      .notNull()
+      .references(() => centres.id),
+    invoiceId: uuid("invoice_id")
+      .notNull()
+      .references(() => invoices.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: REMINDER_KINDS }).notNull(),
+    channel: text("channel", { enum: ["whatsapp"] }).notNull().default("whatsapp"),
+    template: text("template").notNull(),
+    templateVersion: integer("template_version").notNull(),
+    status: text("status", { enum: REMINDER_STATUSES }).notNull(),
+    providerMessageId: text("provider_message_id").unique(),
+    // Why it failed or was skipped (e.g. the parent opted out).
+    error: text("error"),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("reminders_centre_created_idx").on(t.centreId, t.createdAt),
+    // Each scheduled reminder goes once per bill; reminders sent by hand can repeat.
+    uniqueIndex("reminders_invoice_kind_unique")
+      .on(t.invoiceId, t.kind)
+      .where(sql`${t.kind} <> 'manual'`),
+    check("reminders_kind_check", sql.raw(`kind in (${REMINDER_KINDS.map((k) => `'${k}'`).join(", ")})`)),
+    check("reminders_status_check", sql.raw(`status in (${REMINDER_STATUSES.map((k) => `'${k}'`).join(", ")})`)),
+    centreIsolation("reminders_centre_isolation", t.centreId),
+  ],
+).enableRLS();
+
 export type Centre = typeof centres.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Consent = typeof consents.$inferSelect;
@@ -502,4 +547,5 @@ export type Invoice = typeof invoices.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
 export type Receipt = typeof receipts.$inferSelect;
 export type PaymentLink = typeof paymentLinks.$inferSelect;
+export type Reminder = typeof reminders.$inferSelect;
 export type PaymentSettings = typeof paymentSettings.$inferSelect;

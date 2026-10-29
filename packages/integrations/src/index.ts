@@ -19,3 +19,11 @@ export {
   type PaymentGateway,
   type PaymentLinkState,
 } from "./payment-gateway/razorpay";
+export {
+  createFakeWhatsApp,
+  createMetaWhatsApp,
+  verifyMetaSignature,
+  type FakeWhatsApp,
+  type MessagingProvider,
+  type TemplateMessage,
+} from "./messaging/whatsapp";

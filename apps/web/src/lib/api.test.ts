@@ -20,6 +20,11 @@ import {
   connectRazorpay,
   disconnectRazorpay,
   startCheckout,
+  getReminderTone,
+  listReminders,
+  previewReminder,
+  sendReminders,
+  setReminderTone,
   recordPayment,
   receiptPdf,
   savePaymentSettings,
@@ -338,6 +343,29 @@ describe("API client", () => {
       ["http://localhost:8787/api/v1/centre/razorpay", "PUT", { keyId: "rzp_test_a", keySecret: "s", webhookSecret: "w" }],
       ["http://localhost:8787/api/v1/centre/razorpay", "DELETE", undefined],
       ["http://localhost:8787/api/v1/public/invoices/abc/checkout", "POST", undefined],
+    ]);
+  });
+
+  it("lists, previews and sends reminders, and reads and sets their tone", async () => {
+    reply(200, { reminders: [], nextCursor: null });
+    reply(200, { text: "Hello", canSend: true, reason: null });
+    reply(200, { results: [] });
+    reply(200, { tone: "gentle" });
+    reply(200, { tone: "firm" });
+
+    await listReminders("t", "c1");
+    await previewReminder("t", "i1");
+    await sendReminders("t", ["i1", "i2"]);
+    await getReminderTone("t");
+    await setReminderTone("t", "firm");
+
+    const sent = fetchMock.mock.calls.map(([url, init]) => [url, init!.method, init!.body && JSON.parse(init!.body as string)]);
+    expect(sent).toEqual([
+      ["http://localhost:8787/api/v1/reminders?cursor=c1", "GET", undefined],
+      ["http://localhost:8787/api/v1/reminders/preview?invoiceId=i1", "GET", undefined],
+      ["http://localhost:8787/api/v1/reminders/send", "POST", { invoiceIds: ["i1", "i2"] }],
+      ["http://localhost:8787/api/v1/centre/reminder-tone", "GET", undefined],
+      ["http://localhost:8787/api/v1/centre/reminder-tone", "PUT", { tone: "firm" }],
     ]);
   });
 

@@ -18,6 +18,7 @@ describe("loadConfig", () => {
       trustProxyHeaders: false,
       google: null,
       razorpay: "razorpay",
+      whatsapp: null,
     });
   });
 
@@ -104,6 +105,40 @@ describe("loadConfig", () => {
     it("never fakes payments in production, and refuses unknown providers", () => {
       expect(() => loadConfig({ ...valid, NODE_ENV: "production", RAZORPAY_PROVIDER: "fake" })).toThrow("RAZORPAY_PROVIDER=fake");
       expect(() => loadConfig({ ...valid, RAZORPAY_PROVIDER: "paypal" })).toThrow("RAZORPAY_PROVIDER");
+    });
+  });
+
+  describe("WhatsApp", () => {
+    const META = {
+      WHATSAPP_TOKEN: "token",
+      WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+      WHATSAPP_APP_SECRET: "app-secret",
+      WHATSAPP_VERIFY_TOKEN: "verify-me",
+    };
+
+    it("is off until configured: reminders are then recorded as skipped", () => {
+      expect(loadConfig(valid).whatsapp).toBeNull();
+      expect(loadConfig({ ...valid, NODE_ENV: "production" }).whatsapp).toBeNull();
+    });
+
+    it("sends through Meta's Cloud API with Chukta's number", () => {
+      expect(loadConfig({ ...valid, ...META }).whatsapp).toEqual({
+        provider: "meta",
+        token: "token",
+        phoneNumberId: "1234567890",
+        appSecret: "app-secret",
+        verifyToken: "verify-me",
+      });
+    });
+
+    it("needs every Meta setting", () => {
+      expect(() => loadConfig({ ...valid, ...META, WHATSAPP_APP_SECRET: undefined })).toThrow("WHATSAPP_APP_SECRET");
+    });
+
+    it("can fake sending outside production only", () => {
+      expect(loadConfig({ ...valid, WHATSAPP_PROVIDER: "fake" }).whatsapp).toEqual({ provider: "fake" });
+      expect(() => loadConfig({ ...valid, NODE_ENV: "production", WHATSAPP_PROVIDER: "fake" })).toThrow("WHATSAPP_PROVIDER=fake");
+      expect(() => loadConfig({ ...valid, WHATSAPP_PROVIDER: "pigeon" })).toThrow("WHATSAPP_PROVIDER");
     });
   });
 });

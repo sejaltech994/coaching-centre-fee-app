@@ -4,6 +4,7 @@ import { createApp } from "./app";
 import { loadConfig } from "./config";
 import { gatewayFromConfig } from "./gateway";
 import { googleFromConfig } from "./google";
+import { messagingFromConfig } from "./messaging";
 import { runScheduledJobs } from "./jobs";
 
 const config = loadConfig();
@@ -13,7 +14,8 @@ const handle = createLocalDb(config.databaseUrl);
 if (handle.kind === "pglite") await runMigrations(handle);
 
 const gateway = gatewayFromConfig(config, `http://localhost:${config.port}/api/v1`);
-const deps = { db: handle.db, google: googleFromConfig(config.google), gateway, now: () => new Date(), config };
+const messaging = messagingFromConfig(config.whatsapp);
+const deps = { db: handle.db, google: googleFromConfig(config.google), gateway, messaging, now: () => new Date(), config };
 const app = createApp(deps);
 
 // The hourly scheduled jobs, as the Workers' Cron Trigger runs them; also once at start.

@@ -9,6 +9,7 @@ import { ApiError, invalidFields, isUniqueViolation } from "../../lib/errors";
 import { readJson } from "../../lib/request";
 import { openSecret, sealSecret } from "../../lib/secrets";
 import { requireAuth } from "../../middleware/auth";
+import { thankForPayment } from "../reminders/send";
 import { recordPayment, type PaymentMethod } from "./record";
 
 /**
@@ -62,6 +63,7 @@ export async function applyGatewayPayment(
         now,
       });
     });
+    await thankForPayment(deps, input.centreId, input.invoiceId);
   } catch (err) {
     const closed = err instanceof ApiError && (err.code === "invoice_closed" || err.code === "not_found");
     if (!closed && !isUniqueViolation(err)) throw err;

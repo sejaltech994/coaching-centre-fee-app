@@ -8,6 +8,7 @@ import { centreToday } from "../../lib/dates";
 import { readJson } from "../../lib/request";
 import { requireAuth } from "../../middleware/auth";
 import { recordPayment } from "../payments/record";
+import { thankForPayment } from "../reminders/send";
 
 /** Bills (TSD: invoices). They're made by billing.ts; here the owner lists, reads and waives them. */
 
@@ -196,6 +197,7 @@ export function invoiceRoutes(deps: Deps) {
       const [shown] = await withNames(tx).where(and(eq(invoices.id, id), eq(invoices.centreId, centreId)));
       return shown!;
     });
+    await thankForPayment(deps, centreId, id);
     return c.json({ invoice: invoiceDto(row, deps) }, 201);
   });
 

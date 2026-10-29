@@ -14,6 +14,11 @@ export type Config = {
   google: { provider: "google"; clientId: string; clientSecret: string } | { provider: "fake" } | null;
   /** Payments on each centre's own Razorpay account, or the fake checkout (never production). */
   razorpay: "razorpay" | "fake";
+  /** WhatsApp from Chukta's own number via Meta's Cloud API, the fake (never production), or off. */
+  whatsapp:
+    | { provider: "meta"; token: string; phoneNumberId: string; appSecret: string; verifyToken: string }
+    | { provider: "fake" }
+    | null;
 };
 
 const ENVS = ["development", "test", "staging", "production"] as const;
@@ -50,6 +55,29 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     trustProxyHeaders: env.TRUST_PROXY_HEADERS === "true",
     google,
     razorpay,
+    whatsapp: loadWhatsApp(env, nodeEnv),
+  };
+}
+
+function loadWhatsApp(env: Record<string, string | undefined>, nodeEnv: Config["env"]): Config["whatsapp"] {
+  const provider = env.WHATSAPP_PROVIDER ?? (env.WHATSAPP_TOKEN ? "meta" : undefined);
+  if (provider === undefined) return null;
+  if (provider === "fake") {
+    if (nodeEnv === "production") throw new Error("WHATSAPP_PROVIDER=fake sends nothing to parents and is not allowed in production");
+    return { provider: "fake" };
+  }
+  if (provider !== "meta") throw new Error(`WHATSAPP_PROVIDER "${provider}" is not supported`);
+  const setting = (name: string) => {
+    const value = env[name];
+    if (!value) throw new Error(`${name} is not set`);
+    return value;
+  };
+  return {
+    provider: "meta",
+    token: setting("WHATSAPP_TOKEN"),
+    phoneNumberId: setting("WHATSAPP_PHONE_NUMBER_ID"),
+    appSecret: setting("WHATSAPP_APP_SECRET"),
+    verifyToken: setting("WHATSAPP_VERIFY_TOKEN"),
   };
 }
 

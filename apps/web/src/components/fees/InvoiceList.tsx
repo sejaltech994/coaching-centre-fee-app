@@ -23,6 +23,7 @@ import { useEffect, useId, useState } from "react";
 import { listInvoices, receiptPdf, type Invoice, type InvoiceFilters } from "@/lib/api";
 import { copy, errorMessage, fill } from "@/lib/copy";
 import { RecordPaymentDialog } from "./RecordPaymentDialog";
+import { RemindDialog } from "./RemindDialog";
 import { WaiveDialog } from "./WaiveDialog";
 
 type Status = InvoiceFilters["status"];
@@ -57,6 +58,7 @@ export function InvoiceList({ token, studentId }: { token: string; studentId?: s
   const [loadingMore, setLoadingMore] = useState(false);
   const [waiving, setWaiving] = useState<Invoice | null>(null);
   const [paying, setPaying] = useState<Invoice | null>(null);
+  const [reminding, setReminding] = useState<Invoice[] | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const filters: InvoiceFilters = { status, ...(month && { month }), ...(studentId && { studentId }) };
@@ -110,6 +112,8 @@ export function InvoiceList({ token, studentId }: { token: string; studentId?: s
     }
   }
 
+  const unpaidShown = (invoices ?? []).filter((invoice) => invoice.status === "pending" || invoice.status === "overdue");
+
   const replace = (changed: Invoice) =>
     setInvoices((current) => current?.map((invoice) => (invoice.id === changed.id ? changed : invoice)) ?? null);
 
@@ -146,6 +150,14 @@ export function InvoiceList({ token, studentId }: { token: string; studentId?: s
       )}
 
       {error && <Alert severity="error">{error}</Alert>}
+
+      {!studentId && unpaidShown.length > 1 && (
+        <Box>
+          <Button variant="outlined" onClick={() => setReminding(unpaidShown)}>
+            {fill(t.remindAll, { count: unpaidShown.length })}
+          </Button>
+        </Box>
+      )}
 
       {invoices && invoices.length === 0 && (
         <Typography color="text.secondary">{status === "unpaid" && !month ? t.emptyUnpaid : t.empty}</Typography>
@@ -204,6 +216,9 @@ export function InvoiceList({ token, studentId }: { token: string; studentId?: s
                             >
                               {t.recordPayment}
                             </Button>
+                            <Button aria-label={fill(t.remindName, { number: invoice.number })} onClick={() => setReminding([invoice])}>
+                              {t.remind}
+                            </Button>
                             <Button aria-label={fill(t.copyLinkName, { number: invoice.number })} onClick={() => copyPayLink(invoice)}>
                               {t.copyLink}
                             </Button>
@@ -257,6 +272,18 @@ export function InvoiceList({ token, studentId }: { token: string; studentId?: s
             replace(changed);
             setPaying(null);
             setNotice(fill(t.paymentRecorded, { number: changed.payment?.receipt?.number ?? "" }));
+          }}
+        />
+      )}
+
+      {reminding && (
+        <RemindDialog
+          token={token}
+          invoices={reminding}
+          onClose={() => setReminding(null)}
+          onSent={({ sent, skipped }) => {
+            setNotice(reminding.length === 1 && sent === 1 ? t.reminderSent : fill(t.remindersSent, { sent, skipped }));
+            setReminding(null);
           }}
         />
       )}

@@ -188,6 +188,8 @@ jobs:
           GOOGLE_PROVIDER: fake
           # A test checkout in place of each centre's Razorpay (refused in production).
           RAZORPAY_PROVIDER: fake
+          # WhatsApp messages are kept in the API instead of sent (refused in production).
+          WHATSAPP_PROVIDER: fake
         run: nohup npx tsx src/server.ts > /tmp/chukta-api.log 2>&1 &
 
       - name: Serve the web build

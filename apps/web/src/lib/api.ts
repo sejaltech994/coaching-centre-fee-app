@@ -131,6 +131,21 @@ export type Invoice = {
   createdAt: string;
 };
 
+/** A WhatsApp message about a bill, and what became of it. */
+export type Reminder = {
+  id: string;
+  kind: "pre_due" | "due" | "overdue_3" | "overdue_7" | "manual" | "payment_received";
+  status: "sent" | "delivered" | "read" | "failed" | "skipped";
+  template: string;
+  error: string | null;
+  invoice: { id: string; number: number };
+  student: { id: string; name: string };
+  sentAt: string | null;
+  createdAt: string;
+};
+
+export type ReminderTone = "gentle" | "firm";
+
 export type PaymentMethod = "upi" | "cash" | "bank_transfer" | "card" | "netbanking" | "wallet";
 
 /** What the owner records: UPI, cash or a bank transfer; the day it came (YYYY-MM-DD). */
@@ -401,3 +416,24 @@ export const savePaymentSettings = (token: string, settings: PaymentSettings) =>
 
 /** A parent's bill from its pay link's token. */
 export const getPublicInvoice = (token: string) => call<PublicInvoice>(`/public/invoices/${encodeURIComponent(token)}`);
+
+// --- Reminders ---
+
+export const listReminders = (token: string, cursor?: string) =>
+  call<{ reminders: Reminder[]; nextCursor: string | null }>(`/reminders${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`, { token });
+
+/** The exact WhatsApp message a bill's reminder would send now, and whether it can be sent. */
+export const previewReminder = (token: string, invoiceId: string) =>
+  call<{ text: string; canSend: boolean; reason: string | null }>(`/reminders/preview?invoiceId=${encodeURIComponent(invoiceId)}`, { token });
+
+export const sendReminders = (token: string, invoiceIds: string[]) =>
+  call<{ results: { invoiceId: string; status: "sent" | "skipped" | "failed"; error: string | null }[] }>("/reminders/send", {
+    method: "POST",
+    body: { invoiceIds },
+    token,
+  });
+
+export const getReminderTone = (token: string) => call<{ tone: ReminderTone }>("/centre/reminder-tone", { token });
+
+export const setReminderTone = (token: string, tone: ReminderTone) =>
+  call<{ tone: ReminderTone }>("/centre/reminder-tone", { method: "PUT", body: { tone }, token });

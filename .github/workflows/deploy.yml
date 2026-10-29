@@ -40,6 +40,11 @@ jobs:
       # Each environment's own Google OAuth client (variable + secret); unset = no Google sign-in.
       GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
       GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      # WhatsApp from Chukta's number (Meta Cloud API); unset = reminders recorded as skipped.
+      WHATSAPP_PHONE_NUMBER_ID: ${{ vars.WHATSAPP_PHONE_NUMBER_ID }}
+      WHATSAPP_TOKEN: ${{ secrets.WHATSAPP_TOKEN }}
+      WHATSAPP_APP_SECRET: ${{ secrets.WHATSAPP_APP_SECRET }}
+      WHATSAPP_VERIFY_TOKEN: ${{ secrets.WHATSAPP_VERIFY_TOKEN }}
     defaults:
       run:
         working-directory: apps/web
@@ -110,10 +115,13 @@ jobs:
           fi
           umask 077
           # Google's client ID isn't secret, but travels with its secret so the two always match.
+          # WhatsApp travels only when all four of its settings are there.
           node -e '
             const { DATABASE_URL, JWT_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } = process.env;
             const google = GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET ? { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } : {};
-            process.stdout.write(JSON.stringify({ DATABASE_URL, JWT_SECRET, ...google }));
+            const names = ["WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_TOKEN", "WHATSAPP_APP_SECRET", "WHATSAPP_VERIFY_TOKEN"];
+            const whatsapp = names.every((n) => process.env[n]) ? Object.fromEntries(names.map((n) => [n, process.env[n]])) : {};
+            process.stdout.write(JSON.stringify({ DATABASE_URL, JWT_SECRET, ...google, ...whatsapp }));
           ' > "$RUNNER_TEMP/secrets.json"
           npx wrangler secret bulk "$RUNNER_TEMP/secrets.json" --env "$DEPLOY_ENV"
           rm -f "$RUNNER_TEMP/secrets.json"

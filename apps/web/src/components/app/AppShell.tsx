@@ -7,10 +7,9 @@ import type { CentreResponse } from "@/lib/api";
 import { signOut } from "@/lib/signOut";
 import styles from "./app.module.css";
 
-type Section = "dashboard" | "batches" | "students" | "fees" | "settings";
+type Section = "dashboard" | "batches" | "students" | "fees" | "reminders" | "settings";
 
-// Only sections that exist are listed; Reminders joins when it is built
-// (see the Batches design canvas).
+// The sections of the Batches design canvas.
 const SECTIONS: { id: Section; label: string; href: string; icon: ReactNode }[] = [
   {
     id: "dashboard",
@@ -51,6 +50,12 @@ const SECTIONS: { id: Section; label: string; href: string; icon: ReactNode }[] 
         <path d="M7 10h10M7 14h6" />
       </>
     ),
+  },
+  {
+    id: "reminders",
+    label: "Reminders",
+    href: "/reminders",
+    icon: <path d="M21 12a8.5 8.5 0 0 1-12.6 7.4L3 21l1.6-5.2A8.5 8.5 0 1 1 21 12z" />,
   },
   {
     id: "settings",

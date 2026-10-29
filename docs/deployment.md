@@ -84,6 +84,17 @@ gh secret set DATABASE_URL --env dev    # paste the new string; repeat for sit, 
 gh workflow run deploy.yml --ref develop
 ```
 
+## WhatsApp reminders (Meta Cloud API)
+
+Reminders go from **one Chukta WhatsApp number** for every centre, through Meta's Cloud API directly (no reseller markup). Until an environment has these settings, reminders are recorded as *skipped* and nothing else is affected.
+
+1. In Meta Business Manager, create a WhatsApp Business app and add a phone number (dev, sit and uat can use Meta's free test number).
+2. Submit the message templates in `packages/shared/src/messages.ts` under their `metaName`s, category *Utility*, language *English*, with the body text and variables exactly as written there. Wait for *Approved*.
+3. Set, for each GitHub environment: the variable `WHATSAPP_PHONE_NUMBER_ID`, and the secrets `WHATSAPP_TOKEN` (a permanent system-user token), `WHATSAPP_APP_SECRET` (App settings › Basic) and `WHATSAPP_VERIFY_TOKEN` (any long random string). Re-run the deploy.
+4. In the app's WhatsApp › Configuration, set the webhook to `https://<environment's domain>/api/v1/webhooks/whatsapp` with the same verify token, and subscribe to `messages`.
+
+The webhook updates each reminder's delivery status, and a parent replying **STOP** is opted out of WhatsApp.
+
 ## Day to day
 
 - **Sign in on hosted dev, sit or uat:** with Google, once that environment has its own OAuth client ([google-sign-in.md](google-sign-in.md)). While the Google app is in *Testing*, only the test users listed in Google Cloud can sign in.

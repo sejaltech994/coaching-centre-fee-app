@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiRequestError, listInvoices, receiptPdf, recordPayment, waiveInvoice, type Invoice } from "@/lib/api";
+import { ApiRequestError, listInvoices, previewReminder, receiptPdf, recordPayment, sendReminders, waiveInvoice, type Invoice } from "@/lib/api";
 import { ThemeRegistry } from "@/theme/ThemeRegistry";
 import { InvoiceList } from "./InvoiceList";
 
@@ -11,6 +11,8 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   waiveInvoice: vi.fn(),
   recordPayment: vi.fn(),
   receiptPdf: vi.fn(),
+  previewReminder: vi.fn(),
+  sendReminders: vi.fn(),
 }));
 
 const bill = (number: number, extra: Partial<Invoice> = {}): Invoice => ({
@@ -49,6 +51,8 @@ beforeEach(() => {
   vi.mocked(waiveInvoice).mockReset();
   vi.mocked(recordPayment).mockReset();
   vi.mocked(receiptPdf).mockReset();
+  vi.mocked(previewReminder).mockReset().mockResolvedValue({ text: "Hello Neha Sharma, a gentle reminder from Sunrise Classes…", canSend: true, reason: null });
+  vi.mocked(sendReminders).mockReset();
 });
 
 const paidBill = bill(1, {
@@ -223,5 +227,50 @@ describe("InvoiceList", () => {
 
     expect(writeText).toHaveBeenCalledWith(bill(1).payLink);
     expect(await screen.findByText("Pay link copied. Send it to the parent on WhatsApp.")).toBeInTheDocument();
+  });
+
+  it("previews a WhatsApp reminder for one bill, then sends it", async () => {
+    vi.mocked(sendReminders).mockResolvedValue({ results: [{ invoiceId: "i1", status: "sent", error: null }] });
+    const { user } = setup();
+    await screen.findByRole("table");
+
+    await user.click(screen.getByRole("button", { name: "Remind about bill #1" }));
+    const dialog = screen.getByRole("dialog", { name: "Send a WhatsApp reminder" });
+    expect(previewReminder).toHaveBeenCalledWith("token", "i1");
+    expect(await within(dialog).findByText("Hello Neha Sharma, a gentle reminder from Sunrise Classes…")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Send" }));
+
+    expect(sendReminders).toHaveBeenCalledWith("token", ["i1"]);
+    expect(await screen.findByText("Reminder sent.")).toBeInTheDocument();
+  });
+
+  it("reminds about every unpaid bill shown at once, and says how many were skipped", async () => {
+    vi.mocked(sendReminders).mockResolvedValue({
+      results: [
+        { invoiceId: "i2", status: "sent", error: null },
+        { invoiceId: "i1", status: "skipped", error: "The parent hasn’t agreed to WhatsApp messages." },
+      ],
+    });
+    const { user } = setup();
+    await screen.findByRole("table");
+
+    await user.click(screen.getByRole("button", { name: "Remind all (2)" }));
+    const dialog = screen.getByRole("dialog", { name: "Send 2 WhatsApp reminders" });
+    expect(dialog).toHaveTextContent("Each parent gets their own bill. The first one reads:");
+    await user.click(within(dialog).getByRole("button", { name: "Send" }));
+
+    expect(sendReminders).toHaveBeenCalledWith("token", ["i2", "i1"]);
+    expect(await screen.findByText("Sent 1, skipped 1.")).toBeInTheDocument();
+  });
+
+  it("says why a reminder can't be sent, without a Send button", async () => {
+    vi.mocked(previewReminder).mockResolvedValue({ text: "Hello…", canSend: false, reason: "The parent hasn’t agreed to WhatsApp messages." });
+    const { user } = setup();
+    await screen.findByRole("table");
+
+    await user.click(screen.getByRole("button", { name: "Remind about bill #1" }));
+
+    expect(await screen.findByText("The parent hasn’t agreed to WhatsApp messages.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Send" })).not.toBeInTheDocument();
   });
 });
