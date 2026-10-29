@@ -23,6 +23,7 @@ describe("AppShell", () => {
 
     expect(within(nav).getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/dashboard");
     expect(within(nav).getByRole("link", { name: "Students" })).toHaveAttribute("href", "/students");
+    expect(within(nav).getByRole("link", { name: "Fees" })).toHaveAttribute("href", "/fees");
     expect(within(nav).getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
     const batches = within(nav).getByRole("link", { name: "Batches" });
     expect(batches).toHaveAttribute("href", "/batches");

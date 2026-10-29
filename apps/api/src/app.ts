@@ -7,6 +7,7 @@ import { authRoutes } from "./modules/auth/routes";
 import { batchRoutes } from "./modules/batches/routes";
 import { centreRoutes } from "./modules/centre/routes";
 import { feePlanRoutes } from "./modules/fee-plans/routes";
+import { invoiceRoutes } from "./modules/invoices/routes";
 import { meRoutes } from "./modules/me/routes";
 import { enrolmentRoutes, studentRoutes } from "./modules/students/routes";
 
@@ -43,6 +44,7 @@ export function createApp(deps: Deps) {
   app.route("/fee-plans", feePlanRoutes(deps));
   app.route("/students", studentRoutes(deps));
   app.route("/enrolments", enrolmentRoutes(deps));
+  app.route("/invoices", invoiceRoutes(deps));
 
   app.notFound(notFound);
   app.onError(handleError);

@@ -28,6 +28,8 @@ export function errorMessage(err: unknown): string {
       return e.network;
     case "already_enrolled":
       return e.alreadyEnrolled;
+    case "invoice_closed":
+      return e.invoiceClosed;
     case "student_left":
       return e.studentLeft;
     case "google_in_use":

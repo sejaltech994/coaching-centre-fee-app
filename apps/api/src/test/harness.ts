@@ -3,6 +3,7 @@ import type { GoogleSignIn } from "@chukta/integrations";
 import { createApp } from "../app";
 import type { Config } from "../config";
 import { googleFromConfig } from "../google";
+import { runScheduledJobs } from "../jobs";
 
 export const testConfig: Config = {
   env: "test",
@@ -28,7 +29,10 @@ export async function createTestApp(config: Partial<Config> = {}, options: { goo
   };
   const fullConfig = { ...testConfig, ...config };
   const google = options.google ?? googleFromConfig(fullConfig.google);
-  const app = createApp({ db, google, now: clock.now, config: fullConfig });
+  const deps = { db, google, now: clock.now, config: fullConfig };
+  const app = createApp(deps);
+  /** Runs the hourly scheduled jobs now, at the test clock's time. */
+  const runJobs = () => runScheduledJobs(deps);
 
   function call(
     method: string,
@@ -101,7 +105,7 @@ export async function createTestApp(config: Partial<Config> = {}, options: { goo
     return { res, body: body as LoginBody, cookie: refreshCookie(res) };
   }
 
-  return { app, db, clock, call, startGoogle, googleLogin, login };
+  return { app, db, clock, call, startGoogle, googleLogin, login, runJobs };
 }
 
 /** Tests assert on response bodies field by field, so they read them untyped. */

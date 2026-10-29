@@ -305,6 +305,66 @@ export const enrolments = pgTable(
   ],
 ).enableRLS();
 
+/**
+ * A bill for one enrolment and one billing period (TSD: generate-invoices).
+ * The amount (fee less discount) and the plan's late-fee terms are copied on at
+ * creation, so later changes to the plan don't rewrite bills already sent.
+ */
+export const invoices = pgTable(
+  "invoices",
+  {
+    id: id(),
+    centreId: uuid("centre_id")
+      .notNull()
+      .references(() => centres.id),
+    studentId: uuid("student_id")
+      .notNull()
+      .references(() => students.id),
+    enrolmentId: uuid("enrolment_id")
+      .notNull()
+      .references(() => enrolments.id),
+    batchId: uuid("batch_id")
+      .notNull()
+      .references(() => batches.id),
+    // 1, 2, 3… within the centre: what parents and the owner quote.
+    number: integer("number").notNull(),
+    cycle: text("cycle", { enum: ["monthly", "quarterly", "one_time"] }).notNull(),
+    periodStart: date("period_start").notNull(),
+    periodEnd: date("period_end").notNull(),
+    dueDate: date("due_date").notNull(),
+    amountPaise: integer("amount_paise").notNull(),
+    discountPaise: integer("discount_paise").notNull().default(0),
+    planLateFeePaise: integer("plan_late_fee_paise"),
+    planLateFeeAfterDays: integer("plan_late_fee_after_days"),
+    // The late fee added once it fell due.
+    lateFeePaise: integer("late_fee_paise").notNull().default(0),
+    status: text("status", { enum: ["pending", "overdue", "paid", "waived"] }).notNull().default("pending"),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    waivedAt: timestamp("waived_at", { withTimezone: true }),
+    waivedBy: uuid("waived_by").references(() => users.id, { onDelete: "set null" }),
+    waiveReason: text("waive_reason"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    // For the dashboard and the reminder and overdue scans (TSD: key indexes).
+    index("invoices_centre_status_due_idx").on(t.centreId, t.status, t.dueDate),
+    index("invoices_student_idx").on(t.studentId),
+    uniqueIndex("invoices_enrolment_period_unique").on(t.enrolmentId, t.periodStart),
+    uniqueIndex("invoices_centre_number_unique").on(t.centreId, t.number),
+    check("invoices_amount_check", sql`${t.amountPaise} > 0`),
+    check("invoices_money_check", sql`${t.discountPaise} >= 0 and ${t.lateFeePaise} >= 0`),
+    check("invoices_period_check", sql`${t.periodEnd} >= ${t.periodStart}`),
+    check("invoices_status_check", sql`${t.status} in ('pending', 'overdue', 'paid', 'waived')`),
+    check("invoices_paid_check", sql`${t.status} <> 'paid' or ${t.paidAt} is not null`),
+    check(
+      "invoices_waived_check",
+      sql`${t.status} <> 'waived' or (${t.waivedAt} is not null and ${t.waiveReason} is not null and length(trim(${t.waiveReason})) > 0)`,
+    ),
+    centreIsolation("invoices_centre_isolation", t.centreId),
+  ],
+).enableRLS();
+
 export type Centre = typeof centres.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Consent = typeof consents.$inferSelect;
@@ -314,3 +374,4 @@ export type Batch = typeof batches.$inferSelect;
 export type Student = typeof students.$inferSelect;
 export type Enrolment = typeof enrolments.$inferSelect;
 export type FeePlan = typeof feePlans.$inferSelect;
+export type Invoice = typeof invoices.$inferSelect;

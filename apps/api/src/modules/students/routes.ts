@@ -1,13 +1,15 @@
-import { batches, centres, enrolments, feePlans, students, withCentre, type FeePlan, type Student, type Tx } from "@chukta/db";
+import { batches, enrolments, feePlans, students, withCentre, type FeePlan, type Student, type Tx } from "@chukta/db";
 import { validateStudent } from "@chukta/shared";
 import { and, asc, desc, eq, exists, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv, Deps } from "../../deps";
+import { centreToday } from "../../lib/dates";
 import { ApiError, invalidFields, invalidRequest, isUniqueViolation } from "../../lib/errors";
 import { readJson } from "../../lib/request";
 import { requireAuth } from "../../middleware/auth";
 import { feePlanDto } from "../fee-plans/routes";
+import { billEnrolments, dropBillsAfter } from "../invoices/billing";
 
 /**
  * Students (TSD: students) and their enrolments in batches. Every query runs in
@@ -20,15 +22,6 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const studentNotFound = () => new ApiError(404, "not_found", "No such student.");
 const notFound = (what: string) => new ApiError(404, "not_found", `No such ${what}.`);
 const pickActiveBatches = () => invalidFields({ batchIds: "Pick from your active batches." });
-
-/**
- * Today's date (YYYY-MM-DD) in the centre's timezone. Read before withCentre:
- * the centre-scoped role has no access to the centres table.
- */
-async function today(deps: Deps, centreId: string): Promise<string> {
-  const [centre] = await deps.db.select({ timezone: centres.timezone }).from(centres).where(eq(centres.id, centreId));
-  return new Intl.DateTimeFormat("en-CA", { timeZone: centre?.timezone ?? "Asia/Kolkata" }).format(deps.now());
-}
 
 const isCurrent = isNull(enrolments.endDate);
 
@@ -193,7 +186,7 @@ export function studentRoutes(deps: Deps) {
     if (!batchIds.every((id) => UUID.test(id))) throw pickActiveBatches();
     const { centreId } = c.var.auth;
     const now = deps.now();
-    const startDate = batchIds.length > 0 ? await today(deps, centreId) : "";
+    const startDate = batchIds.length > 0 ? await centreToday(deps, centreId) : "";
 
     const student = await withCentre(deps.db, centreId, async (tx) => {
       // Each batch's students are billed on its fee plan.
@@ -210,11 +203,14 @@ export function studentRoutes(deps: Deps) {
         .values({ ...checked.value, centreId, whatsappOptInAt: checked.value.whatsappOptIn ? now : null, createdAt: now })
         .returning();
       if (batchIds.length > 0) {
-        await tx
+        const joined = await tx
           .insert(enrolments)
           .values(
             found.map((batch) => ({ centreId, studentId: row!.id, batchId: batch.id, feePlanId: batch.feePlanId, startDate, createdAt: now })),
-          );
+          )
+          .returning({ id: enrolments.id });
+        // The first bill is made as they join, not at the next scheduled run.
+        await billEnrolments(tx, { centreId, today: startDate, now, enrolmentIds: joined.map((e) => e.id) });
       }
       return withBatches(tx, row!);
     });
@@ -248,7 +244,7 @@ export function studentRoutes(deps: Deps) {
     if (!UUID.test(id)) throw studentNotFound();
     const { status, ...changes } = await readJson(c, patchBody);
     const now = deps.now();
-    const endDate = status === "left" ? await today(deps, centreId) : "";
+    const endDate = status === "left" ? await centreToday(deps, centreId) : "";
 
     const student = await withCentre(deps.db, centreId, async (tx) => {
       const [current] = await tx.select().from(students).where(byId(centreId, id)).for("update");
@@ -270,10 +266,12 @@ export function studentRoutes(deps: Deps) {
         .returning();
       // A student who leaves leaves their batches too.
       if (leaving) {
-        await tx
+        const ended = await tx
           .update(enrolments)
           .set({ endDate })
-          .where(and(eq(enrolments.studentId, id), isCurrent));
+          .where(and(eq(enrolments.studentId, id), isCurrent))
+          .returning({ id: enrolments.id });
+        await dropBillsAfter(tx, { enrolmentIds: ended.map((e) => e.id), endDate });
       }
       return withBatches(tx, row!);
     });
@@ -307,7 +305,7 @@ export function enrolmentRoutes(deps: Deps) {
     if (!UUID.test(studentId) || !UUID.test(batchId)) throw notFound("student or batch");
     const { centreId } = c.var.auth;
     const now = deps.now();
-    const startDate = await today(deps, centreId);
+    const startDate = await centreToday(deps, centreId);
 
     const enrolment = await withCentre(deps.db, centreId, async (tx) => {
       const [student] = await tx
@@ -326,6 +324,7 @@ export function enrolmentRoutes(deps: Deps) {
         .insert(enrolments)
         .values({ centreId, studentId, batchId, feePlanId: batch.feePlanId, startDate, createdAt: now })
         .returning();
+      await billEnrolments(tx, { centreId, today: startDate, now, enrolmentIds: [row!.id] });
       return enrolmentDto({ ...row!, batchId: batch.id, batchName: batch.name });
     }).catch((err: unknown) => {
       if (isUniqueViolation(err)) throw new ApiError(409, "already_enrolled", "This student is already in that batch.");
@@ -361,6 +360,7 @@ export function enrolmentRoutes(deps: Deps) {
       if (discount !== undefined) checkDiscount(discount as number, current.plan);
       const changes = { ...(endDate && { endDate }), ...(discount !== undefined && { discountPaise: discount as number }) };
       if (Object.keys(changes).length > 0) await tx.update(enrolments).set(changes).where(eq(enrolments.id, id));
+      if (endDate) await dropBillsAfter(tx, { enrolmentIds: [id], endDate });
       return enrolmentDto({ ...current, ...changes });
     });
     return c.json({ enrolment });

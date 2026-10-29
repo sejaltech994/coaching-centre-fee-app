@@ -36,6 +36,9 @@
       // Pooled, warm connections (no TCP + TLS + login per request). Query cache is
       // off on the Hyperdrive config: writes don't invalidate it, so lists would go stale.
       "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "2d1e1b85b776482087adb790ff4a8990" }],
+      // Hourly scheduled jobs (bills, overdue, reminders): the Worker's scheduled().
+      // The free plan allows 5 Cron Triggers per account; the 4 environments use 4.
+      "triggers": { "crons": ["0 * * * *"] },
       // Workers Logs: console output kept in the dashboard.
       "observability": { "enabled": true, "logs": { "enabled": true, "invocation_logs": true } },
       "vars": {
@@ -51,6 +54,9 @@
       // Pooled, warm connections (no TCP + TLS + login per request). Query cache is
       // off on the Hyperdrive config: writes don't invalidate it, so lists would go stale.
       "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "acfacac4058841f0a8f436ec6db153e7" }],
+      // Hourly scheduled jobs (bills, overdue, reminders): the Worker's scheduled().
+      // The free plan allows 5 Cron Triggers per account; the 4 environments use 4.
+      "triggers": { "crons": ["0 * * * *"] },
       // Workers Logs: console output kept in the dashboard.
       "observability": { "enabled": true, "logs": { "enabled": true, "invocation_logs": true } },
       "vars": {
@@ -66,6 +72,9 @@
       // Pooled, warm connections (no TCP + TLS + login per request). Query cache is
       // off on the Hyperdrive config: writes don't invalidate it, so lists would go stale.
       "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "c3cb8c0275d74bf0929c2af27b879869" }],
+      // Hourly scheduled jobs (bills, overdue, reminders): the Worker's scheduled().
+      // The free plan allows 5 Cron Triggers per account; the 4 environments use 4.
+      "triggers": { "crons": ["0 * * * *"] },
       // Workers Logs: console output kept in the dashboard.
       "observability": { "enabled": true, "logs": { "enabled": true, "invocation_logs": true } },
       "vars": {
@@ -75,6 +84,9 @@
       }
     },
     "prod": {
+      // Hourly scheduled jobs (bills, overdue, reminders): the Worker's scheduled().
+      // The free plan allows 5 Cron Triggers per account; the 4 environments use 4.
+      "triggers": { "crons": ["0 * * * *"] },
       // Workers Logs: console output kept in the dashboard.
       "observability": { "enabled": true, "logs": { "enabled": true, "invocation_logs": true } },
       "vars": {

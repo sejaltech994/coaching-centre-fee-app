@@ -14,6 +14,8 @@ import {
   updateBatch,
   createFeePlan,
   listFeePlans,
+  listInvoices,
+  waiveInvoice,
   setDiscount,
   updateFeePlan,
   createStudent,
@@ -260,6 +262,23 @@ describe("API client", () => {
       ["http://localhost:8787/api/v1/fee-plans", "POST", plan],
       ["http://localhost:8787/api/v1/fee-plans/p1", "PATCH", { isActive: false }],
       ["http://localhost:8787/api/v1/enrolments/e1", "PATCH", { discountPaise: 25000 }],
+    ]);
+  });
+
+  it("lists bills with only the filters that are set, and waives one with a reason", async () => {
+    reply(200, { invoices: [], nextCursor: null });
+    reply(200, { invoices: [], nextCursor: null });
+    reply(200, { invoice: { id: "i1", status: "waived" } });
+
+    await listInvoices("t", { status: "unpaid" });
+    await listInvoices("t", { status: "all", month: "2026-11", studentId: "s1", batchId: "", cursor: "c" });
+    await waiveInvoice("t", "i1", "Scholarship");
+
+    const sent = fetchMock.mock.calls.map(([url, init]) => [url, init!.method, init!.body && JSON.parse(init!.body as string)]);
+    expect(sent).toEqual([
+      ["http://localhost:8787/api/v1/invoices?status=unpaid", "GET", undefined],
+      ["http://localhost:8787/api/v1/invoices?status=all&month=2026-11&studentId=s1&cursor=c", "GET", undefined],
+      ["http://localhost:8787/api/v1/invoices/i1/waive", "POST", { reason: "Scholarship" }],
     ]);
   });
 

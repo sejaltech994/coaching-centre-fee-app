@@ -31,6 +31,7 @@ import {
   type StudentInput,
 } from "@/lib/api";
 import { copy, errorMessage, fill } from "@/lib/copy";
+import { InvoiceList } from "@/components/fees/InvoiceList";
 import { EnrolledBatch } from "./EnrolledBatch";
 import { StudentForm } from "./StudentForm";
 
@@ -41,6 +42,9 @@ const todayInIndia = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ko
 export function StudentDetail({ token, id }: { token: string; id: string }) {
   const t = copy.students;
   const batchesId = useId();
+  const feesId = useId();
+  // Joining or leaving a batch makes or drops bills, so the fee list reloads.
+  const [feesVersion, setFeesVersion] = useState(0);
   const [student, setStudent] = useState<Detail | null>(null);
   const [missing, setMissing] = useState(!id);
   const [activeBatches, setActiveBatches] = useState<Batch[]>([]);
@@ -104,12 +108,14 @@ export function StudentDetail({ token, id }: { token: string; id: string }) {
       };
       setStudent((current) => current && { ...current, batches: [...current.batches, joined] });
       setJoining("");
+      setFeesVersion((v) => v + 1);
       setNotice(fill(t.added, { batch: joined.name }));
     });
 
   const leaveBatch = (batch: StudentBatch) =>
     batchAction(batch.enrolmentId, () => endEnrolment(token, batch.enrolmentId, todayInIndia()), () => {
       setStudent((current) => current && { ...current, batches: current.batches.filter((b) => b.id !== batch.id) });
+      setFeesVersion((v) => v + 1);
       setNotice(fill(t.removed, { batch: batch.name }));
     });
 
@@ -119,6 +125,7 @@ export function StudentDetail({ token, id }: { token: string; id: string }) {
     try {
       const { student: saved } = await updateStudent(token, id, { status });
       setStudent((current) => current && { ...current, ...saved });
+      setFeesVersion((v) => v + 1);
     } catch (err) {
       setNotice(errorMessage(err));
     } finally {
@@ -190,6 +197,13 @@ export function StudentDetail({ token, id }: { token: string; id: string }) {
             {batchError}
           </Alert>
         )}
+      </Card>
+
+      <Card component="section" aria-labelledby={feesId} sx={{ p: { xs: 2, md: 3 } }}>
+        <Typography id={feesId} variant="h4" component="h2" sx={{ mb: 2 }}>
+          {copy.fees.studentFees}
+        </Typography>
+        <InvoiceList key={feesVersion} token={token} studentId={id} />
       </Card>
 
       <Box>

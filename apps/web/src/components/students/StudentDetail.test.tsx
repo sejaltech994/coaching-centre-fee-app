@@ -7,6 +7,7 @@ import {
   enrol,
   getStudent,
   listBatches,
+  listInvoices,
   setDiscount,
   updateStudent,
   type FeePlan,
@@ -23,6 +24,7 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   enrol: vi.fn(),
   endEnrolment: vi.fn(),
   setDiscount: vi.fn(),
+  listInvoices: vi.fn(),
 }));
 
 const monthly: FeePlan = {
@@ -64,6 +66,7 @@ beforeEach(() => {
   vi.mocked(getStudent).mockReset().mockResolvedValue(aarav);
   vi.mocked(listBatches).mockReset().mockResolvedValue({ batches: [batchRow(maths, monthly), batchRow(science)], nextCursor: null });
   vi.mocked(updateStudent).mockReset();
+  vi.mocked(listInvoices).mockReset().mockResolvedValue({ invoices: [], nextCursor: null });
   vi.mocked(enrol)
     .mockReset()
     .mockResolvedValue({ enrolment: { id: "e2", batch: science, startDate: "2026-11-03", endDate: null, discountPaise: 0 } });
@@ -126,6 +129,16 @@ describe("StudentDetail", () => {
     expect(enrol).toHaveBeenCalledWith("token", "s1", "b2");
     expect(await screen.findByText("Added to Class 10 Science.")).toBeInTheDocument();
     expect(within(batchesSection()).getAllByRole("listitem")).toHaveLength(2);
+    // Joining a batch with a fee plan makes a bill: the fees are loaded again.
+    expect(listInvoices).toHaveBeenCalledTimes(2);
+  });
+
+  it("lists the student's bills", async () => {
+    setup();
+    await screen.findByRole("heading", { level: 1 });
+
+    expect(screen.getByRole("region", { name: "Fees" })).toBeInTheDocument();
+    expect(listInvoices).toHaveBeenCalledWith("token", { status: "all", studentId: "s1" });
   });
 
   it("gives the student a discount on a batch's fee", async () => {

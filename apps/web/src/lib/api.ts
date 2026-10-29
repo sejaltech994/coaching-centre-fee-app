@@ -1,5 +1,5 @@
 /** Typed client for the Chukta API (apps/api). See the TSD's API section. */
-import type { BatchInput, CentreType, FeeCycle, FeePlanInput, Weekday } from "@chukta/shared";
+import type { BatchInput, CentreType, FeeCycle, FeePlanInput, InvoiceStatus, Weekday } from "@chukta/shared";
 
 export type Me = {
   user: {
@@ -99,6 +99,37 @@ export type StudentDetail = StudentSummary & { enrolments: Enrolment[] };
 export type StudentInput = { name: string; parentName: string; parentPhone: string; whatsappOptIn: boolean };
 
 export type StudentFilters = { status: "active" | "left" | "all"; batchId?: string; q?: string; cursor?: string };
+
+/** A bill for one student, batch and billing period; money in paise. */
+export type Invoice = {
+  id: string;
+  number: number;
+  student: { id: string; name: string; parentName: string };
+  batch: { id: string; name: string };
+  cycle: FeeCycle;
+  periodStart: string;
+  periodEnd: string;
+  dueDate: string;
+  amountPaise: number;
+  discountPaise: number;
+  lateFeePaise: number;
+  /** What's owed: the amount plus any late fee. */
+  totalPaise: number;
+  status: InvoiceStatus;
+  paidAt: string | null;
+  waivedAt: string | null;
+  waiveReason: string | null;
+  createdAt: string;
+};
+
+export type InvoiceFilters = {
+  status: "unpaid" | InvoiceStatus | "all";
+  /** YYYY-MM: bills due that month. */
+  month?: string;
+  batchId?: string;
+  studentId?: string;
+  cursor?: string;
+};
 
 export class ApiRequestError extends Error {
   readonly retryAfterSeconds?: number;
@@ -294,3 +325,13 @@ export const setDiscount = (token: string, enrolmentId: string, discountPaise: n
     body: { discountPaise },
     token,
   });
+
+// --- Fees ---
+
+export const listInvoices = (token: string, filters: InvoiceFilters) => {
+  const query = new URLSearchParams(Object.entries(filters).filter((entry): entry is [string, string] => Boolean(entry[1])));
+  return call<{ invoices: Invoice[]; nextCursor: string | null }>(`/invoices?${query}`, { token });
+};
+
+export const waiveInvoice = (token: string, id: string, reason: string) =>
+  call<{ invoice: Invoice }>(`/invoices/${encodeURIComponent(id)}/waive`, { method: "POST", body: { reason }, token });
