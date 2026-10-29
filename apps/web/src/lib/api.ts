@@ -17,6 +17,8 @@ export type Me = {
     centreType: CentreType | null;
     plan: "free" | "pro";
     timezone: string;
+    /** When the account will be deleted, if the owner asked. */
+    deletesAt?: string | null;
   };
 };
 
@@ -47,7 +49,7 @@ export type Identity = { provider: "google"; email: string; lastUsedAt: string |
 export type DeviceSession = { id: string; device: string; city: string | null; signedInAt: string; lastActiveAt: string; current: boolean };
 
 export type CentreResponse = {
-  centre: { id: string; name: string | null; plan: "free" | "pro"; timezone: string };
+  centre: { id: string; name: string | null; plan: "free" | "pro"; timezone: string; deletesAt?: string | null };
 };
 
 export type Batch = {
@@ -522,3 +524,14 @@ export const startPro = (token: string) => call<{ url: string }>("/subscription"
 
 export const cancelPro = (token: string) =>
   call<Pick<Subscription, "plan" | "status" | "renewsAt">>("/subscription/cancel", { method: "POST", token });
+
+// --- Your data and deleting the account ---
+
+/** Everything the centre has, as a JSON file (no keys or tokens). */
+export const downloadMyData = (token: string) => call<Blob>("/me/export", { token, as: "blob" });
+
+/** Asks for deletion in 30 days; every device is signed out. */
+export const deleteAccount = (token: string, confirm: string) =>
+  call<{ deletesAt: string }>("/me", { method: "DELETE", body: { confirm }, token });
+
+export const keepAccount = (token: string) => call<{ deletesAt: null }>("/me/restore", { method: "POST", token });

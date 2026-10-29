@@ -17,8 +17,8 @@ import {
   signAccessToken,
 } from "./tokens";
 
-const REFRESH_COOKIE = "chukta_rt";
-const COOKIE_PATH = "/api/v1/auth";
+export const REFRESH_COOKIE = "chukta_rt";
+export const COOKIE_PATH = "/api/v1/auth";
 
 const registerBody = z.record(z.string(), z.unknown());
 
@@ -38,7 +38,12 @@ export const centreDto = (centre: Centre) => ({
   centreType: centre.centreType,
   plan: centre.plan,
   timezone: centre.timezone,
+  /** When the account will be deleted, if the owner asked (TSD: 30 days to cancel). */
+  deletesAt: centre.deletionRequestedAt ? new Date(centre.deletionRequestedAt.getTime() + DELETE_AFTER_MS).toISOString() : null,
 });
+
+/** How long an owner has to change their mind about deleting the account. */
+export const DELETE_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
 
 export function authRoutes(deps: Deps) {
   const routes = new Hono<AppEnv>();

@@ -3,6 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ApiRequestError,
+  deleteAccount,
+  downloadMyData,
   getIdentities,
   getMe,
   getPaymentSettings,
@@ -11,6 +13,7 @@ import {
   signOutOtherSessions,
   signOutSession,
   updateCentre,
+  keepAccount,
   updateMe,
   type DeviceSession,
   type Me,
@@ -27,6 +30,9 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   listSessions: vi.fn(),
   getPaymentSettings: vi.fn(),
   getSubscription: vi.fn(),
+  downloadMyData: vi.fn(),
+  deleteAccount: vi.fn(),
+  keepAccount: vi.fn(),
   signOutSession: vi.fn(),
   signOutOtherSessions: vi.fn(),
 }));
@@ -75,13 +81,14 @@ beforeEach(() => {
 function setup() {
   const onCentreChanged = vi.fn();
   const onSignOut = vi.fn();
+  const onDeleted = vi.fn();
   const user = userEvent.setup();
   render(
     <ThemeRegistry>
-      <Settings token="token" onCentreChanged={onCentreChanged} onSignOut={onSignOut} />
+      <Settings token="token" onCentreChanged={onCentreChanged} onSignOut={onSignOut} onDeleted={onDeleted} />
     </ThemeRegistry>,
   );
-  return { user, onCentreChanged, onSignOut };
+  return { user, onCentreChanged, onSignOut, onDeleted };
 }
 
 const section = (name: string) => screen.getByRole("region", { name });
@@ -280,5 +287,46 @@ describe("Settings", () => {
     await user.click(await screen.findByRole("button", { name: "Sign out" }));
 
     expect(onSignOut).toHaveBeenCalled();
+  });
+
+  it("downloads the centre's data", async () => {
+    vi.mocked(downloadMyData).mockResolvedValue(new Blob(["{}"], { type: "application/json" }));
+    const createObjectURL = vi.fn(() => "blob:data");
+    vi.stubGlobal("URL", Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }));
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    const { user } = setup();
+
+    await user.click(await screen.findByRole("button", { name: "Download my data" }));
+
+    expect(downloadMyData).toHaveBeenCalledWith("token");
+    expect(click).toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it("deletes the account once the centre's name is typed", async () => {
+    vi.mocked(deleteAccount).mockResolvedValue({ deletesAt: "2026-12-02T04:30:00.000Z" });
+    const { user, onDeleted } = setup();
+    await user.click(await screen.findByRole("button", { name: "Delete account" }));
+    const dialog = screen.getByRole("dialog", { name: "Delete your account?" });
+
+    const confirm = within(dialog).getByRole("button", { name: "Delete account" });
+    expect(confirm).toBeDisabled();
+    await user.type(within(dialog).getByLabelText("Type Sunrise Classes to confirm"), "Sunrise Classes");
+    await user.click(confirm);
+
+    expect(deleteAccount).toHaveBeenCalledWith("token", "Sunrise Classes");
+    expect(onDeleted).toHaveBeenCalled();
+  });
+
+  it("offers to keep an account that's due to be deleted", async () => {
+    vi.mocked(getMe).mockResolvedValue({ ...me, centre: { ...me.centre, deletesAt: "2026-12-02T04:30:00.000Z" } });
+    vi.mocked(keepAccount).mockResolvedValue({ deletesAt: null });
+    const { user } = setup();
+
+    expect(await screen.findByText("This account will be deleted on 2 Dec 2026.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Keep my account" }));
+
+    expect(keepAccount).toHaveBeenCalledWith("token");
+    expect(await screen.findByText("Your account is kept.")).toBeInTheDocument();
   });
 });

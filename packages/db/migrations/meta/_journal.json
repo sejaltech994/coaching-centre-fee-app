@@ -120,6 +120,13 @@
       "when": 1793295878105,
       "tag": "0016_device_city",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793297592871,
+      "tag": "0017_account_deletion",
+      "breakpoints": true
     }
   ]
 }

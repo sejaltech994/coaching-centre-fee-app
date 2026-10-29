@@ -135,6 +135,7 @@ describe("GET /me", () => {
         centreType: "coaching",
         plan: "free",
         timezone: "Asia/Kolkata",
+        deletesAt: null,
       },
     });
   });

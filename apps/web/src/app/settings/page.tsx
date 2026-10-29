@@ -6,7 +6,8 @@ import { AppShell } from "@/components/app/AppShell";
 import app from "@/components/app/app.module.css";
 import { Settings } from "@/components/settings/Settings";
 import type { CentreResponse } from "@/lib/api";
-import { setCachedCentre } from "@/lib/session";
+import { navigate } from "@/lib/navigate";
+import { clearSession, setCachedCentre } from "@/lib/session";
 import { signOut } from "@/lib/signOut";
 import { useSession } from "@/lib/useSession";
 
@@ -30,6 +31,11 @@ export default function SettingsPage() {
           onSignOut={async () => {
             await signOut();
             router.replace("/login");
+          }}
+          onDeleted={() => {
+            // The API has signed every device out already.
+            clearSession();
+            navigate("/login/?session=deleted");
           }}
         />
       ) : (

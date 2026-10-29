@@ -56,6 +56,10 @@ export const centres = pgTable(
     // The Pro subscription on Chukta's own Razorpay account, and where it stands.
     subscriptionId: text("subscription_id").unique(),
     subscriptionStatus: text("subscription_status", { enum: ["created", "active", "cancelled", "halted"] }),
+    // The owner asked to delete the account; it's carried out 30 days later (TSD: Delete account).
+    deletionRequestedAt: timestamp("deletion_requested_at", { withTimezone: true }),
+    // Carried out: personal data erased, fee records kept without names.
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

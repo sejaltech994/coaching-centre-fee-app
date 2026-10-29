@@ -1,6 +1,9 @@
 "use client";
 
+import Alert from "@mui/material/Alert";
+import MuiLink from "@mui/material/Link";
 import Link from "next/link";
+import { copy, fill } from "@/lib/copy";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import type { CentreResponse } from "@/lib/api";
@@ -81,6 +84,8 @@ const SECTIONS: { id: Section; label: string; href: string; icon: ReactNode }[] 
   },
 ];
 
+const deletionDay = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
+
 const initials = (name: string) =>
   name
     .split(/\s+/)
@@ -146,7 +151,17 @@ export function AppShell({
           </button>
         </div>
       </aside>
-      <main className={styles.main}>{children}</main>
+      <main className={styles.main}>
+        {centre?.deletesAt && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            {fill(copy.account.deletesOn, { date: deletionDay.format(new Date(centre.deletesAt)) })}{" "}
+            <MuiLink component={Link} href="/settings">
+              {copy.account.keepShort}
+            </MuiLink>
+          </Alert>
+        )}
+        {children}
+      </main>
     </div>
   );
 }

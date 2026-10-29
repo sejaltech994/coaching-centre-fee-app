@@ -1,9 +1,11 @@
 import { centres, withCentre } from "@chukta/db";
+import { isNull } from "drizzle-orm";
 import type { Deps } from "./deps";
 import { localDate } from "./lib/dates";
 import { billEnrolments, markOverdue } from "./modules/invoices/billing";
 import { razorpayCentres, reconcileRazorpay } from "./modules/payments/razorpay";
 import { sendScheduledReminders } from "./modules/reminders/send";
+import { eraseDeletedCentres } from "./modules/me/account";
 import { endLapsedPro } from "./modules/subscription/routes";
 
 /**
@@ -15,7 +17,9 @@ export async function runScheduledJobs(deps: Deps): Promise<{ centres: number; f
   const now = deps.now();
   // First, so a centre whose Pro has lapsed gets Free's behaviour today.
   await endLapsedPro(deps);
-  const all = await deps.db.select({ id: centres.id, timezone: centres.timezone }).from(centres);
+  await eraseDeletedCentres(deps);
+  // Deleted centres get no more bills or messages.
+  const all = await deps.db.select({ id: centres.id, timezone: centres.timezone }).from(centres).where(isNull(centres.deletedAt));
   let failed = 0;
   for (const centre of all) {
     const today = localDate(centre.timezone, now);

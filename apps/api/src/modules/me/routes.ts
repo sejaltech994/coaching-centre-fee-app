@@ -8,6 +8,7 @@ import { ApiError, invalidFields, unauthenticated } from "../../lib/errors";
 import { readJson } from "../../lib/request";
 import { requireAuth } from "../../middleware/auth";
 import { centreDto, userDto } from "../auth/routes";
+import { exportData, keepAccount, requestDeletion } from "./account";
 import { listSessions, revokeOtherSessions, revokeSession } from "./sessions";
 
 const anyJson = z.record(z.string(), z.unknown());
@@ -50,6 +51,10 @@ export function meRoutes(deps: Deps) {
     if (!user) throw unauthenticated();
     return c.json({ user: userDto(user) });
   });
+
+  routes.get("/export", (c) => exportData(deps, c));
+  routes.delete("/", (c) => requestDeletion(deps, c));
+  routes.post("/restore", (c) => keepAccount(deps, c));
 
   routes.get("/identities", async (c) => {
     const rows = await deps.db

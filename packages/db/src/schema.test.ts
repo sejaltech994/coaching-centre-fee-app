@@ -59,6 +59,11 @@ describe("migrations", () => {
     await expect(db.insert(centres).values({ subscriptionStatus: "paused" as never })).rejects.toThrow();
   });
 
+  it("start a centre with no deletion asked for or done", async () => {
+    const { centre } = await insertOwner();
+    expect(centre).toMatchObject({ deletionRequestedAt: null, deletedAt: null });
+  });
+
   it("only allow known plans", async () => {
     await expect(db.insert(centres).values({ ownerPhone: "+919876543210", plan: "gold" as never })).rejects.toThrow();
   });

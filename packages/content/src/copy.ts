@@ -34,6 +34,11 @@ export const CATALOG = {
         multiline: true,
       },
       loginRequired: { label: "Notice: opened a page while logged out", text: "Log in to continue." },
+      accountDeleted: {
+        label: "Notice: after asking to delete the account",
+        text: "Your account will be deleted in 30 days. Sign in before then to keep it.",
+        multiline: true,
+      },
       loginExpired: {
         label: "Notice: logged out because the login ended",
         text: "Your login has expired. Log in to continue.",
@@ -336,6 +341,32 @@ export const CATALOG = {
       send: { label: "Remind dialog: send button", text: "Send" },
       reminderSent: { label: "Message after one reminder is sent", text: "Reminder sent." },
       remindersSent: { label: "Message after several ({sent} sent, {skipped} not)", text: "Sent {sent}, skipped {skipped}." },
+    },
+  },
+  account: {
+    title: "Settings: your data and deleting the account",
+    entries: {
+      data: { label: "Section: your data", text: "Your data" },
+      dataLead: { label: "Under Your data", text: "Everything Chukta holds for your centre, as one file." },
+      download: { label: "Button: download", text: "Download my data" },
+      delete: { label: "Section and button: delete", text: "Delete account" },
+      deleteLead: {
+        label: "Under Delete account",
+        text: "Your account and your students' names are deleted 30 days after you ask. Fee records stay, without names.",
+        multiline: true,
+      },
+      deleteTitle: { label: "Delete dialog: heading", text: "Delete your account?" },
+      deleteBody: {
+        label: "Delete dialog: what happens",
+        text: "Every device is signed out now. In 30 days your details, your Google link and your students' names and numbers are deleted. Sign in before then to keep the account.",
+        multiline: true,
+      },
+      confirmLabel: { label: "Delete dialog: field ({name})", text: "Type {name} to confirm" },
+      cancel: { label: "Button: cancel", text: "Cancel" },
+      deletesOn: { label: "Banner: deletion date ({date})", text: "This account will be deleted on {date}." },
+      keep: { label: "Banner button: keep the account", text: "Keep my account" },
+      keepShort: { label: "Banner link on every page", text: "Keep it" },
+      kept: { label: "Message after keeping the account", text: "Your account is kept." },
     },
   },
   plan: {

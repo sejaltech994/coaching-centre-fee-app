@@ -19,7 +19,8 @@ export function centreRoutes(deps: Deps) {
     // centre_id comes from the verified token, never from the client.
     const centre = await deps.db.query.centres.findFirst({ where: eq(centres.id, c.var.auth.centreId) });
     if (!centre) throw unauthenticated();
-    return c.json({ centre: { id: centre.id, name: centre.name, plan: centre.plan, timezone: centre.timezone } });
+    const { deletesAt } = centreDto(centre);
+    return c.json({ centre: { id: centre.id, name: centre.name, plan: centre.plan, timezone: centre.timezone, deletesAt } });
   });
 
   /** The centre's name, city and type, edited in Settings. */

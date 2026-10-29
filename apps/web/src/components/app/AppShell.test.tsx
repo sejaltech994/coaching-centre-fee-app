@@ -74,4 +74,10 @@ describe("AppShell", () => {
     await vi.waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
     expect(getAccessToken()).toBeNull();
   });
+
+  it("warns on every page while the account is due to be deleted", () => {
+    render(<AppShell current="dashboard" centre={{ ...centre, deletesAt: "2026-12-02T04:30:00.000Z" }}>content</AppShell>);
+    expect(screen.getByRole("alert")).toHaveTextContent("This account will be deleted on 2 Dec 2026.");
+    expect(screen.getByRole("link", { name: "Keep it" })).toHaveAttribute("href", "/settings");
+  });
 });

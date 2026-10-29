@@ -30,6 +30,7 @@ import {
   type Subscription,
 } from "@/lib/api";
 import { copy, errorMessage, fill } from "@/lib/copy";
+import { Account } from "./Account";
 import { Devices } from "./Devices";
 import { PaymentSettings } from "./PaymentSettings";
 import { PlanCard } from "./PlanCard";
@@ -39,6 +40,8 @@ type Props = {
   /** The centre was renamed or changed: the app shell shows it. */
   onCentreChanged: (centre: Me["centre"]) => void;
   onSignOut: () => void;
+  /** The owner asked to delete the account: they're signed out everywhere. */
+  onDeleted: () => void;
 };
 
 const TYPE_LABEL: Record<CentreType, keyof typeof copy.profile> = {
@@ -64,7 +67,7 @@ const initials = (name: string) =>
  * Google email, their mobile number (as typed, never confirmed), their centre
  * and their sign-in method.
  */
-export function Settings({ token, onCentreChanged, onSignOut }: Props) {
+export function Settings({ token, onCentreChanged, onSignOut, onDeleted }: Props) {
   const t = copy.settings;
   const [me, setMe] = useState<Me | null>(null);
   const [identities, setIdentities] = useState<Identity[]>([]);
@@ -150,6 +153,17 @@ export function Settings({ token, onCentreChanged, onSignOut }: Props) {
       <Section title={t.devices}>
         <Devices token={token} sessions={sessions} onNotice={setNotice} />
       </Section>
+
+      <Account
+        token={token}
+        centreName={centre.name ?? ""}
+        deletesAt={centre.deletesAt ?? null}
+        onDeleted={onDeleted}
+        onKept={() => {
+          setMe({ user, centre: { ...centre, deletesAt: null } });
+          setNotice(copy.account.kept);
+        }}
+      />
 
       <Box>
         <Button variant="outlined" onClick={onSignOut}>
