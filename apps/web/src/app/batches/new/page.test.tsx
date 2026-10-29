@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiRequestError, createBatch } from "@/lib/api";
+import { ApiRequestError, createBatch, listFeePlans } from "@/lib/api";
 import { useSession } from "@/lib/useSession";
 import NewBatchPage from "./page";
 
@@ -10,6 +10,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push, replace: vi.fn() }
 vi.mock("@/lib/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api")>()),
   createBatch: vi.fn(),
+  listFeePlans: vi.fn(),
 }));
 vi.mock("@/lib/useSession", () => ({ useSession: vi.fn() }));
 
@@ -27,6 +28,7 @@ beforeEach(() => {
   push.mockReset();
   vi.mocked(useSession).mockReturnValue({ token: "token", centre });
   vi.mocked(createBatch).mockReset();
+  vi.mocked(listFeePlans).mockResolvedValue({ feePlans: [] });
 });
 
 describe("/batches/new", () => {
@@ -36,6 +38,8 @@ describe("/batches/new", () => {
     render(<NewBatchPage />);
 
     expect(screen.getByRole("heading", { name: "New batch", level: 1 })).toBeVisible();
+    await screen.findByLabelText("Fee plan");
+    expect(listFeePlans).toHaveBeenCalledWith("token", { status: "active" });
     await createYoga(user);
 
     expect(createBatch).toHaveBeenCalledWith("token", {
@@ -44,6 +48,7 @@ describe("/batches/new", () => {
       days: ["sat"],
       startTime: "07:00",
       endTime: "08:00",
+      feePlanId: null,
     });
     expect(push).toHaveBeenCalledWith("/batches");
   });

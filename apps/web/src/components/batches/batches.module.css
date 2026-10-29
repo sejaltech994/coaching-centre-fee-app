@@ -316,6 +316,21 @@
   gap: 12px;
 }
 
+/* Under a field: what it's for (the design's hint text), and a link out. */
+.hint {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+
+.hintLink {
+  align-self: flex-start;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 700;
+  color: var(--indigo);
+}
+
 .error {
   margin: 0;
   padding: 10px 12px;
@@ -349,4 +364,10 @@
   align-items: center;
   gap: 12px;
   padding-right: 20px;
+}
+
+.headerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }

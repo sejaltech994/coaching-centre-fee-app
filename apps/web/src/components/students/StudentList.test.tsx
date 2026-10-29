@@ -24,14 +24,14 @@ const student = (name: string, extra: Partial<StudentSummary> = {}): StudentSumm
 
 beforeEach(() => {
   vi.mocked(listBatches).mockReset().mockResolvedValue({
-    batches: [{ id: "b1", name: "Class 10 Maths", subject: null, days: ["mon"], startTime: "16:00", endTime: "17:00", isActive: true, createdAt: "" }],
+    batches: [{ id: "b1", name: "Class 10 Maths", subject: null, days: ["mon"], startTime: "16:00", endTime: "17:00", isActive: true, feePlan: null, createdAt: "" }],
     nextCursor: null,
   });
   vi.mocked(listStudents)
     .mockReset()
     .mockResolvedValue({
       students: [
-        student("Aarav Sharma", { batches: [{ id: "b1", name: "Class 10 Maths", enrolmentId: "e1", since: "2026-11-02" }] }),
+        student("Aarav Sharma", { batches: [{ id: "b1", name: "Class 10 Maths", enrolmentId: "e1", since: "2026-11-02", feePlan: null, discountPaise: 0 }] }),
         student("Ishita Rao", { parentName: "Suresh Rao", parentPhone: "+919123456789" }),
       ],
       nextCursor: null,

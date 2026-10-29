@@ -13,6 +13,10 @@ import {
   registerOwner,
   updateBatch,
   confirmPhone,
+  createFeePlan,
+  listFeePlans,
+  setDiscount,
+  updateFeePlan,
   createStudent,
   endEnrolment,
   enrol,
@@ -157,7 +161,7 @@ describe("API client", () => {
     reply(201, { batch });
     reply(200, { batch: { ...batch, name: "Morning yoga" } });
     reply(200, { batch: { ...batch, isActive: false } });
-    const input = { name: "Yoga", subject: null, days: ["mon" as const], startTime: "07:00", endTime: "08:00" };
+    const input = { name: "Yoga", subject: null, days: ["mon" as const], startTime: "07:00", endTime: "08:00", feePlanId: null };
 
     await expect(createBatch("t", input)).resolves.toEqual(batch);
     await expect(updateBatch("t", "b1", { name: "Morning yoga" })).resolves.toMatchObject({ name: "Morning yoga" });
@@ -175,7 +179,7 @@ describe("API client", () => {
     reply(409, { error: { code: "batch_name_taken", message: "Taken.", fields: { name: "Taken." } } });
 
     await expect(
-      createBatch("t", { name: "Yoga", subject: null, days: ["mon"], startTime: "07:00", endTime: "08:00" }),
+      createBatch("t", { name: "Yoga", subject: null, days: ["mon"], startTime: "07:00", endTime: "08:00", feePlanId: null }),
     ).rejects.toMatchObject({ status: 409, fields: { name: "Taken." } });
   });
 
@@ -259,6 +263,23 @@ describe("API client", () => {
     reply(200, { students: [], nextCursor: null });
     await listStudents("t", { status: "active" });
     expect(fetchMock.mock.calls[0]![0]).toBe("http://localhost:8787/api/v1/students?status=active");
+  });
+
+  it("lists, creates and changes fee plans, and sets a student's discount", async () => {
+    for (let i = 0; i < 4; i++) reply(200, {});
+    const plan = { name: "Monthly", amountPaise: 250000, cycle: "monthly" as const, dueDay: 5, lateFeePaise: null, lateFeeAfterDays: null };
+
+    await listFeePlans("t", { status: "all" });
+    await createFeePlan("t", plan);
+    await updateFeePlan("t", "p1", { isActive: false });
+    await setDiscount("t", "e1", 25000);
+
+    expect(fetchMock.mock.calls.map(([url, init]) => [url, init!.method, init!.body && JSON.parse(init!.body as string)])).toEqual([
+      ["http://localhost:8787/api/v1/fee-plans?status=all", "GET", undefined],
+      ["http://localhost:8787/api/v1/fee-plans", "POST", plan],
+      ["http://localhost:8787/api/v1/fee-plans/p1", "PATCH", { isActive: false }],
+      ["http://localhost:8787/api/v1/enrolments/e1", "PATCH", { discountPaise: 25000 }],
+    ]);
   });
 
   it("reads the centre with the access token", async () => {

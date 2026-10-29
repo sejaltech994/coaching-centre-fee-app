@@ -33,6 +33,7 @@ describe("POST /enrolments", () => {
       batch: { id: expect.any(String), name: "Class 10 Maths" },
       startDate: "2026-11-02",
       endDate: null,
+      discountPaise: 0,
     });
     const { student: s } = await (await app.call("GET", `/students/${student}`, { token })).json();
     expect(s.batches.map((b: { name: string }) => b.name)).toEqual(["Class 10 Maths"]);

@@ -29,6 +29,7 @@ describe("POST /batches", () => {
       startTime: "16:00",
       endTime: "17:30",
       isActive: true,
+      feePlan: null,
       createdAt: "2026-11-02T04:30:00.000Z",
     });
   });

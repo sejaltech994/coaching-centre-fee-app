@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiRequestError, archiveBatch, getBatch, updateBatch, type Batch } from "@/lib/api";
+import { ApiRequestError, archiveBatch, getBatch, listFeePlans, updateBatch, type Batch, type FeePlan } from "@/lib/api";
 import { useSession } from "@/lib/useSession";
 import EditBatchPage from "./page";
 
@@ -13,6 +13,7 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   getBatch: vi.fn(),
   updateBatch: vi.fn(),
   archiveBatch: vi.fn(),
+  listFeePlans: vi.fn(),
 }));
 vi.mock("@/lib/useSession", () => ({ useSession: vi.fn() }));
 
@@ -25,9 +26,20 @@ const batch = (over: Partial<Batch> = {}): Batch => ({
   startTime: "16:00",
   endTime: "17:00",
   isActive: true,
+  feePlan: null,
   createdAt: "2026-11-02T04:30:00.000Z",
   ...over,
 });
+const MONTHLY: FeePlan = {
+  id: "p1",
+  name: "Class 8 monthly",
+  amountPaise: 200000,
+  cycle: "monthly",
+  dueDay: 5,
+  lateFeePaise: null,
+  lateFeeAfterDays: null,
+  isActive: true,
+};
 
 beforeEach(() => {
   push.mockReset();
@@ -36,6 +48,7 @@ beforeEach(() => {
   vi.mocked(getBatch).mockReset().mockResolvedValue(batch());
   vi.mocked(updateBatch).mockReset().mockResolvedValue(batch());
   vi.mocked(archiveBatch).mockReset().mockResolvedValue(batch({ isActive: false }));
+  vi.mocked(listFeePlans).mockResolvedValue({ feePlans: [MONTHLY] });
 });
 
 describe("/batches/edit", () => {
@@ -61,8 +74,21 @@ describe("/batches/edit", () => {
       days: ["tue", "thu"],
       startTime: "17:00",
       endTime: "18:00",
+      feePlanId: null,
     });
     expect(push).toHaveBeenCalledWith("/batches");
+  });
+
+  it("changes the batch's fee plan", async () => {
+    vi.mocked(getBatch).mockResolvedValueOnce(batch({ feePlan: MONTHLY }));
+    const user = userEvent.setup();
+    render(<EditBatchPage />);
+
+    expect(await screen.findByLabelText("Fee plan")).toHaveValue("p1");
+    await user.selectOptions(screen.getByLabelText("Fee plan"), "");
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(updateBatch).toHaveBeenCalledWith("token", "b1", expect.objectContaining({ feePlanId: null }));
   });
 
   it("archives the batch", async () => {

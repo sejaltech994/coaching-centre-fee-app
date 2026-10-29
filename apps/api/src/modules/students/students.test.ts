@@ -49,7 +49,9 @@ describe("POST /students", () => {
       parentPhone: "+919876543210",
       whatsappOptIn: true,
       status: "active",
-      batches: [{ id: maths, name: "Class 10 Maths", enrolmentId: expect.any(String), since: "2026-11-02" }],
+      batches: [
+        { id: maths, name: "Class 10 Maths", enrolmentId: expect.any(String), since: "2026-11-02", feePlan: null, discountPaise: 0 },
+      ],
     });
     const [row] = await app.db.select().from(students);
     expect(row!.whatsappOptInAt).toEqual(app.clock.now());
@@ -162,8 +164,8 @@ describe("GET /students/:id", () => {
 
     expect(student.batches.map((b: { name: string }) => b.name)).toEqual(["Class 10 Maths"]);
     expect(student.enrolments).toEqual([
-      { id: expect.any(String), batch: { id: maths, name: "Class 10 Maths" }, startDate: "2026-11-02", endDate: null },
-      { id: enrolment, batch: { id: science, name: "Class 10 Science" }, startDate: "2026-11-02", endDate: "2026-11-02" },
+      { id: expect.any(String), batch: { id: maths, name: "Class 10 Maths" }, startDate: "2026-11-02", endDate: null, discountPaise: 0 },
+      { id: enrolment, batch: { id: science, name: "Class 10 Science" }, startDate: "2026-11-02", endDate: "2026-11-02", discountPaise: 0 },
     ]);
   });
 

@@ -1,4 +1,4 @@
-import { batches, centres, enrolments, students, withCentre, type Student, type Tx } from "@chukta/db";
+import { batches, centres, enrolments, feePlans, students, withCentre, type FeePlan, type Student, type Tx } from "@chukta/db";
 import { validateStudent } from "@chukta/shared";
 import { and, asc, desc, eq, exists, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
@@ -7,6 +7,7 @@ import type { AppEnv, Deps } from "../../deps";
 import { ApiError, invalidFields, invalidRequest, isUniqueViolation } from "../../lib/errors";
 import { readJson } from "../../lib/request";
 import { requireAuth } from "../../middleware/auth";
+import { feePlanDto } from "../fee-plans/routes";
 
 /**
  * Students (TSD: students) and their enrolments in batches. Every query runs in
@@ -31,7 +32,14 @@ async function today(deps: Deps, centreId: string): Promise<string> {
 
 const isCurrent = isNull(enrolments.endDate);
 
-type BatchRef = { id: string; name: string; enrolmentId: string; since: string };
+type BatchRef = {
+  id: string;
+  name: string;
+  enrolmentId: string;
+  since: string;
+  feePlan: ReturnType<typeof feePlanDto> | null;
+  discountPaise: number;
+};
 
 /** Each student's current batches, by name. */
 async function currentBatches(tx: Tx, studentIds: string[]): Promise<Map<string, BatchRef[]>> {
@@ -42,14 +50,19 @@ async function currentBatches(tx: Tx, studentIds: string[]): Promise<Map<string,
       studentId: enrolments.studentId,
       enrolmentId: enrolments.id,
       since: enrolments.startDate,
+      discountPaise: enrolments.discountPaise,
       id: batches.id,
       name: batches.name,
+      plan: feePlans,
     })
     .from(enrolments)
     .innerJoin(batches, eq(batches.id, enrolments.batchId))
+    .leftJoin(feePlans, eq(feePlans.id, enrolments.feePlanId))
     .where(and(inArray(enrolments.studentId, studentIds), isCurrent))
     .orderBy(asc(sql`lower(${batches.name})`));
-  for (const { studentId, ...batch } of rows) byStudent.get(studentId)!.push(batch);
+  for (const { studentId, plan, ...batch } of rows) {
+    byStudent.get(studentId)!.push({ ...batch, feePlan: plan && feePlanDto(plan) });
+  }
   return byStudent;
 }
 
@@ -67,17 +80,28 @@ async function withBatches(tx: Tx, row: Student) {
   return toDto(row, (await currentBatches(tx, [row.id])).get(row.id)!);
 }
 
-const enrolmentDto = (row: { id: string; startDate: string; endDate: string | null; batchId: string; batchName: string }) => ({
+type EnrolmentRow = {
+  id: string;
+  startDate: string;
+  endDate: string | null;
+  discountPaise: number;
+  batchId: string;
+  batchName: string;
+};
+
+const enrolmentDto = (row: EnrolmentRow) => ({
   id: row.id,
   batch: { id: row.batchId, name: row.batchName },
   startDate: row.startDate,
   endDate: row.endDate,
+  discountPaise: row.discountPaise,
 });
 
 const enrolmentColumns = {
   id: enrolments.id,
   startDate: enrolments.startDate,
   endDate: enrolments.endDate,
+  discountPaise: enrolments.discountPaise,
   batchId: batches.id,
   batchName: batches.name,
 };
@@ -172,9 +196,11 @@ export function studentRoutes(deps: Deps) {
     const startDate = batchIds.length > 0 ? await today(deps, centreId) : "";
 
     const student = await withCentre(deps.db, centreId, async (tx) => {
+      // Each batch's students are billed on its fee plan.
+      let found: { id: string; feePlanId: string | null }[] = [];
       if (batchIds.length > 0) {
-        const found = await tx
-          .select({ id: batches.id })
+        found = await tx
+          .select({ id: batches.id, feePlanId: batches.feePlanId })
           .from(batches)
           .where(and(eq(batches.centreId, centreId), eq(batches.isActive, true), inArray(batches.id, batchIds)));
         if (found.length !== batchIds.length) throw pickActiveBatches();
@@ -186,7 +212,9 @@ export function studentRoutes(deps: Deps) {
       if (batchIds.length > 0) {
         await tx
           .insert(enrolments)
-          .values(batchIds.map((batchId) => ({ centreId, studentId: row!.id, batchId, startDate, createdAt: now })));
+          .values(
+            found.map((batch) => ({ centreId, studentId: row!.id, batchId: batch.id, feePlanId: batch.feePlanId, startDate, createdAt: now })),
+          );
       }
       return withBatches(tx, row!);
     });
@@ -256,7 +284,14 @@ export function studentRoutes(deps: Deps) {
 }
 
 const enrolBody = z.object({ studentId: z.string(), batchId: z.string() });
-const endBody = z.object({ endDate: z.unknown() });
+const changeBody = z.object({ endDate: z.unknown(), discountPaise: z.unknown() }).partial().strict();
+
+/** A discount comes off the plan's fee, so it needs a plan and can't exceed its fee. */
+function checkDiscount(discountPaise: number, plan: FeePlan | null) {
+  if (discountPaise === 0) return;
+  if (!plan) throw invalidFields({ discountPaise: "Give the batch a fee plan before a discount." });
+  if (discountPaise > plan.amountPaise) throw invalidFields({ discountPaise: "The discount can’t be more than the fee." });
+}
 
 /** A real calendar date as YYYY-MM-DD, or null. */
 const asDate = (value: unknown) =>
@@ -280,7 +315,7 @@ export function enrolmentRoutes(deps: Deps) {
         .from(students)
         .where(and(eq(students.id, studentId), eq(students.centreId, centreId)));
       const [batch] = await tx
-        .select({ id: batches.id, name: batches.name })
+        .select({ id: batches.id, name: batches.name, feePlanId: batches.feePlanId })
         .from(batches)
         .where(and(eq(batches.id, batchId), eq(batches.centreId, centreId), eq(batches.isActive, true)));
       if (!student || !batch) throw notFound("student or batch");
@@ -289,7 +324,7 @@ export function enrolmentRoutes(deps: Deps) {
       }
       const [row] = await tx
         .insert(enrolments)
-        .values({ centreId, studentId, batchId, startDate, createdAt: now })
+        .values({ centreId, studentId, batchId, feePlanId: batch.feePlanId, startDate, createdAt: now })
         .returning();
       return enrolmentDto({ ...row!, batchId: batch.id, batchName: batch.name });
     }).catch((err: unknown) => {
@@ -299,26 +334,34 @@ export function enrolmentRoutes(deps: Deps) {
     return c.json({ enrolment }, 201);
   });
 
-  /** Ends an enrolment: the student leaves the batch on endDate. */
+  /** Ends an enrolment (the student leaves the batch on endDate) or changes the student's discount. */
   routes.patch("/:id", async (c) => {
     const { centreId } = c.var.auth;
     const id = c.req.param("id");
     if (!UUID.test(id)) throw notFound("enrolment");
-    const endDate = asDate((await readJson(c, endBody)).endDate);
-    if (!endDate) throw invalidFields({ endDate: "Enter a date." });
+    const body = await readJson(c, changeBody);
+    const endDate = body.endDate === undefined ? undefined : asDate(body.endDate);
+    if (endDate === null) throw invalidFields({ endDate: "Enter a date." });
+    const discount = body.discountPaise;
+    if (discount !== undefined && !(Number.isInteger(discount) && (discount as number) >= 0)) {
+      throw invalidFields({ discountPaise: "Enter a discount of ₹0 or more." });
+    }
 
     const enrolment = await withCentre(deps.db, centreId, async (tx) => {
       const [current] = await tx
-        .select(enrolmentColumns)
+        .select({ ...enrolmentColumns, plan: feePlans })
         .from(enrolments)
         .innerJoin(batches, eq(batches.id, enrolments.batchId))
+        .leftJoin(feePlans, eq(feePlans.id, enrolments.feePlanId))
         .where(and(eq(enrolments.id, id), eq(enrolments.centreId, centreId)));
       if (!current) throw notFound("enrolment");
-      if (endDate < current.startDate) {
+      if (endDate && endDate < current.startDate) {
         throw invalidFields({ endDate: `The end date can't be before the start (${current.startDate}).` });
       }
-      await tx.update(enrolments).set({ endDate }).where(eq(enrolments.id, id));
-      return enrolmentDto({ ...current, endDate });
+      if (discount !== undefined) checkDiscount(discount as number, current.plan);
+      const changes = { ...(endDate && { endDate }), ...(discount !== undefined && { discountPaise: discount as number }) };
+      if (Object.keys(changes).length > 0) await tx.update(enrolments).set(changes).where(eq(enrolments.id, id));
+      return enrolmentDto({ ...current, ...changes });
     });
     return c.json({ enrolment });
   });

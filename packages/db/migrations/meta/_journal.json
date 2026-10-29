@@ -57,6 +57,13 @@
       "when": 1793248325471,
       "tag": "0007_students",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793252146036,
+      "tag": "0008_fee_plans",
+      "breakpoints": true
     }
   ]
 }

@@ -1,12 +1,13 @@
 "use client";
 
-import { formatDays, formatTimeRange } from "@chukta/shared";
+import { describeFeePlan, formatDays, formatTimeRange } from "@chukta/shared";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import app from "@/components/app/app.module.css";
 import styles from "@/components/batches/batches.module.css";
 import { listBatches, type Batch } from "@/lib/api";
+import { copy } from "@/lib/copy";
 import { useSession } from "@/lib/useSession";
 
 /** Web 1 / Mobile 1 · Batches list from the Batches design canvas. */
@@ -46,12 +47,17 @@ export default function BatchesPage() {
           <h1 className={app.title}>Batches</h1>
           {batches && <p className={app.subtitle}>{active.length} active</p>}
         </div>
-        <Link href="/batches/new" className={app.primaryButton}>
+        <div className={styles.headerActions}>
+          <Link href="/fee-plans" className={app.secondaryButton}>
+            {copy.feePlans.title}
+          </Link>
+          <Link href="/batches/new" className={app.primaryButton}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" aria-hidden="true">
             <path d="M12 5v14M5 12h14" />
           </svg>
           New batch
-        </Link>
+          </Link>
+        </div>
       </div>
 
       <section className={app.panel} aria-label="Your batches">
@@ -119,6 +125,7 @@ export default function BatchesPage() {
                       {batch.name}
                     </Link>
                     {batch.subject && <span className={styles.secondary}>{batch.subject}</span>}
+                    {batch.feePlan && <span className={styles.secondary}>{describeFeePlan(batch.feePlan)}</span>}
                     {!batch.isActive && <span className={styles.archived}>Archived</span>}
                   </td>
                   <td>
