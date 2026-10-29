@@ -26,6 +26,10 @@ import {
   sendReminders,
   setReminderTone,
   getDashboardSummary,
+  getAbsenceAlerts,
+  getAttendance,
+  saveAttendance,
+  setAbsenceAlerts,
   recordPayment,
   receiptPdf,
   savePaymentSettings,
@@ -378,6 +382,26 @@ describe("API client", () => {
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
       "http://localhost:8787/api/v1/dashboard/summary",
       "http://localhost:8787/api/v1/dashboard/summary?month=2026-10",
+    ]);
+  });
+
+  it("reads and saves a day's attendance, and the absence-alert switch", async () => {
+    reply(200, { students: [] });
+    reply(200, { students: [] });
+    reply(200, { on: false });
+    reply(200, { on: true });
+
+    await getAttendance("t", "b1", "2026-11-02");
+    await saveAttendance("t", { batchId: "b1", date: "2026-11-02", marks: [{ studentId: "s1", present: false }] });
+    await getAbsenceAlerts("t");
+    await setAbsenceAlerts("t", true);
+
+    const sent = fetchMock.mock.calls.map(([url, init]) => [url, init!.method, init!.body && JSON.parse(init!.body as string)]);
+    expect(sent).toEqual([
+      ["http://localhost:8787/api/v1/attendance?batchId=b1&date=2026-11-02", "GET", undefined],
+      ["http://localhost:8787/api/v1/attendance", "PUT", { batchId: "b1", date: "2026-11-02", marks: [{ studentId: "s1", present: false }] }],
+      ["http://localhost:8787/api/v1/centre/absence-alerts", "GET", undefined],
+      ["http://localhost:8787/api/v1/centre/absence-alerts", "PUT", { on: true }],
     ]);
   });
 

@@ -7,7 +7,7 @@ import type { CentreResponse } from "@/lib/api";
 import { signOut } from "@/lib/signOut";
 import styles from "./app.module.css";
 
-type Section = "dashboard" | "batches" | "students" | "fees" | "reminders" | "settings";
+type Section = "dashboard" | "batches" | "students" | "attendance" | "fees" | "reminders" | "settings";
 
 // The sections of the Batches design canvas.
 const SECTIONS: { id: Section; label: string; href: string; icon: ReactNode }[] = [
@@ -37,6 +37,17 @@ const SECTIONS: { id: Section; label: string; href: string; icon: ReactNode }[] 
         <circle cx="9" cy="8" r="3.5" />
         <path d="M3 20c.8-3.4 3.2-5 6-5s5.2 1.6 6 5" />
         <path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 15c1.6.6 2.6 2 3 5" />
+      </>
+    ),
+  },
+  {
+    id: "attendance",
+    label: "Attendance",
+    href: "/attendance",
+    icon: (
+      <>
+        <rect x="3" y="4" width="18" height="17" rx="2" />
+        <path d="M3 9h18M8 2v4M16 2v4M8.5 15l2.5 2.5 5-5" />
       </>
     ),
   },

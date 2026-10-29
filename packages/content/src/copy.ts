@@ -377,6 +377,28 @@ export const CATALOG = {
       setUpBatches: { label: "Button: set up batches", text: "Set up batches" },
     },
   },
+  attendance: {
+    title: "Attendance",
+    entries: {
+      title: { label: "Heading", text: "Attendance" },
+      lead: { label: "Text under the heading", text: "Mark who came to each class." },
+      batch: { label: "Field: batch", text: "Batch" },
+      day: { label: "Field: day", text: "Day" },
+      present: { label: "Mark: present", text: "Present" },
+      absent: { label: "Mark: absent", text: "Absent" },
+      allPresent: { label: "Button: mark everyone present", text: "Mark all present" },
+      save: { label: "Button: save", text: "Save attendance" },
+      saved: { label: "Message after saving", text: "Attendance saved." },
+      alertsSent: { label: "Message after saving with alerts sent ({count})", text: "Attendance saved. Absence messages sent: {count}." },
+      noStudents: { label: "When the batch had nobody that day", text: "Nobody was in this batch on that day." },
+      noBatches: { label: "When there are no batches", text: "Add a batch first, then take its attendance here." },
+      alerts: { label: "Switch: absence alerts", text: "Message parents on WhatsApp when their child is absent" },
+      alertsHint: {
+        label: "Under the switch",
+        text: "Only parents who agreed to WhatsApp, once per absence.",
+      },
+    },
+  },
   reminders: {
     title: "Reminders",
     entries: {

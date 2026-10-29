@@ -50,6 +50,8 @@ export const centres = pgTable(
     plan: text("plan", { enum: ["free", "pro"] }).notNull().default("free"),
     // How fee reminders read: gentle or firm (TSD: default_reminder_tone).
     reminderTone: text("reminder_tone", { enum: ["gentle", "firm"] }).notNull().default("gentle"),
+    // Message parents on WhatsApp when their child is marked absent (TSD: absence-alert).
+    absenceAlerts: boolean("absence_alerts").notNull().default(false),
     planRenewsAt: timestamp("plan_renews_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -534,6 +536,35 @@ export const reminders = pgTable(
   ],
 ).enableRLS();
 
+/** A day's attendance for one student in one batch (TSD: attendance), and any absence alert sent for it. */
+export const attendance = pgTable(
+  "attendance",
+  {
+    id: id(),
+    centreId: uuid("centre_id")
+      .notNull()
+      .references(() => centres.id),
+    batchId: uuid("batch_id")
+      .notNull()
+      .references(() => batches.id),
+    studentId: uuid("student_id")
+      .notNull()
+      .references(() => students.id),
+    date: date("date").notNull(),
+    present: boolean("present").notNull(),
+    // The parent was told of the absence (or why not), at most once per mark.
+    alertedAt: timestamp("alerted_at", { withTimezone: true }),
+    alertError: text("alert_error"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex("attendance_batch_student_date_unique").on(t.batchId, t.studentId, t.date),
+    index("attendance_centre_batch_date_idx").on(t.centreId, t.batchId, t.date),
+    centreIsolation("attendance_centre_isolation", t.centreId),
+  ],
+).enableRLS();
+
 export type Centre = typeof centres.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Consent = typeof consents.$inferSelect;
@@ -548,4 +579,5 @@ export type Payment = typeof payments.$inferSelect;
 export type Receipt = typeof receipts.$inferSelect;
 export type PaymentLink = typeof paymentLinks.$inferSelect;
 export type Reminder = typeof reminders.$inferSelect;
+export type Attendance = typeof attendance.$inferSelect;
 export type PaymentSettings = typeof paymentSettings.$inferSelect;

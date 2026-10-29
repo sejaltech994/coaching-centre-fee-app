@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MESSAGE_TEMPLATES, messageFor, reminderKindOn, renderMessage, type MessageValues } from "./messages";
+import { ABSENCE_TEMPLATE, MESSAGE_TEMPLATES, messageFor, reminderKindOn, renderAbsence, renderMessage, type MessageValues } from "./messages";
 
 const values: MessageValues = {
   parent: "Neha",
@@ -52,5 +52,15 @@ describe("messageFor", () => {
   it("says the fee is due up to the due date, and overdue after it", () => {
     expect(messageFor("2026-11-05", "2026-11-05")).toBe("fee_due");
     expect(messageFor("2026-11-05", "2026-11-06")).toBe("fee_overdue");
+  });
+});
+
+describe("the absence alert", () => {
+  it("tells the parent which class their child missed, and when", () => {
+    const values = { parent: "Neha", student: "Aarav", batch: "Class 10 Maths", centre: "Sunrise Classes", date: "2 Nov 2026" };
+    expect(renderAbsence(values)).toBe(
+      "Hello Neha, Aarav was marked absent from Class 10 Maths at Sunrise Classes on 2 Nov 2026. If you didn't expect this, please contact the centre.",
+    );
+    expect(ABSENCE_TEMPLATE).toMatchObject({ metaName: "chukta_absence_v1", variables: ["parent", "student", "batch", "centre", "date"] });
   });
 });

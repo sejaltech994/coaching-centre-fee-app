@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { AppEnv, Deps } from "./deps";
 import { handleError, notFound } from "./lib/errors";
+import { absenceAlertRoutes, attendanceRoutes } from "./modules/attendance/routes";
 import { authRoutes } from "./modules/auth/routes";
 import { batchRoutes } from "./modules/batches/routes";
 import { centreRoutes } from "./modules/centre/routes";
@@ -48,6 +49,7 @@ export function createApp(deps: Deps) {
   app.route("/centre/payment-settings", paymentSettingsRoutes(deps));
   app.route("/centre/razorpay", razorpaySettingsRoutes(deps));
   app.route("/centre/reminder-tone", reminderToneRoutes(deps));
+  app.route("/centre/absence-alerts", absenceAlertRoutes(deps));
   app.route("/centre", centreRoutes(deps));
   app.route("/batches", batchRoutes(deps));
   app.route("/fee-plans", feePlanRoutes(deps));
@@ -57,6 +59,7 @@ export function createApp(deps: Deps) {
   app.route("/receipts", receiptRoutes(deps));
   app.route("/reminders", reminderRoutes(deps));
   app.route("/dashboard", dashboardRoutes(deps));
+  app.route("/attendance", attendanceRoutes(deps));
   // No sign-in: a parent's pay link and receipt, keyed by the bill's secret token.
   app.route("/public", publicRoutes(deps));
   // Signed by each centre's own Razorpay webhook secret.

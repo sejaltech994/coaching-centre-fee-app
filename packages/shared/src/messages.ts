@@ -69,6 +69,19 @@ export function renderMessage(key: MessageKey, tone: Tone, values: MessageValues
   return MESSAGE_TEMPLATES[key][tone].body.replace(/\{(\w+)\}/g, (_match, name: keyof MessageValues) => values[name]);
 }
 
+export type AbsenceValues = { parent: string; student: string; batch: string; centre: string; date: string };
+
+/** The absence alert (TSD: absence-alert), sent when the centre has turned it on. */
+export const ABSENCE_TEMPLATE = {
+  metaName: "chukta_absence_v1",
+  version: 1,
+  body: "Hello {parent}, {student} was marked absent from {batch} at {centre} on {date}. If you didn't expect this, please contact the centre.",
+  variables: ["parent", "student", "batch", "centre", "date"] as (keyof AbsenceValues)[],
+};
+
+export const renderAbsence = (values: AbsenceValues) =>
+  ABSENCE_TEMPLATE.body.replace(/\{(\w+)\}/g, (_match, name: keyof AbsenceValues) => values[name]);
+
 /** The automatic schedule (TSD): 3 days before the due date, on it, then 3 and 7 days after. */
 export type ReminderKind = "pre_due" | "due" | "overdue_3" | "overdue_7";
 const SCHEDULE: [ReminderKind, number][] = [

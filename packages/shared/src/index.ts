@@ -43,6 +43,9 @@ export {
 } from "./billing";
 export { upiPayLink, validatePaymentSettings, type PaymentSettingsInput } from "./payments";
 export {
+  ABSENCE_TEMPLATE,
+  renderAbsence,
+  type AbsenceValues,
   MESSAGE_TEMPLATES,
   messageFor,
   reminderKindOn,

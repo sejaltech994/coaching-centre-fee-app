@@ -146,6 +146,13 @@ export type Reminder = {
 
 export type ReminderTone = "gentle" | "firm";
 
+/** A batch's students on a day, each present, absent or not yet marked (null). */
+export type AttendanceDay = {
+  batch: { id: string; name: string };
+  date: string;
+  students: { id: string; name: string; present: boolean | null }[];
+};
+
 /** A month's money and who owes (GET /dashboard/summary); money in paise. */
 export type DashboardSummary = {
   month: string;
@@ -457,3 +464,16 @@ export const setReminderTone = (token: string, tone: ReminderTone) =>
 
 export const getDashboardSummary = (token: string, month?: string) =>
   call<DashboardSummary>(`/dashboard/summary${month ? `?month=${encodeURIComponent(month)}` : ""}`, { token });
+
+// --- Attendance ---
+
+export const getAttendance = (token: string, batchId: string, date: string) =>
+  call<AttendanceDay>(`/attendance?batchId=${encodeURIComponent(batchId)}&date=${encodeURIComponent(date)}`, { token });
+
+export const saveAttendance = (token: string, day: { batchId: string; date: string; marks: { studentId: string; present: boolean }[] }) =>
+  call<AttendanceDay & { absenceAlerts: { sent: number; skipped: number } }>("/attendance", { method: "PUT", body: day, token });
+
+export const getAbsenceAlerts = (token: string) => call<{ on: boolean }>("/centre/absence-alerts", { token });
+
+export const setAbsenceAlerts = (token: string, on: boolean) =>
+  call<{ on: boolean }>("/centre/absence-alerts", { method: "PUT", body: { on }, token });
