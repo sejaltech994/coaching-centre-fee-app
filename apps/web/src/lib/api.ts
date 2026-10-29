@@ -62,6 +62,28 @@ export type Batch = {
   createdAt: string;
 };
 
+/** A batch a student is in now. */
+export type StudentBatch = { id: string; name: string; enrolmentId: string; since: string };
+
+export type StudentSummary = {
+  id: string;
+  name: string;
+  parentName: string;
+  parentPhone: string;
+  whatsappOptIn: boolean;
+  status: "active" | "left";
+  batches: StudentBatch[];
+};
+
+export type Enrolment = { id: string; batch: { id: string; name: string }; startDate: string; endDate: string | null };
+
+/** A student with every batch they've been in. */
+export type StudentDetail = StudentSummary & { enrolments: Enrolment[] };
+
+export type StudentInput = { name: string; parentName: string; parentPhone: string; whatsappOptIn: boolean };
+
+export type StudentFilters = { status: "active" | "left" | "all"; batchId?: string; q?: string; cursor?: string };
+
 export class ApiRequestError extends Error {
   /** After a wrong code: how many tries it has left. */
   readonly attemptsLeft?: number;
@@ -187,3 +209,25 @@ export const updateBatch = async (token: string, id: string, changes: Partial<Ba
 /** The API archives rather than deletes. */
 export const archiveBatch = async (token: string, id: string) =>
   (await call<{ batch: Batch }>(`/batches/${id}`, { method: "DELETE", token })).batch;
+
+export const listStudents = (token: string, filters: StudentFilters) => {
+  const query = new URLSearchParams(Object.entries(filters).filter((entry): entry is [string, string] => Boolean(entry[1])));
+  return call<{ students: StudentSummary[]; nextCursor: string | null }>(`/students?${query}`, { token });
+};
+
+export const createStudent = (token: string, input: StudentInput & { batchIds: string[] }) =>
+  call<{ student: StudentSummary }>("/students", { method: "POST", body: input, token });
+
+export const getStudent = (token: string, id: string) =>
+  call<{ student: StudentDetail }>(`/students/${encodeURIComponent(id)}`, { token }).then(({ student }) => student);
+
+export const updateStudent = (token: string, id: string, changes: Partial<StudentInput> & { status?: "active" | "left" }) =>
+  call<{ student: StudentSummary }>(`/students/${encodeURIComponent(id)}`, { method: "PATCH", body: changes, token });
+
+/** Puts a student in a batch from today. */
+export const enrol = (token: string, studentId: string, batchId: string) =>
+  call<{ enrolment: Enrolment }>("/enrolments", { method: "POST", body: { studentId, batchId }, token });
+
+/** Takes a student out of a batch on `endDate` (YYYY-MM-DD). */
+export const endEnrolment = (token: string, id: string, endDate: string) =>
+  call<{ enrolment: Enrolment }>(`/enrolments/${encodeURIComponent(id)}`, { method: "PATCH", body: { endDate }, token });

@@ -7,6 +7,7 @@ import { authRoutes } from "./modules/auth/routes";
 import { batchRoutes } from "./modules/batches/routes";
 import { centreRoutes } from "./modules/centre/routes";
 import { meRoutes } from "./modules/me/routes";
+import { enrolmentRoutes, studentRoutes } from "./modules/students/routes";
 
 /** The JSON API under /api/v1. See the TSD's API section. */
 export function createApp(deps: Deps) {
@@ -38,6 +39,8 @@ export function createApp(deps: Deps) {
   app.route("/me", meRoutes(deps));
   app.route("/centre", centreRoutes(deps));
   app.route("/batches", batchRoutes(deps));
+  app.route("/students", studentRoutes(deps));
+  app.route("/enrolments", enrolmentRoutes(deps));
 
   app.notFound(notFound);
   app.onError(handleError);

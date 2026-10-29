@@ -13,6 +13,12 @@ import {
   registerOwner,
   updateBatch,
   confirmPhone,
+  createStudent,
+  endEnrolment,
+  enrol,
+  getStudent,
+  listStudents,
+  updateStudent,
   listSessions,
   signOutOtherSessions,
   signOutSession,
@@ -223,6 +229,36 @@ describe("API client", () => {
       ["http://localhost:8787/api/v1/me/sessions/s1", "DELETE"],
       ["http://localhost:8787/api/v1/me/sessions/sign-out-others", "POST"],
     ]);
+  });
+
+  it("lists, adds, reads and changes students, and their batches", async () => {
+    for (let i = 0; i < 6; i++) reply(200, {});
+
+    await listStudents("t", { status: "left", batchId: "b1", q: "rao", cursor: "c1" });
+    await createStudent("t", { name: "Aarav", parentName: "Neha", parentPhone: "98765 43210", whatsappOptIn: true, batchIds: ["b1"] });
+    await getStudent("t", "s1");
+    await updateStudent("t", "s1", { status: "left" });
+    await enrol("t", "s1", "b2");
+    await endEnrolment("t", "e1", "2026-11-02");
+
+    expect(fetchMock.mock.calls.map(([url, init]) => [url, init!.method, init!.body && JSON.parse(init!.body as string)])).toEqual([
+      ["http://localhost:8787/api/v1/students?status=left&batchId=b1&q=rao&cursor=c1", "GET", undefined],
+      [
+        "http://localhost:8787/api/v1/students",
+        "POST",
+        { name: "Aarav", parentName: "Neha", parentPhone: "98765 43210", whatsappOptIn: true, batchIds: ["b1"] },
+      ],
+      ["http://localhost:8787/api/v1/students/s1", "GET", undefined],
+      ["http://localhost:8787/api/v1/students/s1", "PATCH", { status: "left" }],
+      ["http://localhost:8787/api/v1/enrolments", "POST", { studentId: "s1", batchId: "b2" }],
+      ["http://localhost:8787/api/v1/enrolments/e1", "PATCH", { endDate: "2026-11-02" }],
+    ]);
+  });
+
+  it("leaves out list filters that aren't set", async () => {
+    reply(200, { students: [], nextCursor: null });
+    await listStudents("t", { status: "active" });
+    expect(fetchMock.mock.calls[0]![0]).toBe("http://localhost:8787/api/v1/students?status=active");
   });
 
   it("reads the centre with the access token", async () => {

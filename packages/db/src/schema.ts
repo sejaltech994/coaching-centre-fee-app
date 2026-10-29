@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  date,
   index,
   integer,
   pgPolicy,
@@ -12,6 +13,7 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
 /** Created in migration 0001; centre-scoped transactions run as this role (see withCentre). */
@@ -193,6 +195,16 @@ export const refreshTokens = pgTable(
   (t) => [index("refresh_tokens_family_id_idx").on(t.familyId), index("refresh_tokens_user_id_idx").on(t.userId)],
 );
 
+/** Every centre-owned table: rows are visible and writable only inside withCentre for their centre. */
+const centreIsolation = (name: string, centreId: AnyPgColumn) =>
+  pgPolicy(name, {
+    as: "permissive",
+    for: "all",
+    to: appRole,
+    using: sql`${centreId} = ${currentCentre}`,
+    withCheck: sql`${centreId} = ${currentCentre}`,
+  });
+
 /** A class group with a weekly schedule. Archived (is_active = false) rather than deleted. */
 export const batches = pgTable(
   "batches",
@@ -223,13 +235,72 @@ export const batches = pgTable(
       sql`cardinality(${t.days}) > 0 and ${t.days} <@ array['mon','tue','wed','thu','fri','sat','sun']`,
     ),
     check("batches_time_check", sql`${t.endTime} > ${t.startTime}`),
-    pgPolicy("batches_centre_isolation", {
-      as: "permissive",
-      for: "all",
-      to: appRole,
-      using: sql`${t.centreId} = ${currentCentre}`,
-      withCheck: sql`${t.centreId} = ${currentCentre}`,
-    }),
+    centreIsolation("batches_centre_isolation", t.centreId),
+  ],
+).enableRLS();
+
+/** A child at the centre, with the parent who pays and gets the reminders. */
+export const students = pgTable(
+  "students",
+  {
+    id: id(),
+    centreId: uuid("centre_id")
+      .notNull()
+      .references(() => centres.id),
+    name: text("name").notNull(),
+    parentName: text("parent_name").notNull(),
+    // E.164. Reminders and receipts go here.
+    parentPhone: text("parent_phone").notNull(),
+    // TSD (Consent): the parent agreed to WhatsApp messages; recorded with when.
+    whatsappOptIn: boolean("whatsapp_opt_in").notNull().default(false),
+    whatsappOptInAt: timestamp("whatsapp_opt_in_at", { withTimezone: true }),
+    status: text("status", { enum: ["active", "left"] }).notNull().default("active"),
+    leftAt: timestamp("left_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("students_centre_status_name_idx").on(t.centreId, t.status, sql`lower(${t.name})`),
+    index("students_centre_parent_phone_idx").on(t.centreId, t.parentPhone),
+    check("students_name_check", sql`length(trim(${t.name})) > 0`),
+    check("students_parent_name_check", sql`length(trim(${t.parentName})) > 0`),
+    check("students_status_check", sql`${t.status} in ('active', 'left')`),
+    centreIsolation("students_centre_isolation", t.centreId),
+  ],
+).enableRLS();
+
+/**
+ * A student in a batch from start_date until end_date (open while null). The fee
+ * plan and discount arrive with fee plans; fee_plan_id gets its foreign key then.
+ */
+export const enrolments = pgTable(
+  "enrolments",
+  {
+    id: id(),
+    centreId: uuid("centre_id")
+      .notNull()
+      .references(() => centres.id),
+    studentId: uuid("student_id")
+      .notNull()
+      .references(() => students.id),
+    batchId: uuid("batch_id")
+      .notNull()
+      .references(() => batches.id),
+    feePlanId: uuid("fee_plan_id"),
+    startDate: date("start_date").notNull(),
+    endDate: date("end_date"),
+    discountPaise: integer("discount_paise").notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("enrolments_centre_batch_idx").on(t.centreId, t.batchId),
+    index("enrolments_student_idx").on(t.studentId),
+    // One current enrolment per student and batch; ended ones are history.
+    uniqueIndex("enrolments_current_unique").on(t.studentId, t.batchId).where(sql`${t.endDate} is null`),
+    check("enrolments_dates_check", sql`${t.endDate} is null or ${t.endDate} >= ${t.startDate}`),
+    check("enrolments_discount_check", sql`${t.discountPaise} >= 0`),
+    centreIsolation("enrolments_centre_isolation", t.centreId),
   ],
 ).enableRLS();
 
@@ -241,3 +312,5 @@ export type AuthIdentity = typeof authIdentities.$inferSelect;
 export type SignupTicket = typeof signupTickets.$inferSelect;
 export type RefreshToken = typeof refreshTokens.$inferSelect;
 export type Batch = typeof batches.$inferSelect;
+export type Student = typeof students.$inferSelect;
+export type Enrolment = typeof enrolments.$inferSelect;

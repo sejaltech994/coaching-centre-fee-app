@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { INVALID_PHONE_MESSAGE, normalizeIndianMobile, type IndianMobile } from "./phone";
+import { check, indianMobile, text, type Validation } from "./fields";
+import type { IndianMobile } from "./phone";
 
 /** Centre types from the TSD (Registration, login and profile). */
 export const CENTRE_TYPES = ["tuition", "coaching", "dance", "music", "sports", "other"] as const;
@@ -27,42 +28,16 @@ export type ProfileInput = {
   centreType: CentreType;
 };
 
-const text = (missing: string, max: number, tooLong: string) =>
-  z.string({ error: missing }).trim().min(1, missing).max(max, tooLong);
-
 const profileSchema = z.object({
   fullName: text("Enter your name.", 80, "Keep your name to 80 characters or fewer."),
   centreName: text("Enter your centre’s name.", 100, "Keep the centre’s name to 100 characters or fewer."),
   city: text("Enter your city.", 60, "Keep the city to 60 characters or fewer."),
   centreType: z.enum(CENTRE_TYPES, { error: "Pick the type of centre." }),
-  phone: z
-    .string({ error: INVALID_PHONE_MESSAGE })
-    .transform((raw, ctx) => {
-      const phone = normalizeIndianMobile(raw);
-      if (!phone) {
-        ctx.addIssue({ code: "custom", message: INVALID_PHONE_MESSAGE });
-        return z.NEVER;
-      }
-      return phone;
-    }),
+  phone: indianMobile(),
   acceptedTerms: z.literal(true, { error: "Accept the terms and privacy notice to continue." }),
 });
 
-type Validation<T> = { ok: true; value: T } | { ok: false; fields: Record<string, string> };
 export type ProfileValidation = Validation<ProfileInput>;
-
-/** Parses `input`; on failure, one message per field at fault. */
-function check<T>(schema: z.ZodType<T>, input: unknown): Validation<T> {
-  const parsed = schema.safeParse(input);
-  if (parsed.success) return { ok: true, value: parsed.data };
-
-  const fields: Record<string, string> = {};
-  for (const issue of parsed.error.issues) {
-    const field = String(issue.path[0] ?? "profile");
-    fields[field] ??= issue.message;
-  }
-  return { ok: false, fields };
-}
 
 /** Checks and normalises a sign-up. */
 export function validateProfile(input: unknown): ProfileValidation {

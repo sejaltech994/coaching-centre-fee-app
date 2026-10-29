@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { getTableConfig } from "drizzle-orm/pg-core";
+import { getTableConfig, PgTable } from "drizzle-orm/pg-core";
 import { beforeEach, describe, expect, it } from "vitest";
+import * as schema from "./schema";
 import { centres, otpChallenges, refreshTokens, users } from "./schema";
 import { createTestDb, type TestDb } from "./testing";
 
@@ -95,6 +96,32 @@ describe("migrations", () => {
     expect(userFk!.reference().foreignTable).toBe(centres);
     expect(tokenFk!.reference().foreignTable).toBe(users);
     expect(tokenFk!.onDelete).toBe("cascade");
+  });
+
+  it.each([
+    ["users.centre_id", "centres", "no action"],
+    ["auth_identities.user_id", "users", "cascade"],
+    ["consents.user_id", "users", "cascade"],
+    ["otp_challenges.user_id", "users", "cascade"],
+    ["refresh_tokens.user_id", "users", "cascade"],
+    ["batches.centre_id", "centres", "no action"],
+    ["students.centre_id", "centres", "no action"],
+    ["enrolments.centre_id", "centres", "no action"],
+    ["enrolments.student_id", "students", "no action"],
+    ["enrolments.batch_id", "batches", "no action"],
+  ])("link %s to %s (on delete: %s)", (column, target, onDelete) => {
+    const tables = Object.values(schema).filter((value) => value instanceof PgTable);
+    const links = tables.flatMap((table) => {
+      const { name, foreignKeys } = getTableConfig(table);
+      return foreignKeys.map((fk) => {
+        const { columns, foreignTable } = fk.reference();
+        return { from: `${name}.${columns[0]!.name}`, to: getTableConfig(foreignTable).name, onDelete: fk.onDelete };
+      });
+    });
+
+    expect(links).toContainEqual({ from: column, to: target, onDelete });
+    // Every link in the schema is listed here, so a new one needs a row above.
+    expect(links).toHaveLength(10);
   });
 
   it("keep refresh token hashes unique and delete them with their user", async () => {
