@@ -18,7 +18,7 @@ beforeEach(() => {
   push.mockReset();
   vi.mocked(useSession).mockReturnValue({ token: "token", centre: null });
   vi.mocked(listBatches).mockResolvedValue({
-    batches: [{ id: "b1", name: "Class 10 Maths", subject: null, days: ["mon"], startTime: "16:00", endTime: "17:00", isActive: true, createdAt: "" }],
+    batches: [{ id: "b1", name: "Class 10 Maths", subject: null, days: ["mon"], startTime: "16:00", endTime: "17:00", isActive: true, feePlan: null, createdAt: "" }],
     nextCursor: null,
   });
   vi.mocked(createStudent).mockResolvedValue({
