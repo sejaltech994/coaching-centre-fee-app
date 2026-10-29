@@ -22,7 +22,7 @@ export {
   type ProfileInput,
   type ProfileValidation,
 } from "./profile";
-export { validateStudent, type StudentInput } from "./student";
+export { STUDENT_IMPORT_HEADINGS, validateStudent, type StudentInput } from "./student";
 export {
   describeFeePlan,
   FEE_CYCLES,
@@ -57,3 +57,4 @@ export {
   type Tone,
 } from "./messages";
 export { PLANS, PRO_PRICE_PAISE, studentLimitReached, type Plan } from "./plans";
+export { parseCsv, toCsv } from "./csv";

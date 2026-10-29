@@ -11,6 +11,7 @@ import { requireAuth } from "../../middleware/auth";
 import { feePlanDto } from "../fee-plans/routes";
 import { billEnrolments, dropBillsAfter } from "../invoices/billing";
 import { centrePlan, ensureStudentPlace } from "../subscription/routes";
+import { importStudents } from "./import";
 
 /**
  * Students (TSD: students) and their enrolments in batches. Every query runs in
@@ -178,6 +179,8 @@ export function studentRoutes(deps: Deps) {
       nextCursor: more ? encodeCursor(page.at(-1)!) : null,
     });
   });
+
+  routes.post("/import", (c) => importStudents(deps, c));
 
   routes.post("/", async (c) => {
     const body = await readJson(c, createBody);

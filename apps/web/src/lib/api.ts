@@ -96,6 +96,22 @@ export type Enrolment = {
 /** A student with every batch they've been in. */
 export type StudentDetail = StudentSummary & { enrolments: Enrolment[] };
 
+/** A students CSV checked row by row (POST /students/import). */
+export type ImportResult = {
+  rows: {
+    line: number;
+    name: string;
+    parentName: string;
+    parentPhone: string;
+    whatsappOptIn: boolean;
+    batches: string[];
+    errors: Record<string, string>;
+  }[];
+  valid: number;
+  invalid: number;
+  imported: number;
+};
+
 export type StudentInput = { name: string; parentName: string; parentPhone: string; whatsappOptIn: boolean };
 
 export type StudentFilters = { status: "active" | "left" | "all"; batchId?: string; q?: string; cursor?: string };
@@ -382,6 +398,14 @@ export const listStudents = (token: string, filters: StudentFilters) => {
   const query = new URLSearchParams(Object.entries(filters).filter((entry): entry is [string, string] => Boolean(entry[1])));
   return call<{ students: StudentSummary[]; nextCursor: string | null }>(`/students?${query}`, { token });
 };
+
+/** Checks a CSV without adding anyone. */
+export const previewImport = (token: string, csv: string) =>
+  call<ImportResult>("/students/import", { method: "POST", body: { csv, dryRun: true }, token });
+
+/** Adds every student in the CSV, only if every row is right. */
+export const importStudents = (token: string, csv: string) =>
+  call<ImportResult>("/students/import", { method: "POST", body: { csv }, token });
 
 export const createStudent = (token: string, input: StudentInput & { batchIds: string[] }) =>
   call<{ student: StudentSummary }>("/students", { method: "POST", body: input, token });

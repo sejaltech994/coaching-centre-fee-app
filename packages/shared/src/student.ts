@@ -19,4 +19,7 @@ const studentSchema = z.object({
   whatsappOptIn: z.boolean({ error: "Say whether the parent agreed to WhatsApp messages." }).default(false),
 });
 
+/** The columns of the students CSV template, in order (TSD: POST /students/import). */
+export const STUDENT_IMPORT_HEADINGS = ["Student name", "Parent name", "Parent mobile", "WhatsApp consent", "Batches"];
+
 export const validateStudent = (input: unknown): Validation<StudentInput> => check(studentSchema, input);
