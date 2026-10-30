@@ -4,10 +4,10 @@ Each environment is **one Cloudflare Worker** that serves both the web app (stat
 
 | Environment | Branch | Worker and URL | Database | API |
 | --- | --- | --- | --- | --- |
-| dev | `develop` | `chukta-web-dev`, https://chukta-web-dev.chukta.workers.dev | `chukta_dev` (non-prod project) | **Live**; login codes in the Worker log |
+| dev | `develop` | `chukta-web-dev`, https://chukta-web-dev.chukta.workers.dev | `chukta_dev` (non-prod project) | **Live** |
 | sit | `sit` | `chukta-web-sit`, https://chukta-web-sit.chukta.workers.dev | `chukta_sit` (non-prod project) | Ready; goes live on the first promotion to `sit` |
 | uat | `uat` | `chukta-web-uat`, https://chukta-web-uat.chukta.workers.dev | `chukta_uat` (non-prod project) | Ready; goes live on the first promotion to `uat` |
-| prod | `main` | `chukta-web-prod`, https://chukta-web-prod.chukta.workers.dev (custom domain later) | Own Neon project in Mumbai (not created yet) | **Off (503)** until real SMS (MSG91, DLT-registered) is set up |
+| prod | `main` | `chukta-web-prod`, https://chukta-web-prod.chukta.workers.dev (custom domain later) | Own Neon project in Mumbai (not created yet) | Goes live once its database and `JWT_SECRET` are set |
 
 ### Databases
 
@@ -73,7 +73,7 @@ Connection strings use the **direct** host (no `-pooler`) and `sslmode=require`,
    openssl rand -base64 48 | tr -d '\n' | gh secret set JWT_SECRET --env prod
    ```
 
-The next deploy to `main` migrates it. Its API stays off until real SMS is configured.
+The next deploy to `main` migrates it and turns its API on.
 
 ### Rotating a database password
 
@@ -83,6 +83,27 @@ If a connection string is ever exposed (pasted in chat, logged, committed), rese
 gh secret set DATABASE_URL --env dev    # paste the new string; repeat for sit, uat
 gh workflow run deploy.yml --ref develop
 ```
+
+## WhatsApp reminders (Meta Cloud API)
+
+Reminders go from **one Chukta WhatsApp number** for every centre, through Meta's Cloud API directly (no reseller markup). Until an environment has these settings, reminders are recorded as *skipped* and nothing else is affected.
+
+1. In Meta Business Manager, create a WhatsApp Business app and add a phone number (dev, sit and uat can use Meta's free test number).
+2. Submit the message templates in `packages/shared/src/messages.ts` under their `metaName`s, category *Utility*, language *English*, with the body text and variables exactly as written there. Wait for *Approved*.
+3. Set, for each GitHub environment: the variable `WHATSAPP_PHONE_NUMBER_ID`, and the secrets `WHATSAPP_TOKEN` (a permanent system-user token), `WHATSAPP_APP_SECRET` (App settings › Basic) and `WHATSAPP_VERIFY_TOKEN` (any long random string). Re-run the deploy.
+4. In the app's WhatsApp › Configuration, set the webhook to `https://<environment's domain>/api/v1/webhooks/whatsapp` with the same verify token, and subscribe to `messages`.
+
+The webhook updates each reminder's delivery status, and a parent replying **STOP** is opted out of WhatsApp.
+
+## Pro plan billing (Chukta's own Razorpay account)
+
+Pro (₹499 a month) is a Razorpay Subscription on **Chukta's own** account: the only money Chukta takes is its own fee. Parents' fees never touch it; they go to each centre's own UPI ID or Razorpay account. Until an environment has these settings, Settings › Plan says Pro isn't available there.
+
+1. In Chukta's Razorpay dashboard (test mode for dev, sit and uat): **Subscriptions › Plans › Create plan**, monthly, ₹499. Note its plan ID.
+2. **Webhooks › Add**: `https://<environment's domain>/api/v1/webhooks/chukta-razorpay`, events `subscription.activated`, `subscription.charged`, `subscription.cancelled` and `subscription.halted`, with a long random secret.
+3. For each GitHub environment, set the variables `CHUKTA_RAZORPAY_KEY_ID` and `CHUKTA_RAZORPAY_PRO_PLAN_ID`, and the secrets `CHUKTA_RAZORPAY_KEY_SECRET` and `CHUKTA_RAZORPAY_WEBHOOK_SECRET`. Re-run the deploy.
+
+Free covers up to 25 active students with reminders sent by hand; Pro adds any number of students, automatic reminders and each centre's own Razorpay. A cancelled or failed Pro lasts until the end of the period paid for, then the hourly job moves the centre back to Free.
 
 ## Day to day
 
@@ -99,7 +120,6 @@ gh workflow run deploy.yml --ref develop
 
 ## Later
 
-- **Real SMS** (MSG91 or similar) needs DLT registration of the sender ID and template. Production's API turns on once it's configured.
 - **Background jobs** (`apps/worker`, BullMQ): Upstash Redis free gives 1 database and 500K commands/month ([pricing](https://upstash.com/pricing/redis)). BullMQ polls Redis constantly, so budget for pay-as-you-go before prod, or use Cloudflare Queues and Cron Triggers instead.
 
 ## Performance

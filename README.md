@@ -36,7 +36,7 @@ Needs Node 22.13+. No Docker or Postgres install: the API uses an embedded Postg
 ```sh
 npm install                       # once, from the repo root (npm workspaces)
 cp .env.example .env              # then set JWT_SECRET: openssl rand -base64 48
-GOOGLE_PROVIDER=fake npm run dev -w apps/api           # API on http://localhost:8787/api/v1
+GOOGLE_PROVIDER=fake RAZORPAY_PROVIDER=fake npm run dev -w apps/api   # API on http://localhost:8787/api/v1
 NEXT_PUBLIC_GOOGLE_SIGN_IN=on npm run dev -w apps/web   # web on http://localhost:3000 (second terminal)
 ```
 

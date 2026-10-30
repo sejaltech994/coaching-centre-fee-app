@@ -24,7 +24,7 @@ beforeEach(() => {
   replace.mockReset();
   vi.mocked(useSession).mockReturnValue({ token: "token", centre });
   vi.mocked(getMe).mockResolvedValue({
-    user: { id: "u1", phone: "+919876543210", phoneVerified: false, fullName: "Asha Sharma", email: "asha@example.com", role: "owner" },
+    user: { id: "u1", phone: "98765 43210", fullName: "Asha Sharma", email: "asha@example.com", role: "owner" },
     centre: { ...centre, city: "Pune", centreType: "coaching" },
   });
   vi.mocked(getIdentities).mockResolvedValue({ identities: [] });

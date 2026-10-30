@@ -1,5 +1,6 @@
 import { logout, refreshSession, setSessionHooks, type CentreResponse } from "./api";
 import { navigate } from "./navigate";
+import { loginUrl } from "./returnTo";
 
 // The access token lives in memory only, never in localStorage, so a script
 // injected into the page can't read it from storage. After a reload it is
@@ -68,7 +69,7 @@ export function endLogin(): Promise<void> {
       clearSession();
       // Keep the guard until the page is gone, so later failures don't navigate again.
       ending = Promise.resolve();
-      navigate("/login/?session=expired");
+      navigate(loginUrl("expired"));
     });
   return ending;
 }

@@ -5,7 +5,7 @@ import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { z } from "zod";
 import type { AppEnv, Deps } from "../../deps";
 import { invalidFields, unauthenticated } from "../../lib/errors";
-import { clientIp, readJson } from "../../lib/request";
+import { clientCity, clientIp, readJson } from "../../lib/request";
 import { clearPendingGoogle, googlePendingMissing, googleRoutes, readPendingGoogle } from "./google";
 import { register } from "./signup";
 import {
@@ -17,8 +17,8 @@ import {
   signAccessToken,
 } from "./tokens";
 
-const REFRESH_COOKIE = "chukta_rt";
-const COOKIE_PATH = "/api/v1/auth";
+export const REFRESH_COOKIE = "chukta_rt";
+export const COOKIE_PATH = "/api/v1/auth";
 
 const registerBody = z.record(z.string(), z.unknown());
 
@@ -26,7 +26,6 @@ const registerBody = z.record(z.string(), z.unknown());
 export const userDto = (user: User) => ({
   id: user.id,
   phone: user.phone,
-  phoneVerified: user.phoneVerifiedAt !== null,
   fullName: user.name,
   email: user.email,
   role: user.role,
@@ -39,7 +38,12 @@ export const centreDto = (centre: Centre) => ({
   centreType: centre.centreType,
   plan: centre.plan,
   timezone: centre.timezone,
+  /** When the account will be deleted, if the owner asked (TSD: 30 days to cancel). */
+  deletesAt: centre.deletionRequestedAt ? new Date(centre.deletionRequestedAt.getTime() + DELETE_AFTER_MS).toISOString() : null,
 });
+
+/** How long an owner has to change their mind about deleting the account. */
+export const DELETE_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
 
 export function authRoutes(deps: Deps) {
   const routes = new Hono<AppEnv>();
@@ -55,7 +59,11 @@ export function authRoutes(deps: Deps) {
 
   /** Starts a session: refresh cookie plus the access token and who signed in. */
   async function signIn(c: Context, user: User, centre: Centre, isNewAccount: boolean) {
-    const refresh = await issueRefreshToken(deps, { userId: user.id, userAgent: c.req.header("user-agent") });
+    const refresh = await issueRefreshToken(deps, {
+      userId: user.id,
+      userAgent: c.req.header("user-agent"),
+      city: clientCity(c, deps.config.trustProxyHeaders),
+    });
     setRefreshCookie(c, refresh.token);
     return {
       status: "signed_in" as const,
@@ -92,7 +100,7 @@ export function authRoutes(deps: Deps) {
   routes.post("/refresh", async (c) => {
     const token = getCookie(c, REFRESH_COOKIE);
     if (!token) throw unauthenticated();
-    const rotated = await rotateRefreshToken(deps, token, c.req.header("user-agent"));
+    const rotated = await rotateRefreshToken(deps, token, c.req.header("user-agent"), clientCity(c, deps.config.trustProxyHeaders));
     setRefreshCookie(c, rotated.token);
     return c.json({ accessToken: await signAccessToken(deps, rotated.auth), expiresIn: ACCESS_TOKEN_TTL_SECONDS });
   });

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { centres, consents, signupTickets, users } from "./schema";
+import { centres, consents, users } from "./schema";
 import { createTestDb, type TestDb } from "./testing";
 
 let db: TestDb;
@@ -50,13 +50,5 @@ describe("profile migration", () => {
 
     expect(consent).toMatchObject({ userId: user.id, kind: "terms_and_privacy", version: "2026-10" });
     expect(consent!.acceptedAt).toBeInstanceOf(Date);
-  });
-
-  it("keeps signup ticket hashes unique and starts them unused", async () => {
-    const ticket = { phone: "+919876543210", tokenHash: "same", expiresAt: new Date() };
-    const [row] = await db.insert(signupTickets).values(ticket).returning();
-
-    expect(row!.consumedAt).toBeNull();
-    await expect(db.insert(signupTickets).values(ticket)).rejects.toThrow();
   });
 });

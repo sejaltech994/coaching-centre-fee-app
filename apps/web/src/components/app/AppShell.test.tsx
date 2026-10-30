@@ -23,6 +23,9 @@ describe("AppShell", () => {
 
     expect(within(nav).getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/dashboard");
     expect(within(nav).getByRole("link", { name: "Students" })).toHaveAttribute("href", "/students");
+    expect(within(nav).getByRole("link", { name: "Fees" })).toHaveAttribute("href", "/fees");
+    expect(within(nav).getByRole("link", { name: "Reminders" })).toHaveAttribute("href", "/reminders");
+    expect(within(nav).getByRole("link", { name: "Attendance" })).toHaveAttribute("href", "/attendance");
     expect(within(nav).getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
     const batches = within(nav).getByRole("link", { name: "Batches" });
     expect(batches).toHaveAttribute("href", "/batches");
@@ -70,5 +73,11 @@ describe("AppShell", () => {
 
     await vi.waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
     expect(getAccessToken()).toBeNull();
+  });
+
+  it("warns on every page while the account is due to be deleted", () => {
+    render(<AppShell current="dashboard" centre={{ ...centre, deletesAt: "2026-12-02T04:30:00.000Z" }}>content</AppShell>);
+    expect(screen.getByRole("alert")).toHaveTextContent("This account will be deleted on 2 Dec 2026.");
+    expect(screen.getByRole("link", { name: "Keep it" })).toHaveAttribute("href", "/settings");
   });
 });

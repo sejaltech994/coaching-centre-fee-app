@@ -40,6 +40,16 @@ jobs:
       # Each environment's own Google OAuth client (variable + secret); unset = no Google sign-in.
       GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
       GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      # WhatsApp from Chukta's number (Meta Cloud API); unset = reminders recorded as skipped.
+      WHATSAPP_PHONE_NUMBER_ID: ${{ vars.WHATSAPP_PHONE_NUMBER_ID }}
+      WHATSAPP_TOKEN: ${{ secrets.WHATSAPP_TOKEN }}
+      WHATSAPP_APP_SECRET: ${{ secrets.WHATSAPP_APP_SECRET }}
+      WHATSAPP_VERIFY_TOKEN: ${{ secrets.WHATSAPP_VERIFY_TOKEN }}
+      # Chukta's own Razorpay account, for the Pro plan; unset = upgrading isn't offered.
+      CHUKTA_RAZORPAY_KEY_ID: ${{ vars.CHUKTA_RAZORPAY_KEY_ID }}
+      CHUKTA_RAZORPAY_PRO_PLAN_ID: ${{ vars.CHUKTA_RAZORPAY_PRO_PLAN_ID }}
+      CHUKTA_RAZORPAY_KEY_SECRET: ${{ secrets.CHUKTA_RAZORPAY_KEY_SECRET }}
+      CHUKTA_RAZORPAY_WEBHOOK_SECRET: ${{ secrets.CHUKTA_RAZORPAY_WEBHOOK_SECRET }}
     defaults:
       run:
         working-directory: apps/web
@@ -110,10 +120,15 @@ jobs:
           fi
           umask 077
           # Google's client ID isn't secret, but travels with its secret so the two always match.
+          # WhatsApp and Chukta's own Razorpay each travel only when all four of their settings are there.
           node -e '
             const { DATABASE_URL, JWT_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } = process.env;
             const google = GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET ? { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } : {};
-            process.stdout.write(JSON.stringify({ DATABASE_URL, JWT_SECRET, ...google }));
+            const names = ["WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_TOKEN", "WHATSAPP_APP_SECRET", "WHATSAPP_VERIFY_TOKEN"];
+            const whatsapp = names.every((n) => process.env[n]) ? Object.fromEntries(names.map((n) => [n, process.env[n]])) : {};
+            const proNames = ["CHUKTA_RAZORPAY_KEY_ID", "CHUKTA_RAZORPAY_PRO_PLAN_ID", "CHUKTA_RAZORPAY_KEY_SECRET", "CHUKTA_RAZORPAY_WEBHOOK_SECRET"];
+            const pro = proNames.every((n) => process.env[n]) ? Object.fromEntries(proNames.map((n) => [n, process.env[n]])) : {};
+            process.stdout.write(JSON.stringify({ DATABASE_URL, JWT_SECRET, ...google, ...whatsapp, ...pro }));
           ' > "$RUNNER_TEMP/secrets.json"
           npx wrangler secret bulk "$RUNNER_TEMP/secrets.json" --env "$DEPLOY_ENV"
           rm -f "$RUNNER_TEMP/secrets.json"
@@ -137,8 +152,8 @@ jobs:
           code404=$(curl -s -o /dev/null -w '%{http_code}' "$URL/__smoke-test-missing__/")
           [ "$code404" = 404 ] || { echo "::error::Unknown paths return HTTP $code404 instead of 404"; exit 1; }
 
-          # The API and its database. Prod's API stays off until real SMS exists.
-          if [ "$DEPLOY_ENV" != prod ] && [ -n "$DATABASE_URL" ] && [ -n "$JWT_SECRET" ]; then
+          # The API and its database, once the environment has them.
+          if [ -n "$DATABASE_URL" ] && [ -n "$JWT_SECRET" ]; then
             for attempt in 1 2 3 4 5; do
               ready=$(curl -s -o ready.json -w '%{http_code}' "$URL/api/v1/health/ready") && [ "$ready" = 200 ] && break
               echo "Attempt $attempt: API readiness HTTP $ready, retrying in 5s"; sleep 5

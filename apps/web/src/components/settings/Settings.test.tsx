@@ -3,14 +3,17 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ApiRequestError,
-  confirmPhone,
+  deleteAccount,
+  downloadMyData,
   getIdentities,
   getMe,
+  getPaymentSettings,
+  getSubscription,
   listSessions,
-  sendPhoneCode,
   signOutOtherSessions,
   signOutSession,
   updateCentre,
+  keepAccount,
   updateMe,
   type DeviceSession,
   type Me,
@@ -24,9 +27,12 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   getIdentities: vi.fn(),
   updateMe: vi.fn(),
   updateCentre: vi.fn(),
-  sendPhoneCode: vi.fn(),
-  confirmPhone: vi.fn(),
   listSessions: vi.fn(),
+  getPaymentSettings: vi.fn(),
+  getSubscription: vi.fn(),
+  downloadMyData: vi.fn(),
+  deleteAccount: vi.fn(),
+  keepAccount: vi.fn(),
   signOutSession: vi.fn(),
   signOutOtherSessions: vi.fn(),
 }));
@@ -34,6 +40,7 @@ vi.mock("@/lib/api", async (importOriginal) => ({
 const thisPhone: DeviceSession = {
   id: "s-phone",
   device: "Chrome on Android",
+  city: null,
   signedInAt: "2026-10-28T04:30:00.000Z",
   lastActiveAt: "2026-10-28T04:30:00.000Z",
   current: true,
@@ -41,6 +48,7 @@ const thisPhone: DeviceSession = {
 const laptop: DeviceSession = {
   id: "s-laptop",
   device: "Chrome on Windows",
+  city: "Pune",
   signedInAt: "2026-10-20T04:30:00.000Z",
   lastActiveAt: "2026-10-25T10:00:00.000Z",
   current: false,
@@ -48,7 +56,7 @@ const laptop: DeviceSession = {
 const tablet: DeviceSession = { ...laptop, id: "s-tablet", device: "Safari on iPad" };
 
 const me: Me = {
-  user: { id: "u1", phone: "+919876543210", phoneVerified: false, fullName: "Asha Sharma", email: "asha@example.com", role: "owner" },
+  user: { id: "u1", phone: "98765 43210", fullName: "Asha Sharma", email: "asha@example.com", role: "owner" },
   centre: { id: "c1", name: "Sunrise Classes", city: "Pune", centreType: "coaching", plan: "free", timezone: "Asia/Kolkata" },
 };
 
@@ -58,6 +66,10 @@ beforeEach(() => {
     identities: [{ provider: "google", email: "asha@example.com", lastUsedAt: "2026-10-28T10:00:00.000Z" }],
   });
   vi.mocked(updateMe).mockReset().mockResolvedValue({ user: { ...me.user, fullName: "Asha S. Sharma" } });
+  vi.mocked(getPaymentSettings).mockReset().mockResolvedValue({ paymentSettings: { upiId: "sunrise@okicici", payeeName: "Sunrise Classes", razorpay: null } });
+  vi.mocked(getSubscription)
+    .mockReset()
+    .mockResolvedValue({ plan: "free", status: null, renewsAt: null, proPricePaise: 49900, canUpgrade: true, students: { active: 3, max: 25 } });
   vi.mocked(listSessions).mockReset().mockResolvedValue({ sessions: [thisPhone, laptop, tablet] });
   vi.mocked(signOutSession).mockReset().mockResolvedValue(undefined);
   vi.mocked(signOutOtherSessions).mockReset().mockResolvedValue({ signedOut: 2 });
@@ -69,13 +81,14 @@ beforeEach(() => {
 function setup() {
   const onCentreChanged = vi.fn();
   const onSignOut = vi.fn();
+  const onDeleted = vi.fn();
   const user = userEvent.setup();
   render(
     <ThemeRegistry>
-      <Settings token="token" onCentreChanged={onCentreChanged} onSignOut={onSignOut} />
+      <Settings token="token" onCentreChanged={onCentreChanged} onSignOut={onSignOut} onDeleted={onDeleted} />
     </ThemeRegistry>,
   );
-  return { user, onCentreChanged, onSignOut };
+  return { user, onCentreChanged, onSignOut, onDeleted };
 }
 
 const section = (name: string) => screen.getByRole("region", { name });
@@ -91,54 +104,41 @@ describe("Settings", () => {
     expect(profile).toHaveTextContent("asha@example.com");
     expect(profile).toHaveTextContent("Confirmed");
     expect(profile).toHaveTextContent("From your Google account");
-    expect(profile).toHaveTextContent("+91 98765 43210");
-    expect(profile).toHaveTextContent("Not confirmed");
+    expect(profile).toHaveTextContent("98765 43210");
+    expect(profile).not.toHaveTextContent("Not confirmed");
     expect(section("Centre")).toHaveTextContent("Sunrise Classes · Coaching · Pune");
     expect(section("Sign-in methods")).toHaveTextContent("Connected as asha@example.com");
+    expect(await within(section("Payments")).findByText("sunrise@okicici")).toBeInTheDocument();
+    expect(await within(section("Plan")).findByText("3 of 25 students")).toBeInTheDocument();
   });
 
-  it("shows a confirmed mobile number as confirmed, without the reminder hint", async () => {
-    vi.mocked(getMe).mockResolvedValue({ ...me, user: { ...me.user, phoneVerified: true } });
+  it("never asks for the mobile number to be confirmed", async () => {
     setup();
-
-    const profile = await screen.findByRole("region", { name: "Profile" });
-    expect(within(profile).getAllByText("Confirmed")).toHaveLength(2);
-    expect(profile).not.toHaveTextContent("Not confirmed");
-    expect(profile).not.toHaveTextContent("Fee reminders go out on WhatsApp once you confirm it.");
+    await screen.findByRole("region", { name: "Profile" });
+    expect(screen.queryByRole("button", { name: /Confirm/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Confirm your mobile number/)).not.toBeInTheDocument();
   });
 
-  it("asks for the mobile number to be confirmed, and confirms it with a code", async () => {
-    vi.mocked(sendPhoneCode).mockResolvedValue({ expiresInSeconds: 300, resendAfterSeconds: 30 });
-    vi.mocked(confirmPhone).mockResolvedValue({ user: { ...me.user, phoneVerified: true } });
-    const { user } = setup();
-    expect(await screen.findByText("Confirm your mobile number to start sending fee reminders on WhatsApp.")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Confirm mobile number" }));
-    await user.click(screen.getByRole("button", { name: "Send code" }));
-    await user.click(await screen.findByLabelText("Digit 1"));
-    await user.keyboard("482913");
-    await user.click(screen.getByRole("button", { name: "Confirm" }));
-
-    expect(await screen.findByText("Mobile number confirmed.")).toBeInTheDocument();
-    expect(section("Profile")).not.toHaveTextContent("Not confirmed");
-    expect(screen.queryByText(/Confirm your mobile number to start/)).not.toBeInTheDocument();
+  it("says when there's no mobile number", async () => {
+    vi.mocked(getMe).mockResolvedValue({ ...me, user: { ...me.user, phone: null } });
+    setup();
+    expect(await screen.findByRole("region", { name: "Profile" })).toHaveTextContent("Not added");
   });
 
-  it("opens the same steps from the banner", async () => {
+  it("changes the mobile number with the name, as typed, with no code", async () => {
+    vi.mocked(updateMe).mockResolvedValue({ user: { ...me.user, phone: "+44 7700 900123" } });
     const { user } = setup();
+    await user.click(await screen.findByRole("button", { name: "Edit profile" }));
+    const phone = within(section("Profile")).getByLabelText("Mobile number");
+    expect(phone).toHaveValue("98765 43210");
 
-    await user.click(await screen.findByRole("button", { name: "Confirm number" }));
+    await user.clear(phone);
+    await user.type(phone, "+44 7700 900123");
+    await user.click(screen.getByRole("button", { name: "Save" }));
 
-    expect(within(section("Profile")).getByRole("button", { name: "Send code" })).toBeInTheDocument();
-  });
-
-  it("offers to change a confirmed number", async () => {
-    vi.mocked(getMe).mockResolvedValue({ ...me, user: { ...me.user, phoneVerified: true } });
-    const { user } = setup();
-
-    await user.click(await screen.findByRole("button", { name: "Change mobile number" }));
-
-    expect(within(section("Profile")).getByLabelText("Mobile number")).toHaveValue("98765 43210");
+    expect(updateMe).toHaveBeenCalledWith("token", { fullName: "Asha Sharma", phone: "+44 7700 900123" });
+    expect(await screen.findByText("Saved.")).toBeInTheDocument();
+    expect(section("Profile")).toHaveTextContent("+44 7700 900123");
   });
 
   it("changes the owner's name", async () => {
@@ -151,7 +151,7 @@ describe("Settings", () => {
     await user.type(name, "Asha S. Sharma");
     await user.click(screen.getByRole("button", { name: "Save" }));
 
-    expect(updateMe).toHaveBeenCalledWith("token", { fullName: "Asha S. Sharma" });
+    expect(updateMe).toHaveBeenCalledWith("token", { fullName: "Asha S. Sharma", phone: "98765 43210" });
     expect(await screen.findByText("Saved.")).toBeInTheDocument();
     expect(section("Profile")).toHaveTextContent("Asha S. Sharma");
     expect(within(section("Profile")).queryByLabelText("Your name")).not.toBeInTheDocument();
@@ -236,7 +236,7 @@ describe("Settings", () => {
     const rows = within(devices).getAllByRole("listitem");
     expect(rows.map((row) => row.textContent)).toEqual([
       expect.stringMatching(/^Chrome on Android.*This device/),
-      expect.stringMatching(/^Chrome on Windows.*Last active 25 Oct 2026/),
+      expect.stringMatching(/^Chrome on Windows · Pune.*Last active 25 Oct 2026/),
       expect.stringMatching(/^Safari on iPad.*Last active 25 Oct 2026/),
     ]);
     expect(within(rows[0]!).queryByRole("button")).not.toBeInTheDocument();
@@ -287,5 +287,46 @@ describe("Settings", () => {
     await user.click(await screen.findByRole("button", { name: "Sign out" }));
 
     expect(onSignOut).toHaveBeenCalled();
+  });
+
+  it("downloads the centre's data", async () => {
+    vi.mocked(downloadMyData).mockResolvedValue(new Blob(["{}"], { type: "application/json" }));
+    const createObjectURL = vi.fn(() => "blob:data");
+    vi.stubGlobal("URL", Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }));
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    const { user } = setup();
+
+    await user.click(await screen.findByRole("button", { name: "Download my data" }));
+
+    expect(downloadMyData).toHaveBeenCalledWith("token");
+    expect(click).toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it("deletes the account once the centre's name is typed", async () => {
+    vi.mocked(deleteAccount).mockResolvedValue({ deletesAt: "2026-12-02T04:30:00.000Z" });
+    const { user, onDeleted } = setup();
+    await user.click(await screen.findByRole("button", { name: "Delete account" }));
+    const dialog = screen.getByRole("dialog", { name: "Delete your account?" });
+
+    const confirm = within(dialog).getByRole("button", { name: "Delete account" });
+    expect(confirm).toBeDisabled();
+    await user.type(within(dialog).getByLabelText("Type Sunrise Classes to confirm"), "Sunrise Classes");
+    await user.click(confirm);
+
+    expect(deleteAccount).toHaveBeenCalledWith("token", "Sunrise Classes");
+    expect(onDeleted).toHaveBeenCalled();
+  });
+
+  it("offers to keep an account that's due to be deleted", async () => {
+    vi.mocked(getMe).mockResolvedValue({ ...me, centre: { ...me.centre, deletesAt: "2026-12-02T04:30:00.000Z" } });
+    vi.mocked(keepAccount).mockResolvedValue({ deletesAt: null });
+    const { user } = setup();
+
+    expect(await screen.findByText("This account will be deleted on 2 Dec 2026.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Keep my account" }));
+
+    expect(keepAccount).toHaveBeenCalledWith("token");
+    expect(await screen.findByText("Your account is kept.")).toBeInTheDocument();
   });
 });

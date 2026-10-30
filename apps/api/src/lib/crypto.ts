@@ -1,10 +1,5 @@
-import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { jwtVerify, SignJWT, type JWTPayload } from "jose";
-
-/** A uniformly random 6-digit code, leading zeros kept. */
-export function randomOtp(): string {
-  return String(randomInt(0, 1_000_000)).padStart(6, "0");
-}
 
 /** 256 bits, URL- and cookie-safe. */
 export function randomToken(): string {
@@ -12,8 +7,8 @@ export function randomToken(): string {
 }
 
 /**
- * Keyed hash for values we must recognise but never store: OTP codes and refresh
- * tokens. `purpose` separates the two so one can never be replayed as the other.
+ * Keyed hash for values we must recognise but never store, such as refresh
+ * tokens. `purpose` keeps each kind apart so one can never be replayed as another.
  */
 export function keyedHash(secret: string, purpose: string, value: string): string {
   return createHmac("sha256", secret).update(`${purpose}:${value}`).digest("hex");

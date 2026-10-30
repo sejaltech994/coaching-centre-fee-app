@@ -1,6 +1,7 @@
 import type { Database, DbHandle } from "@chukta/db";
 import { createTestDb } from "@chukta/db/testing";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import { centres } from "@chukta/db";
 import { PROFILE } from "./test/harness";
 import { createWorker, type WorkerEnv } from "./worker";
 
@@ -129,5 +130,30 @@ describe("Cloudflare Worker", () => {
     const worker = createWorker(makeDb);
     const res = await worker.fetch(new Request(`${SITE}/`), env({ DATABASE_URL: undefined }), ctx());
     expect(res.status).toBe(200);
+  });
+});
+
+describe("Cloudflare Worker, on its hourly Cron Trigger", () => {
+  it("runs the scheduled jobs against the environment's database, then closes it", async () => {
+    const worker = createWorker(makeDb);
+    const select = vi.spyOn(db, "select");
+    await db.insert(centres).values({});
+
+    await worker.scheduled({ cron: "0 * * * *", scheduledTime: Date.now() }, env(), ctx());
+
+    expect(makeDb).toHaveBeenCalledWith("postgres://user:pass@db.example/neondb");
+    // It read the centres to bill, and closed the connection afterwards.
+    expect(select).toHaveBeenCalled();
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it("does nothing, and says why in the log, when the API isn't configured", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const worker = createWorker(makeDb);
+
+    await worker.scheduled({ cron: "0 * * * *", scheduledTime: Date.now() }, env({ JWT_SECRET: undefined }), ctx());
+
+    expect(makeDb).not.toHaveBeenCalled();
+    expect(String(error.mock.calls[0])).toContain("JWT_SECRET");
   });
 });

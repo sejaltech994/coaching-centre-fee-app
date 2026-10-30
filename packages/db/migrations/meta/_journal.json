@@ -64,6 +64,69 @@
       "when": 1793252146036,
       "tag": "0008_fee_plans",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793270535962,
+      "tag": "0009_owner_phone_unconfirmed",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793271483437,
+      "tag": "0010_invoices",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793273841318,
+      "tag": "0011_payments",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793275686084,
+      "tag": "0012_razorpay",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793276663957,
+      "tag": "0013_reminders",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793278145830,
+      "tag": "0014_attendance",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1793292373028,
+      "tag": "0015_subscription",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1793295878105,
+      "tag": "0016_device_city",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793297592871,
+      "tag": "0017_account_deletion",
+      "breakpoints": true
     }
   ]
 }

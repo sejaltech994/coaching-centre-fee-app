@@ -52,6 +52,7 @@ describe("SignIn", () => {
   it.each([
     ["required", "Log in to continue."],
     ["expired", "Your login has expired. Log in to continue."],
+    ["deleted", "Your account will be deleted in 30 days. Sign in before then to keep it."],
   ])("explains a ?session=%s redirect", (session, message) => {
     render(<SignIn googleEnabled session={session} />);
     expect(screen.getByRole("status")).toHaveTextContent(message);

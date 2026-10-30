@@ -1,4 +1,4 @@
-import { users } from "@chukta/db";
+import { centres, users } from "@chukta/db";
 import { describe, expect, it } from "vitest";
 import { createTestApp } from "../../test/harness";
 
@@ -13,6 +13,36 @@ describe("PATCH /me", () => {
     expect((await res.json()).user).toMatchObject({ id: body.user.id, fullName: "Asha S. Sharma", email: "asha@example.com" });
     const [user] = await db.select().from(users);
     expect(user!.name).toBe("Asha S. Sharma");
+  });
+
+  it("saves the owner's mobile number as typed, with no code to confirm it", async () => {
+    const { login, call, db } = await createTestApp();
+    const { body } = await login();
+
+    const res = await call("PATCH", "/me", { token: body.accessToken, body: { fullName: "Asha", phone: " 91234 56789 " } });
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).user).toEqual(expect.objectContaining({ phone: "91234 56789" }));
+    const [user] = await db.select().from(users);
+    const [centre] = await db.select().from(centres);
+    expect([user!.phone, centre!.ownerPhone]).toEqual(["91234 56789", "91234 56789"]);
+  });
+
+  it("clears the number when it's emptied, and keeps it when it isn't sent", async () => {
+    const { login, call, db } = await createTestApp();
+    const { body } = await login();
+    const phone = async () => (await db.select().from(users))[0]!.phone;
+
+    await call("PATCH", "/me", { token: body.accessToken, body: { fullName: "Asha" } });
+    expect(await phone()).toBe("98765 43210");
+    await call("PATCH", "/me", { token: body.accessToken, body: { fullName: "Asha", phone: "" } });
+    expect(await phone()).toBeNull();
+  });
+
+  it.each(["/me/phone/verify", "/me/phone/confirm"])("has no mobile-number code: %s is gone", async (path) => {
+    const { login, call } = await createTestApp();
+    const { body } = await login();
+    expect((await call("POST", path, { token: body.accessToken, body: { phone: "9876543210" } })).status).toBe(404);
   });
 
   it("names the field at fault and changes nothing", async () => {

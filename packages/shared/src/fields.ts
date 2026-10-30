@@ -22,6 +22,15 @@ export function check<T>(schema: z.ZodType<T>, input: unknown): Validation<T> {
 export const text = (missing: string, max: number, tooLong: string) =>
   z.string({ error: missing }).trim().min(1, missing).max(max, tooLong);
 
+/** Optional text, trimmed, at most `max` characters; empty or missing becomes null. */
+export const optionalText = (max: number, tooLong: string) =>
+  z
+    .string()
+    .trim()
+    .max(max, tooLong)
+    .nullish()
+    .transform((value) => value || null);
+
 /** An Indian mobile number in any common spelling, as E.164. */
 export const indianMobile = () =>
   z.string({ error: INVALID_PHONE_MESSAGE }).transform((raw, ctx) => {

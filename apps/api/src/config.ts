@@ -4,20 +4,25 @@ export type Config = {
   port: number;
   databaseUrl: string;
   jwtSecret: string;
-  smsProvider: "console";
   /** Web app origins allowed to call the API with cookies (CORS). */
   webOrigins: string[];
   /** Secure cookies need HTTPS; off only for local http development. */
   cookieSecure: boolean;
   /** Read the client IP from cf-connecting-ip / x-forwarded-for. Only behind a trusted proxy. */
   trustProxyHeaders: boolean;
-  /** Hourly OTP limits. The TSD's values; only non-production may raise them (automated test runs). */
-  otpLimits: { perPhonePerHour: number; perIpPerHour: number };
   /** Google sign-in: the environment's OAuth client, the fake chooser (never production), or off. */
   google: { provider: "google"; clientId: string; clientSecret: string } | { provider: "fake" } | null;
+  /** Payments on each centre's own Razorpay account, or the fake checkout (never production). */
+  razorpay: "razorpay" | "fake";
+  /** WhatsApp from Chukta's own number via Meta's Cloud API, the fake (never production), or off. */
+  whatsapp:
+    | { provider: "meta"; token: string; phoneNumberId: string; appSecret: string; verifyToken: string }
+    | { provider: "fake" }
+    | null;
+  /** Chukta's own Razorpay account and its ₹499/month Pro plan, or null: upgrading isn't offered. */
+  proPlan: { keyId: string; keySecret: string; webhookSecret: string; planId: string } | null;
 };
 
-const SMS_PROVIDERS = ["console"] as const;
 const ENVS = ["development", "test", "staging", "production"] as const;
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
@@ -31,29 +36,12 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   const jwtSecret = required("JWT_SECRET");
   if (jwtSecret.length < 32) throw new Error("JWT_SECRET must be at least 32 characters");
 
-  const limit = (name: string, fallback: number) => {
-    const raw = env[name];
-    if (raw === undefined) return fallback;
-    if (nodeEnv === "production") throw new Error(`${name} can't be changed in production`);
-    const value = Number(raw);
-    if (!Number.isInteger(value) || value < 1) throw new Error(`${name} must be a positive whole number`);
-    return value;
-  };
-
-  // Checked first, so changing a limit in production always fails loudly.
-  const otpLimits = {
-    perPhonePerHour: limit("OTP_PER_PHONE_PER_HOUR", 5),
-    perIpPerHour: limit("OTP_PER_IP_PER_HOUR", 10),
-  };
-
   const google = loadGoogle(env, nodeEnv);
 
-  const smsProvider = env.SMS_PROVIDER ?? "console";
-  if (!SMS_PROVIDERS.includes(smsProvider as (typeof SMS_PROVIDERS)[number])) {
-    throw new Error(`SMS_PROVIDER "${smsProvider}" is not supported`);
-  }
-  if (nodeEnv === "production" && smsProvider === "console") {
-    throw new Error("SMS_PROVIDER=console prints login codes to the log and is not allowed in production");
+  const razorpay = env.RAZORPAY_PROVIDER ?? "razorpay";
+  if (razorpay !== "razorpay" && razorpay !== "fake") throw new Error(`RAZORPAY_PROVIDER "${razorpay}" is not supported`);
+  if (razorpay === "fake" && nodeEnv === "production") {
+    throw new Error("RAZORPAY_PROVIDER=fake marks bills paid without real money and is not allowed in production");
   }
 
   return {
@@ -61,15 +49,54 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     port: Number(env.PORT ?? 8787),
     databaseUrl: required("DATABASE_URL"),
     jwtSecret,
-    smsProvider: smsProvider as Config["smsProvider"],
     webOrigins: (env.WEB_ORIGINS ?? "http://localhost:3000")
       .split(",")
       .map((origin) => origin.trim())
       .filter(Boolean),
     cookieSecure: nodeEnv !== "development",
     trustProxyHeaders: env.TRUST_PROXY_HEADERS === "true",
-    otpLimits,
     google,
+    razorpay,
+    whatsapp: loadWhatsApp(env, nodeEnv),
+    proPlan: loadProPlan(env, razorpay),
+  };
+}
+
+function loadProPlan(env: Record<string, string | undefined>, razorpay: Config["razorpay"]): Config["proPlan"] {
+  if (razorpay === "fake") {
+    return { keyId: "rzp_test_chukta", keySecret: "fake", webhookSecret: "fake-webhook-secret", planId: "plan_fake_pro" };
+  }
+  const names = ["CHUKTA_RAZORPAY_KEY_ID", "CHUKTA_RAZORPAY_KEY_SECRET", "CHUKTA_RAZORPAY_WEBHOOK_SECRET", "CHUKTA_RAZORPAY_PRO_PLAN_ID"];
+  if (names.every((name) => !env[name])) return null;
+  const missing = names.find((name) => !env[name]);
+  if (missing) throw new Error(`${missing} is not set`);
+  return {
+    keyId: env.CHUKTA_RAZORPAY_KEY_ID!,
+    keySecret: env.CHUKTA_RAZORPAY_KEY_SECRET!,
+    webhookSecret: env.CHUKTA_RAZORPAY_WEBHOOK_SECRET!,
+    planId: env.CHUKTA_RAZORPAY_PRO_PLAN_ID!,
+  };
+}
+
+function loadWhatsApp(env: Record<string, string | undefined>, nodeEnv: Config["env"]): Config["whatsapp"] {
+  const provider = env.WHATSAPP_PROVIDER ?? (env.WHATSAPP_TOKEN ? "meta" : undefined);
+  if (provider === undefined) return null;
+  if (provider === "fake") {
+    if (nodeEnv === "production") throw new Error("WHATSAPP_PROVIDER=fake sends nothing to parents and is not allowed in production");
+    return { provider: "fake" };
+  }
+  if (provider !== "meta") throw new Error(`WHATSAPP_PROVIDER "${provider}" is not supported`);
+  const setting = (name: string) => {
+    const value = env[name];
+    if (!value) throw new Error(`${name} is not set`);
+    return value;
+  };
+  return {
+    provider: "meta",
+    token: setting("WHATSAPP_TOKEN"),
+    phoneNumberId: setting("WHATSAPP_PHONE_NUMBER_ID"),
+    appSecret: setting("WHATSAPP_APP_SECRET"),
+    verifyToken: setting("WHATSAPP_VERIFY_TOKEN"),
   };
 }
 

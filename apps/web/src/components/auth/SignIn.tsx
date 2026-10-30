@@ -20,7 +20,7 @@ type Props = {
   session?: string;
 };
 
-const SESSION_NOTICES = { required: "loginRequired", expired: "loginExpired" } as const;
+const SESSION_NOTICES = { required: "loginRequired", expired: "loginExpired", deleted: "accountDeleted" } as const;
 
 /**
  * Sign in (W1). Google is the only way in, for new and returning owners alike:

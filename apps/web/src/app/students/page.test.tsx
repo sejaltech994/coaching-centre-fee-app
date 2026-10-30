@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { listBatches, listStudents } from "@/lib/api";
 import { useSession } from "@/lib/useSession";
@@ -26,5 +27,14 @@ describe("/students", () => {
     const nav = screen.getByRole("navigation", { name: "Main" });
     expect(within(nav).getByRole("link", { name: "Students" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "Add student" })).toHaveAttribute("href", "/students/new");
+  });
+
+  it("imports students from a CSV", async () => {
+    const user = userEvent.setup();
+    render(<StudentsPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Import from CSV" }));
+
+    expect(screen.getByRole("dialog", { name: "Import students" })).toBeInTheDocument();
   });
 });

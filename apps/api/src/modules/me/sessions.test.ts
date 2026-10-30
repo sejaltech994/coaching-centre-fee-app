@@ -25,11 +25,26 @@ describe("GET /me/sessions", () => {
     const { sessions } = await list();
 
     expect(sessions).toEqual([
-      { id: expect.any(String), device: "Chrome on Android", signedInAt: app.clock.now().toISOString(), lastActiveAt: app.clock.now().toISOString(), current: true },
-      { id: expect.any(String), device: "Chrome on Windows", signedInAt: start, lastActiveAt: start, current: false },
+      { id: expect.any(String), device: "Chrome on Android", city: null, signedInAt: app.clock.now().toISOString(), lastActiveAt: app.clock.now().toISOString(), current: true },
+      { id: expect.any(String), device: "Chrome on Windows", city: null, signedInAt: start, lastActiveAt: start, current: false },
     ]);
     expect((await list(laptop.body.accessToken)).sessions.map((s: { current: boolean }) => s.current)).toEqual([true, false]);
     expect(phone.body.accessToken).not.toBe(laptop.body.accessToken);
+  });
+
+  it("shows the city each device was last seen in, from Cloudflare", async () => {
+    const { app, laptop, list } = await twoDevices();
+
+    await app.app.request("/api/v1/auth/refresh", {
+      method: "POST",
+      headers: { cookie: laptop.cookie, "user-agent": LAPTOP, "cf-ipcity": "Pune" },
+    });
+
+    const { sessions } = await list();
+    expect(sessions.map((s: { device: string; city: string | null }) => [s.device, s.city])).toEqual([
+      ["Chrome on Android", null],
+      ["Chrome on Windows", "Pune"],
+    ]);
   });
 
   it("keeps a device's place when its session is refreshed, and shows when it was last used", async () => {

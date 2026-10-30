@@ -15,7 +15,7 @@ describe("POST /auth/register, after Google sign-in", () => {
       status: "signed_in",
       isNewAccount: true,
       expiresIn: 900,
-      user: { phone: "+919876543210", phoneVerified: false, fullName: "Asha Sharma", email: "asha@example.com", role: "owner" },
+      user: { phone: "98765 43210", fullName: "Asha Sharma", email: "asha@example.com", role: "owner" },
       centre: { name: "Sunrise Classes", city: "Pune", centreType: "coaching", plan: "free" },
     });
     expect(body.accessToken.split(".")).toHaveLength(3);
@@ -23,10 +23,11 @@ describe("POST /auth/register, after Google sign-in", () => {
     expect(cookieNamed(res, "chukta_google")).toContain("Max-Age=0");
 
     const [user] = await app.db.select().from(users);
-    // Google has confirmed the email; the mobile number waits for its own code.
-    expect(user).toMatchObject({ email: "asha@example.com", emailVerifiedAt: app.clock.now(), phoneVerifiedAt: null });
+    // Google has confirmed the email; the mobile number is kept as typed, never confirmed.
+    expect(user).toMatchObject({ email: "asha@example.com", emailVerifiedAt: app.clock.now(), phone: "98765 43210" });
+    expect(user).not.toHaveProperty("phoneVerifiedAt");
     const [centre] = await app.db.select().from(centres);
-    expect(centre).toMatchObject({ ownerPhone: "+919876543210", name: "Sunrise Classes", city: "Pune" });
+    expect(centre).toMatchObject({ ownerPhone: "98765 43210", name: "Sunrise Classes", city: "Pune" });
     const [consent] = await app.db.select().from(consents);
     expect(consent).toMatchObject({ userId: body.user.id, kind: "terms_and_privacy", ip: "203.0.113.7" });
     expect(consent!.version).toMatch(/^\d{4}-\d{2}$/);
@@ -52,14 +53,14 @@ describe("POST /auth/register, after Google sign-in", () => {
     const { pending } = await app.googleLogin();
 
     const res = await app.call("POST", "/auth/register", {
-      body: { fullName: "", phone: "123", centreName: "", city: "", centreType: "bakery", acceptedTerms: false },
+      body: { fullName: "", phone: "9".repeat(21), centreName: "", city: "", centreType: "bakery", acceptedTerms: false },
       cookie: pending,
     });
 
     expect(res.status).toBe(400);
     const { error } = await res.json();
     expect(error.code).toBe("invalid_request");
-    expect(error.fields).toMatchObject({ phone: "Enter a 10-digit Indian mobile number." });
+    expect(error.fields).toMatchObject({ phone: "Keep the mobile number to 20 characters or fewer." });
     expect(Object.keys(error.fields).sort()).toEqual(["acceptedTerms", "centreName", "centreType", "city", "fullName", "phone"]);
     expect(cookieNamed(res, "chukta_google")).toBeUndefined();
     expect((await app.call("POST", "/auth/register", { body: PROFILE, cookie: pending })).status).toBe(201);
@@ -71,7 +72,7 @@ describe("POST /auth/register, after Google sign-in", () => {
 
     const ravi = await app.login("ravi@example.com", { fullName: "Ravi Kumar" });
 
-    expect(ravi.body.user).toMatchObject({ phone: "+919876543210", email: "ravi@example.com" });
+    expect(ravi.body.user).toMatchObject({ phone: "98765 43210", email: "ravi@example.com" });
   });
 
   it("creates one account per Google account, even if its sign-in is replayed", async () => {
@@ -122,8 +123,7 @@ describe("GET /me", () => {
     expect(await res.json()).toEqual({
       user: {
         id: body.user.id,
-        phone: "+919876543210",
-        phoneVerified: false,
+        phone: "98765 43210",
         fullName: "Asha Sharma",
         email: "asha@example.com",
         role: "owner",
@@ -135,6 +135,7 @@ describe("GET /me", () => {
         centreType: "coaching",
         plan: "free",
         timezone: "Asia/Kolkata",
+        deletesAt: null,
       },
     });
   });

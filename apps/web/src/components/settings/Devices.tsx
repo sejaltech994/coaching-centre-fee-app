@@ -50,7 +50,7 @@ export function Devices({ token, sessions: initial, onNotice }: Props) {
         {sessions.map((session) => (
           <ListItem key={session.id} disableGutters divider sx={{ gap: 2, justifyContent: "space-between" }}>
             <Box sx={{ minWidth: 0 }}>
-              <Typography sx={{ fontWeight: 600 }}>{session.device}</Typography>
+              <Typography sx={{ fontWeight: 600 }}>{[session.device, session.city].filter(Boolean).join(" · ")}</Typography>
               {!session.current && (
                 <Typography variant="body2" color="text.secondary">
                   {fill(t.lastActive, { date: day.format(new Date(session.lastActiveAt)) })}

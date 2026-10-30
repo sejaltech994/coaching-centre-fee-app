@@ -153,8 +153,6 @@ jobs:
     env:
       WEB_URL: http://localhost:3000
       API_URL: http://localhost:8787/api/v1
-      # The API's console SMS provider writes codes here; @sms scenarios read them.
-      OTP_LOG_FILE: /tmp/chukta-api.log
     steps:
       - uses: actions/checkout@v7
       - uses: actions/checkout@v7
@@ -185,11 +183,14 @@ jobs:
           PORT: "8787"
           DATABASE_URL: pglite:memory
           JWT_SECRET: e2e-only-secret-not-used-anywhere-else-0123456789
-          SMS_PROVIDER: console
           WEB_ORIGINS: ${{ env.WEB_URL }}
           # The API's own account chooser in place of Google (refused in production).
           GOOGLE_PROVIDER: fake
-        run: nohup npx tsx src/server.ts > "$OTP_LOG_FILE" 2>&1 &
+          # A test checkout in place of each centre's Razorpay (refused in production).
+          RAZORPAY_PROVIDER: fake
+          # WhatsApp messages are kept in the API instead of sent (refused in production).
+          WHATSAPP_PROVIDER: fake
+        run: nohup npx tsx src/server.ts > /tmp/chukta-api.log 2>&1 &
 
       - name: Serve the web build
         run: nohup node scripts/serve-static.mjs apps/web/out 3000 > /tmp/chukta-web.log 2>&1 &

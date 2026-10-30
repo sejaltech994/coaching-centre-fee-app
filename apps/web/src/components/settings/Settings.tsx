@@ -1,6 +1,6 @@
 "use client";
 
-import { CENTRE_TYPES, formatIndianMobile, validateCentre, validateOwner, type CentreType } from "@chukta/shared";
+import { CENTRE_TYPES, validateCentre, validateOwner, type CentreType } from "@chukta/shared";
 import Alert from "@mui/material/Alert";
 import Avatar from "@mui/material/Avatar";
 import Box from "@mui/material/Box";
@@ -20,23 +20,28 @@ import {
   ApiRequestError,
   getIdentities,
   getMe,
+  getSubscription,
   listSessions,
   updateCentre,
   updateMe,
   type DeviceSession,
   type Identity,
   type Me,
+  type Subscription,
 } from "@/lib/api";
 import { copy, errorMessage, fill } from "@/lib/copy";
+import { Account } from "./Account";
 import { Devices } from "./Devices";
-import { PhoneBanner } from "./PhoneBanner";
-import { PhoneConfirm } from "./PhoneConfirm";
+import { PaymentSettings } from "./PaymentSettings";
+import { PlanCard } from "./PlanCard";
 
 type Props = {
   token: string;
   /** The centre was renamed or changed: the app shell shows it. */
   onCentreChanged: (centre: Me["centre"]) => void;
   onSignOut: () => void;
+  /** The owner asked to delete the account: they're signed out everywhere. */
+  onDeleted: () => void;
 };
 
 const TYPE_LABEL: Record<CentreType, keyof typeof copy.profile> = {
@@ -59,15 +64,16 @@ const initials = (name: string) =>
 
 /**
  * Profile and account (W11), for Google-only sign-in: the owner's name, their
- * Google email, their mobile number, their centre and their sign-in method.
+ * Google email, their mobile number (as typed, never confirmed), their centre
+ * and their sign-in method.
  */
-export function Settings({ token, onCentreChanged, onSignOut }: Props) {
+export function Settings({ token, onCentreChanged, onSignOut, onDeleted }: Props) {
   const t = copy.settings;
   const [me, setMe] = useState<Me | null>(null);
   const [identities, setIdentities] = useState<Identity[]>([]);
   const [sessions, setSessions] = useState<DeviceSession[]>([]);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [confirmingPhone, setConfirmingPhone] = useState(false);
   // A short note after a save, e.g. "Saved."
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -80,6 +86,7 @@ export function Settings({ token, onCentreChanged, onSignOut }: Props) {
       },
       (err: unknown) => setLoadError(errorMessage(err)),
     );
+    getSubscription(token).then(setSubscription, () => undefined);
   }, [token]);
 
   if (!me) return loadError ? <Alert severity="error">{loadError}</Alert> : null;
@@ -94,8 +101,6 @@ export function Settings({ token, onCentreChanged, onSignOut }: Props) {
         </Typography>
         <Typography color="text.secondary">{t.lead}</Typography>
       </Stack>
-
-      {!user.phoneVerified && !confirmingPhone && <PhoneBanner onConfirm={() => setConfirmingPhone(true)} />}
 
       <Section title={t.profile}>
         <ProfileEditor
@@ -112,30 +117,7 @@ export function Settings({ token, onCentreChanged, onSignOut }: Props) {
           <Chip label={t.confirmed} color="paid" />
         </Row>
         <Divider />
-        {confirmingPhone ? (
-          <PhoneConfirm
-            token={token}
-            phone={user.phone}
-            onCancel={() => setConfirmingPhone(false)}
-            onConfirmed={(changed) => {
-              setMe({ user: changed, centre });
-              setConfirmingPhone(false);
-              setNotice(t.phoneConfirmed);
-            }}
-          />
-        ) : (
-          <Row label={t.mobile} value={formatIndianMobile(user.phone)} hint={user.phoneVerified ? undefined : t.mobileHint}>
-            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-              {user.phoneVerified ? <Chip label={t.confirmed} color="paid" /> : <Chip label={t.notConfirmed} color="pending" />}
-              <Button
-                aria-label={user.phoneVerified ? t.changeNumberName : t.confirmNumberName}
-                onClick={() => setConfirmingPhone(true)}
-              >
-                {user.phoneVerified ? t.changeNumber : t.confirmNumber}
-              </Button>
-            </Stack>
-          </Row>
-        )}
+        <Row label={t.mobile} value={user.phone ?? t.mobileNotAdded} />
       </Section>
 
       <Section title={t.centre}>
@@ -149,6 +131,10 @@ export function Settings({ token, onCentreChanged, onSignOut }: Props) {
           }}
         />
       </Section>
+
+      {subscription && <PlanCard token={token} subscription={subscription} onChange={setSubscription} />}
+
+      <PaymentSettings token={token} plan={subscription?.plan ?? "free"} onSaved={() => setNotice(t.saved)} />
 
       {google && (
         <Section title={t.signInMethods}>
@@ -167,6 +153,17 @@ export function Settings({ token, onCentreChanged, onSignOut }: Props) {
       <Section title={t.devices}>
         <Devices token={token} sessions={sessions} onNotice={setNotice} />
       </Section>
+
+      <Account
+        token={token}
+        centreName={centre.name ?? ""}
+        deletesAt={centre.deletesAt ?? null}
+        onDeleted={onDeleted}
+        onKept={() => {
+          setMe({ user, centre: { ...centre, deletesAt: null } });
+          setNotice(copy.account.kept);
+        }}
+      />
 
       <Box>
         <Button variant="outlined" onClick={onSignOut}>
@@ -264,14 +261,15 @@ function ProfileEditor({
 }) {
   const t = copy.settings;
   const name = user.fullName ?? "";
+  const current = () => ({ fullName: name, phone: user.phone ?? "" });
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(name);
+  const [draft, setDraft] = useState(current);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   function startEditing() {
-    setDraft(name);
+    setDraft(current());
     setFields({});
     setError(null);
     setEditing(true);
@@ -279,7 +277,7 @@ function ProfileEditor({
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const checked = validateOwner({ fullName: draft });
+    const checked = validateOwner(draft);
     if (!checked.ok) return setFields(checked.fields);
     const result = await save(() => updateMe(token, checked.value), { setBusy, setFields, setError });
     if (result) {
@@ -293,12 +291,21 @@ function ProfileEditor({
       <Stack component="form" spacing={2} noValidate onSubmit={submit} sx={{ p: { xs: 2, md: 3 }, pt: 1 }}>
         <TextField
           label={copy.profile.fullName}
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
+          value={draft.fullName}
+          onChange={(event) => setDraft((d) => ({ ...d, fullName: event.target.value }))}
           error={Boolean(fields.fullName)}
           helperText={fields.fullName}
           autoComplete="name"
           autoFocus
+        />
+        <TextField
+          label={t.mobile}
+          value={draft.phone}
+          onChange={(event) => setDraft((d) => ({ ...d, phone: event.target.value }))}
+          error={Boolean(fields.phone)}
+          helperText={fields.phone ?? copy.profile.phoneHint}
+          type="tel"
+          autoComplete="tel"
         />
         <EditActions busy={busy} error={error} onCancel={() => setEditing(false)} />
       </Stack>

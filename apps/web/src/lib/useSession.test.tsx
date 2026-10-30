@@ -98,4 +98,12 @@ describe("useSession", () => {
     showTab("visible");
     expect(checkLogin).toHaveBeenCalledTimes(1);
   });
+
+  it("goes back to the page the owner was sent away from, once signed in", async () => {
+    window.sessionStorage.setItem("chukta.returnTo", "/fees/");
+    renderHook(() => useSession());
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/fees/"));
+    expect(window.sessionStorage.getItem("chukta.returnTo")).toBeNull();
+  });
 });

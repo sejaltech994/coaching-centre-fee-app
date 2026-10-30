@@ -36,4 +36,11 @@ describe("/login", () => {
     render(<LoginPage />);
     expect(screen.getByRole("status")).toHaveTextContent("Your login has expired. Log in to continue.");
   });
+
+  it("remembers where to go back to after signing in", () => {
+    search = new URLSearchParams({ session: "required", next: "/fees/" });
+    render(<LoginPage />);
+    expect(window.sessionStorage.getItem("chukta.returnTo")).toBe("/fees/");
+    window.sessionStorage.clear();
+  });
 });

@@ -6,7 +6,6 @@ import Button from "@mui/material/Button";
 import Checkbox from "@mui/material/Checkbox";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import FormHelperText from "@mui/material/FormHelperText";
-import InputAdornment from "@mui/material/InputAdornment";
 import Link from "@mui/material/Link";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
@@ -39,7 +38,7 @@ const TYPE_LABEL: Record<CentreType, keyof typeof copy.profile> = {
 const isExpired = (err: unknown) => err instanceof ApiRequestError && err.code === "google_pending_missing";
 
 /**
- * Sign-up after Google (W3, with W2's name and mobile number): the Google account
+ * Sign-up after Google (W3, with W2's name and an optional mobile number): the Google account
  * is signed in but has no Chukta account yet. Its email is Google's.
  */
 export function SignUpForm({ onSignedUp, onExpired }: Props) {
@@ -115,12 +114,8 @@ export function SignUpForm({ onSignedUp, onExpired }: Props) {
       <TextField
         {...field("phone", t.phone)}
         type="tel"
-        autoComplete="tel-national"
+        autoComplete="tel"
         helperText={fieldErrors.phone ?? t.phoneHint}
-        slotProps={{
-          htmlInput: { inputMode: "numeric" },
-          input: { startAdornment: <InputAdornment position="start">+91</InputAdornment> },
-        }}
       />
       <TextField {...field("centreName", t.centreName)} />
       <TextField {...field("city", t.city)} autoComplete="address-level2" />

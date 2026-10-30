@@ -1,33 +1,30 @@
 import { createTestDb } from "@chukta/db/testing";
-import type { GoogleSignIn, SmsProvider } from "@chukta/integrations";
-import { vi } from "vitest";
+import type { GoogleSignIn } from "@chukta/integrations";
 import { createApp } from "../app";
 import type { Config } from "../config";
+import { gatewayFromConfig } from "../gateway";
 import { googleFromConfig } from "../google";
+import { messagingFromConfig } from "../messaging";
+import { runScheduledJobs } from "../jobs";
 
 export const testConfig: Config = {
   env: "test",
   port: 8787,
   databaseUrl: "unused-in-tests",
   jwtSecret: "test-secret-that-is-at-least-32-characters-long",
-  smsProvider: "console",
   webOrigins: ["http://localhost:3000"],
   cookieSecure: true,
   trustProxyHeaders: true,
-  otpLimits: { perPhonePerHour: 5, perIpPerHour: 10 },
   // Owners sign in only with Google; tests use the fake account chooser.
   google: { provider: "fake" },
+  razorpay: "fake",
+  whatsapp: { provider: "fake" },
+  proPlan: { keyId: "rzp_test_chukta", keySecret: "fake", webhookSecret: "fake-webhook-secret", planId: "plan_fake_pro" },
 };
 
-/** The API wired to an in-memory Postgres, a recording SMS fake, the fake Google and a clock the test controls. */
+/** The API wired to an in-memory Postgres, the fake Google and a clock the test controls. */
 export async function createTestApp(config: Partial<Config> = {}, options: { google?: GoogleSignIn } = {}) {
   const db = await createTestDb();
-  const sent: { to: string; code: string }[] = [];
-  const sms = {
-    sendOtp: vi.fn<SmsProvider["sendOtp"]>(async (to, code) => {
-      sent.push({ to, code });
-    }),
-  };
   let now = new Date("2026-11-02T04:30:00.000Z");
   const clock = {
     now: () => now,
@@ -37,7 +34,12 @@ export async function createTestApp(config: Partial<Config> = {}, options: { goo
   };
   const fullConfig = { ...testConfig, ...config };
   const google = options.google ?? googleFromConfig(fullConfig.google);
-  const app = createApp({ db, sms, google, now: clock.now, config: fullConfig });
+  const gateway = gatewayFromConfig(fullConfig, "http://localhost:8787/api/v1");
+  const messaging = messagingFromConfig(fullConfig.whatsapp);
+  const deps = { db, google, gateway, messaging, now: clock.now, config: fullConfig };
+  const app = createApp(deps);
+  /** Runs the hourly scheduled jobs now, at the test clock's time. */
+  const runJobs = () => runScheduledJobs(deps);
 
   function call(
     method: string,
@@ -110,7 +112,7 @@ export async function createTestApp(config: Partial<Config> = {}, options: { goo
     return { res, body: body as LoginBody, cookie: refreshCookie(res) };
   }
 
-  return { app, db, sms, sent, clock, call, startGoogle, googleLogin, login };
+  return { app, db, clock, gateway, messaging, call, startGoogle, googleLogin, login, runJobs };
 }
 
 /** Tests assert on response bodies field by field, so they read them untyped. */
@@ -135,7 +137,7 @@ export type LoginBody = {
   accessToken: string;
   expiresIn: number;
   isNewAccount: boolean;
-  user: { id: string; phone: string; phoneVerified: boolean; fullName: string | null; email: string | null; role: string };
+  user: { id: string; phone: string | null; fullName: string | null; email: string | null; role: string };
   centre: { id: string; name: string | null; city: string | null; centreType: string | null; plan: string };
 };
 

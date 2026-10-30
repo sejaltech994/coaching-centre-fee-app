@@ -12,9 +12,32 @@ import {
   refreshSession,
   registerOwner,
   updateBatch,
-  confirmPhone,
   createFeePlan,
   listFeePlans,
+  listInvoices,
+  getPaymentSettings,
+  getPublicInvoice,
+  connectRazorpay,
+  disconnectRazorpay,
+  startCheckout,
+  getReminderTone,
+  listReminders,
+  previewReminder,
+  sendReminders,
+  setReminderTone,
+  getDashboardSummary,
+  getAbsenceAlerts,
+  getAttendance,
+  saveAttendance,
+  setAbsenceAlerts,
+  cancelPro,
+  getSubscription,
+  startPro,
+  downloadMonthlyReport,
+  recordPayment,
+  receiptPdf,
+  savePaymentSettings,
+  waiveInvoice,
   setDiscount,
   updateFeePlan,
   createStudent,
@@ -26,7 +49,6 @@ import {
   listSessions,
   signOutOtherSessions,
   signOutSession,
-  sendPhoneCode,
   setSessionHooks,
   updateCentre,
   updateMe,
@@ -185,40 +207,21 @@ describe("API client", () => {
     ).rejects.toMatchObject({ status: 409, fields: { name: "Taken." } });
   });
 
-  it("saves the owner's name and the centre's details from Settings", async () => {
+  it("saves the owner's name and number, and the centre's details, from Settings", async () => {
     reply(200, { user: { fullName: "Asha S. Sharma" } });
     reply(200, { centre: { name: "Sunrise Academy" } });
     reply(200, { identities: [] });
 
-    await updateMe("t", { fullName: "Asha S. Sharma" });
+    await updateMe("t", { fullName: "Asha S. Sharma", phone: "98765 43210" });
     await updateCentre("t", { centreName: "Sunrise Academy", city: "Patna", centreType: "tuition" });
     await getIdentities("t");
 
     const sent = fetchMock.mock.calls.map(([url, init]) => [url, init!.method, init!.body && JSON.parse(init!.body as string)]);
     expect(sent).toEqual([
-      ["http://localhost:8787/api/v1/me", "PATCH", { fullName: "Asha S. Sharma" }],
+      ["http://localhost:8787/api/v1/me", "PATCH", { fullName: "Asha S. Sharma", phone: "98765 43210" }],
       ["http://localhost:8787/api/v1/centre", "PATCH", { centreName: "Sunrise Academy", city: "Patna", centreType: "tuition" }],
       ["http://localhost:8787/api/v1/me/identities", "GET", undefined],
     ]);
-  });
-
-  it("sends and checks the code that confirms a mobile number", async () => {
-    reply(202, { expiresInSeconds: 300, resendAfterSeconds: 30 });
-    reply(200, { user: { phoneVerified: true } });
-
-    await expect(sendPhoneCode("t", "91234 56789")).resolves.toEqual({ expiresInSeconds: 300, resendAfterSeconds: 30 });
-    await expect(confirmPhone("t", "91234 56789", "482913")).resolves.toEqual({ user: { phoneVerified: true } });
-
-    const sent = fetchMock.mock.calls.map(([url, init]) => [url, init!.method, JSON.parse(init!.body as string)]);
-    expect(sent).toEqual([
-      ["http://localhost:8787/api/v1/me/phone/verify", "POST", { phone: "91234 56789" }],
-      ["http://localhost:8787/api/v1/me/phone/confirm", "POST", { phone: "91234 56789", code: "482913" }],
-    ]);
-  });
-
-  it("passes on how many tries a wrong code leaves", async () => {
-    reply(400, { error: { code: "invalid_otp", message: "That code didn’t match. 4 tries left.", attemptsLeft: 4 } });
-    await expect(confirmPhone("t", "9876543210", "000000")).rejects.toMatchObject({ code: "invalid_otp", attemptsLeft: 4 });
   });
 
   it("lists devices and signs them out", async () => {
@@ -282,6 +285,149 @@ describe("API client", () => {
       ["http://localhost:8787/api/v1/fee-plans/p1", "PATCH", { isActive: false }],
       ["http://localhost:8787/api/v1/enrolments/e1", "PATCH", { discountPaise: 25000 }],
     ]);
+  });
+
+  it("lists bills with only the filters that are set, and waives one with a reason", async () => {
+    reply(200, { invoices: [], nextCursor: null });
+    reply(200, { invoices: [], nextCursor: null });
+    reply(200, { invoice: { id: "i1", status: "waived" } });
+
+    await listInvoices("t", { status: "unpaid" });
+    await listInvoices("t", { status: "all", month: "2026-11", studentId: "s1", batchId: "", cursor: "c" });
+    await waiveInvoice("t", "i1", "Scholarship");
+
+    const sent = fetchMock.mock.calls.map(([url, init]) => [url, init!.method, init!.body && JSON.parse(init!.body as string)]);
+    expect(sent).toEqual([
+      ["http://localhost:8787/api/v1/invoices?status=unpaid", "GET", undefined],
+      ["http://localhost:8787/api/v1/invoices?status=all&month=2026-11&studentId=s1&cursor=c", "GET", undefined],
+      ["http://localhost:8787/api/v1/invoices/i1/waive", "POST", { reason: "Scholarship" }],
+    ]);
+  });
+
+  it("reads and saves the centre's UPI ID, and records a payment for a bill", async () => {
+    reply(200, { paymentSettings: { upiId: null, payeeName: null } });
+    reply(200, { paymentSettings: { upiId: "sunrise@okicici", payeeName: "Sunrise" } });
+    reply(201, { invoice: { id: "i1", status: "paid" } });
+
+    await getPaymentSettings("t");
+    await savePaymentSettings("t", { upiId: "sunrise@okicici", payeeName: "Sunrise" });
+    await recordPayment("t", "i1", { method: "cash", reference: "", receivedOn: "2026-11-01" });
+
+    const sent = fetchMock.mock.calls.map(([url, init]) => [url, init!.method, init!.body && JSON.parse(init!.body as string)]);
+    expect(sent).toEqual([
+      ["http://localhost:8787/api/v1/centre/payment-settings", "GET", undefined],
+      ["http://localhost:8787/api/v1/centre/payment-settings", "PUT", { upiId: "sunrise@okicici", payeeName: "Sunrise" }],
+      ["http://localhost:8787/api/v1/invoices/i1/payments", "POST", { method: "cash", reference: "", receivedOn: "2026-11-01" }],
+    ]);
+  });
+
+  it("downloads a receipt as a PDF, with the access token", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("%PDF-1.7", { status: 200, headers: { "content-type": "application/pdf" } }));
+
+    const pdf = await receiptPdf("t", "r1");
+
+    expect(pdf.type).toBe("application/pdf");
+    expect(await pdf.text()).toBe("%PDF-1.7");
+    expect(fetchMock.mock.calls[0]![0]).toBe("http://localhost:8787/api/v1/receipts/r1/pdf");
+  });
+
+  it("reads a parent's bill from its pay link, without signing in", async () => {
+    reply(200, { centre: { name: "Sunrise" } });
+    await getPublicInvoice("abc");
+    expect(fetchMock.mock.calls[0]![0]).toBe("http://localhost:8787/api/v1/public/invoices/abc");
+    expect(new Headers(fetchMock.mock.calls[0]![1]!.headers).get("authorization")).toBeNull();
+  });
+
+  it("connects and disconnects Razorpay, and starts a parent's checkout without signing in", async () => {
+    reply(200, { razorpay: { keyId: "rzp_test_a", webhookUrl: "u" } });
+    reply(204);
+    reply(200, { url: "https://rzp.io/i/a" });
+
+    await connectRazorpay("t", { keyId: "rzp_test_a", keySecret: "s", webhookSecret: "w" });
+    await disconnectRazorpay("t");
+    await expect(startCheckout("abc")).resolves.toEqual({ url: "https://rzp.io/i/a" });
+
+    const sent = fetchMock.mock.calls.map(([url, init]) => [url, init!.method, init!.body && JSON.parse(init!.body as string)]);
+    expect(sent).toEqual([
+      ["http://localhost:8787/api/v1/centre/razorpay", "PUT", { keyId: "rzp_test_a", keySecret: "s", webhookSecret: "w" }],
+      ["http://localhost:8787/api/v1/centre/razorpay", "DELETE", undefined],
+      ["http://localhost:8787/api/v1/public/invoices/abc/checkout", "POST", undefined],
+    ]);
+  });
+
+  it("lists, previews and sends reminders, and reads and sets their tone", async () => {
+    reply(200, { reminders: [], nextCursor: null });
+    reply(200, { text: "Hello", canSend: true, reason: null });
+    reply(200, { results: [] });
+    reply(200, { tone: "gentle" });
+    reply(200, { tone: "firm" });
+
+    await listReminders("t", "c1");
+    await previewReminder("t", "i1");
+    await sendReminders("t", ["i1", "i2"]);
+    await getReminderTone("t");
+    await setReminderTone("t", "firm");
+
+    const sent = fetchMock.mock.calls.map(([url, init]) => [url, init!.method, init!.body && JSON.parse(init!.body as string)]);
+    expect(sent).toEqual([
+      ["http://localhost:8787/api/v1/reminders?cursor=c1", "GET", undefined],
+      ["http://localhost:8787/api/v1/reminders/preview?invoiceId=i1", "GET", undefined],
+      ["http://localhost:8787/api/v1/reminders/send", "POST", { invoiceIds: ["i1", "i2"] }],
+      ["http://localhost:8787/api/v1/centre/reminder-tone", "GET", undefined],
+      ["http://localhost:8787/api/v1/centre/reminder-tone", "PUT", { tone: "firm" }],
+    ]);
+  });
+
+  it("reads the dashboard for this month or a chosen one", async () => {
+    reply(200, { month: "2026-11" });
+    reply(200, { month: "2026-10" });
+    await getDashboardSummary("t");
+    await getDashboardSummary("t", "2026-10");
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "http://localhost:8787/api/v1/dashboard/summary",
+      "http://localhost:8787/api/v1/dashboard/summary?month=2026-10",
+    ]);
+  });
+
+  it("reads and saves a day's attendance, and the absence-alert switch", async () => {
+    reply(200, { students: [] });
+    reply(200, { students: [] });
+    reply(200, { on: false });
+    reply(200, { on: true });
+
+    await getAttendance("t", "b1", "2026-11-02");
+    await saveAttendance("t", { batchId: "b1", date: "2026-11-02", marks: [{ studentId: "s1", present: false }] });
+    await getAbsenceAlerts("t");
+    await setAbsenceAlerts("t", true);
+
+    const sent = fetchMock.mock.calls.map(([url, init]) => [url, init!.method, init!.body && JSON.parse(init!.body as string)]);
+    expect(sent).toEqual([
+      ["http://localhost:8787/api/v1/attendance?batchId=b1&date=2026-11-02", "GET", undefined],
+      ["http://localhost:8787/api/v1/attendance", "PUT", { batchId: "b1", date: "2026-11-02", marks: [{ studentId: "s1", present: false }] }],
+      ["http://localhost:8787/api/v1/centre/absence-alerts", "GET", undefined],
+      ["http://localhost:8787/api/v1/centre/absence-alerts", "PUT", { on: true }],
+    ]);
+  });
+
+  it("reads the plan, goes Pro and cancels it", async () => {
+    reply(200, { plan: "free" });
+    reply(200, { url: "https://rzp.io/i/sub" });
+    reply(200, { plan: "pro", status: "cancelled" });
+    await getSubscription("t");
+    await startPro("t");
+    await cancelPro("t");
+    const sent = fetchMock.mock.calls.map(([url, init]) => [url, init!.method]);
+    expect(sent).toEqual([
+      ["http://localhost:8787/api/v1/subscription", "GET"],
+      ["http://localhost:8787/api/v1/subscription", "POST"],
+      ["http://localhost:8787/api/v1/subscription/cancel", "POST"],
+    ]);
+  });
+
+  it("downloads a month's report as a file", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("Bill", { status: 200, headers: { "content-type": "text/csv" } }));
+    expect(await (await downloadMonthlyReport("t", "2026-11")).text()).toBe("Bill");
+    expect(fetchMock.mock.calls[0]![0]).toBe("http://localhost:8787/api/v1/reports/monthly?month=2026-11");
   });
 
   it("reads the centre with the access token", async () => {

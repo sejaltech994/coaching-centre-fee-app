@@ -23,7 +23,7 @@ beforeEach(() => {
     accessToken: "access-token",
     expiresIn: 900,
     isNewAccount: true,
-    user: { id: "u1", phone: "+919876543210", phoneVerified: false, fullName: "Asha Sharma", email: "asha@example.com", role: "owner" },
+    user: { id: "u1", phone: "98765 43210", fullName: "Asha Sharma", email: "asha@example.com", role: "owner" },
     centre: { id: "c1", name: "Sunrise Classes", city: "Pune", centreType: "coaching", plan: "free", timezone: "Asia/Kolkata" },
   });
 });

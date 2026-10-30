@@ -1,16 +1,18 @@
 "use client";
 
+import Alert from "@mui/material/Alert";
+import MuiLink from "@mui/material/Link";
 import Link from "next/link";
+import { copy, fill } from "@/lib/copy";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import type { CentreResponse } from "@/lib/api";
 import { signOut } from "@/lib/signOut";
 import styles from "./app.module.css";
 
-type Section = "dashboard" | "batches" | "students" | "settings";
+type Section = "dashboard" | "batches" | "students" | "attendance" | "fees" | "reminders" | "settings";
 
-// Only sections that exist are listed; Fees and Reminders join as they are
-// built (see the Batches design canvas).
+// The sections of the Batches design canvas.
 const SECTIONS: { id: Section; label: string; href: string; icon: ReactNode }[] = [
   {
     id: "dashboard",
@@ -42,6 +44,34 @@ const SECTIONS: { id: Section; label: string; href: string; icon: ReactNode }[] 
     ),
   },
   {
+    id: "attendance",
+    label: "Attendance",
+    href: "/attendance",
+    icon: (
+      <>
+        <rect x="3" y="4" width="18" height="17" rx="2" />
+        <path d="M3 9h18M8 2v4M16 2v4M8.5 15l2.5 2.5 5-5" />
+      </>
+    ),
+  },
+  {
+    id: "fees",
+    label: "Fees",
+    href: "/fees",
+    icon: (
+      <>
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <path d="M7 10h10M7 14h6" />
+      </>
+    ),
+  },
+  {
+    id: "reminders",
+    label: "Reminders",
+    href: "/reminders",
+    icon: <path d="M21 12a8.5 8.5 0 0 1-12.6 7.4L3 21l1.6-5.2A8.5 8.5 0 1 1 21 12z" />,
+  },
+  {
     id: "settings",
     label: "Settings",
     href: "/settings",
@@ -53,6 +83,8 @@ const SECTIONS: { id: Section; label: string; href: string; icon: ReactNode }[] 
     ),
   },
 ];
+
+const deletionDay = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
 
 const initials = (name: string) =>
   name
@@ -119,7 +151,17 @@ export function AppShell({
           </button>
         </div>
       </aside>
-      <main className={styles.main}>{children}</main>
+      <main className={styles.main}>
+        {centre?.deletesAt && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            {fill(copy.account.deletesOn, { date: deletionDay.format(new Date(centre.deletesAt)) })}{" "}
+            <MuiLink component={Link} href="/settings">
+              {copy.account.keepShort}
+            </MuiLink>
+          </Alert>
+        )}
+        {children}
+      </main>
     </div>
   );
 }

@@ -52,7 +52,7 @@ describe("/batches", () => {
     render(<BatchesPage />);
 
     const link = await screen.findByRole("link", { name: "Class 10 Maths" });
-    expect(link).toHaveAttribute("href", "/batches/edit?id=b1");
+    expect(link).toHaveAttribute("href", "/batches/view?id=b1");
     const cells = within(row("Class 10 Maths"));
     expect(cells.getByText("Mathematics")).toBeVisible();
     expect(cells.getByText("Mon · Wed · Fri")).toBeVisible();

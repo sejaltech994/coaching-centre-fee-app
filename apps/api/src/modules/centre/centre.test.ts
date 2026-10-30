@@ -10,7 +10,7 @@ describe("GET /centre", () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
-      centre: { id: body.centre.id, name: "Sunrise Classes", plan: "free", timezone: "Asia/Kolkata" },
+      centre: { id: body.centre.id, name: "Sunrise Classes", plan: "free", timezone: "Asia/Kolkata", deletesAt: null },
     });
   });
 
@@ -73,6 +73,7 @@ describe("PATCH /centre", () => {
         centreType: "tuition",
         plan: "free",
         timezone: "Asia/Kolkata",
+        deletesAt: null,
       },
     });
     expect((await (await call("GET", "/me", { token: body.accessToken })).json()).centre.name).toBe("Sunrise Academy");

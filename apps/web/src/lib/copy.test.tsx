@@ -37,29 +37,6 @@ describe("errorMessage", () => {
     expect(errorMessage(new ApiRequestError(400, code, "x"))).toBe(text);
   });
 
-  it.each([
-    [1, "That code didn’t match. 1 try left."],
-    [3, "That code didn’t match. 3 tries left."],
-  ])("says how many tries a wrong code leaves (%i)", (attemptsLeft, text) => {
-    expect(errorMessage(new ApiRequestError(400, "invalid_otp", "x", { attemptsLeft }))).toBe(text);
-  });
-
-  it.each([
-    ["too_many_attempts", "Too many wrong codes. Request a new one."],
-    ["otp_expired", "This code has expired. Request a new one."],
-    ["rate_limited", "Too many codes requested. Try again later."],
-    ["sms_unavailable", "We couldn't send the SMS. Try again in a moment."],
-    ["phone_taken", "Another Chukta account has confirmed this number. Use a different one."],
-  ])("uses the editable text for %s", (code, text) => {
-    expect(errorMessage(new ApiRequestError(400, code, "x"))).toBe(text);
-  });
-
-  it("says how long to wait before a new code", () => {
-    expect(errorMessage(new ApiRequestError(429, "otp_resend_too_soon", "x", { retryAfterSeconds: 12 }))).toBe(
-      "Wait 12 seconds before asking for a new code.",
-    );
-  });
-
   it("shows the server's own message for codes the copy doesn't cover", () => {
     expect(errorMessage(new ApiRequestError(400, "something_new", "Server says no."))).toBe("Server says no.");
   });
