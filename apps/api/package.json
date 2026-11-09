@@ -15,18 +15,18 @@
     "@chukta/db": "*",
     "@chukta/integrations": "*",
     "@chukta/shared": "*",
-    "@hono/node-server": "2.1.4",
+    "@hono/node-server": "2.1.6",
     "drizzle-orm": "0.45.4",
-    "hono": "4.13.13",
-    "jose": "6.2.12",
+    "hono": "4.13.16",
+    "jose": "6.2.15",
     "pdf-lib": "1.17.1",
-    "zod": "4.6.6"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/node": "^22",
-    "@vitest/coverage-v8": "5.0.3",
+    "@vitest/coverage-v8": "5.1.0",
     "tsx": "4.23.15",
     "typescript": "7.0.2",
-    "vitest": "5.0.3"
+    "vitest": "5.1.0"
   }
 }
